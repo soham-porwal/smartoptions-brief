@@ -1,0 +1,85 @@
+name: Refresh quotes
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Covers both DST variants and one close sweep. Job checks the ET clock.
+    - cron: '*/8 13-21 * * 1-5'
+    # Outside regular hours the job only checks the clock after its close sweep.
+    - cron: '17 0-12,22-23 * * 1-5'
+    - cron: '17 * * 0,6'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: quotes-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.repository == 'soham-porwal/smartoptions-brief' || github.repository == 'samsej/sp500-screener-dashboard'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install quote dependencies
+        run: python -m pip install 'yfinance>=0.2.65,<2' 'requests>=2.32,<3'
+      - name: Refresh (previous quotes preserved on total failure)
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+          QUOTE_WATCHLIST: ${{ vars.QUOTE_WATCHLIST }}
+        run: |
+          mkdir -p logs
+          python scripts/gh_quotes_refresh.py --core data/core.json --out data/quotes.json > logs/refresh.txt 2>&1
+      - name: Commit only changed quotes
+        shell: bash
+        run: |
+          git add -- data/quotes.json
+          if git diff --cached --quiet -- data/quotes.json; then
+            echo 'quotes.json unchanged'
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Refresh timestamped quotes' -- data/quotes.json
+          git push origin HEAD:main
+      # GITHUB_TOKEN commits do not trigger a branch-based Pages build. Deploy
+      # explicitly so the newly committed quotes also reach the public site.
+      - uses: actions/configure-pages@v5
+      - name: Prepare committed public files
+        run: |
+          mkdir -p _site
+          git archive HEAD | tar -x -C _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy updated Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Record status in run summary
+        if: always()
+        shell: bash
+        run: |
+          echo '### Quotes refresh' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f logs/quotes-status.json ]; then
+            cat logs/quotes-status.json >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'FAIL: refresh did not produce a status receipt; previous quotes remain.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quotes-refresh-${{ github.run_id }}
+          path: logs/
+          retention-days: 14

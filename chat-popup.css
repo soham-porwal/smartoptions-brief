@@ -51,6 +51,13 @@
 .cp-in textarea { flex: 1; min-height: 44px; resize: none; font: inherit; font-size: 15px; padding: 11px 12px; border: 1px solid var(--b-line-2); border-radius: 12px; background: var(--b-card); color: var(--b-ink); }
 .cp-send { min-height: 44px; padding: 0 16px !important; border-radius: var(--b-r-pill) !important; background: var(--b-ink) !important; color: var(--b-card) !important; font-weight: 600; }
 .cp-disc { margin: 0; padding: 4px 20px 12px; font-size: 12px; color: var(--b-ink-3); }
+.cp-in textarea { min-width: 0; }
+.cp-follow { display: flex; flex-wrap: wrap; gap: 6px; }
+.cp-follow button, .cp-simple, .cp-cancel, .cp-context { min-height: 44px; padding: 8px 12px !important; border: 1px solid var(--b-line-2) !important; border-radius: 16px !important; font: inherit; font-size: 13px; background: var(--b-card); color: var(--b-ink); cursor: pointer; }
+.cp-context { margin: 8px 12px; }
+.cp-load-error { position: fixed; bottom: 16px; right: 16px; z-index: 100; background: var(--b-card); padding: 12px; }
+.cp-key[hidden], .cp-cancel[hidden] { display: none !important; }
+.cp-chips button, .cp-prov button { min-height: 44px; }
 @media (max-width: 560px) {
   .cp-fab { right: 16px; bottom: 16px; }
   .cp { right: 8px; left: 8px; bottom: 82px; width: auto; max-height: calc(100vh - 140px); }

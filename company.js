@@ -36,6 +36,7 @@ function fmtMetric(m) {
   if (u === 'x') return v.toFixed(2) + 'x';
   if (u === 'USD') return (v < 0 ? '−$' : '$') + big(Math.abs(v));
   if (/^USD\/share$/i.test(u)) return '$' + v.toFixed(2);
+  if (Math.abs(v) >= 1e6 && !/revision|count|dimension/i.test(u)) return big(v) + (u ? ' ' + u : '');
   if (Number.isInteger(v) || /revision|count|dimension/i.test(u)) return Math.round(v) + (u ? ' ' + u : '');
   return (Math.abs(v) >= 1e6 ? big(v) : String(+v.toFixed(2))) + (u ? ' ' + u : '');
 }
@@ -45,7 +46,7 @@ function headline(card, key) {
   const m = (card.metrics || []).find(x => fmtMetric(x) != null && x.unit !== 'date');
   if (!m) return null;
   const u = String(m.unit || ''), plain = isNum(m.value) && u && !/^(%|pp|x|USD|USD\/share)$/i.test(u);
-  return {label: m.label, value: plain ? String(Math.round(m.value * 100) / 100) : fmtMetric(m), period: m.period || ''};
+  return {label: m.label, value: plain && Math.abs(m.value) < 1e6 ? String(Math.round(m.value * 100) / 100) : fmtMetric(m), period: m.period || ''};
 }
 function safeURL(u) { return /^https:\/\/[^\s"'<>]+$/i.test(String(u || '')) ? String(u) : null; }
 const toneOf = s => TONE[s] || 'none';
@@ -58,6 +59,7 @@ function tally(doc) {
 
 /* ---------- browser ---------- */
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
+const impact = () => root.SmartOptionsImpact;
 const reduced = () => !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const cap1 = s => { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
 function chip(status) { const t = toneOf(status); return `<span class="b-chip sm t-${t}">${ICON[t]}${esc(cap1(status || 'unavailable'))}</span>`; }
@@ -70,7 +72,7 @@ function metricTable(metrics) {
   if (!ms.length) return '<p class="co-na">No measured inputs were attached to this line.</p>';
   return `<table class="co-mt"><thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">Period</th><th scope="col">Source</th></tr></thead><tbody>${ms.map(m => {
     const v = fmtMetric(m), u = safeURL(m.source_url);
-    return `<tr><td>${esc(m.label)}${m.note ? `<span class="co-mnote">${esc(m.note)}</span>` : ''}</td>
+    return `<tr><td>${impact() ? impact().term(m.label) : esc(m.label)}${m.note ? `<span class="co-mnote">${esc(m.note)}</span>` : ''}</td>
       <td class="v">${v == null ? '<span class="co-na">Not available</span>' : esc(v)}</td>
       <td>${esc(m.period || '')}${m.asof && String(m.asof).slice(0, 10) !== m.period ? `<span class="co-mnote" title="${esc(m.asof)}">retrieved ${esc(String(m.asof).slice(0, 10))}</span>` : ''}</td>
       <td>${u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(m.source || 'Source')}</a>` : esc(m.source || 'Source not stated')}</td></tr>`;
@@ -84,6 +86,7 @@ function cardHtml(key, label, gloss, card, i) {
       <header class="co-ch"><h3 id="${id}-h" title="${esc(gloss)}">${esc(label)}</h3>${chip(st)}</header>
       ${hl ? `<p class="co-hl"><b>${esc(hl.value)}</b><span>${esc(hl.label)}${hl.period ? ', ' + esc(hl.period) : ''}</span></p>` : ''}
       <p class="co-line">${esc(c.line || 'Not available')}</p>
+      ${impact() ? impact().drivenBy(impact().drivers([{status: st, metrics: c.metrics}]), {max: 3}) : ''}
       <footer class="co-cf">${pips(st)}<button type="button" class="co-flip" aria-expanded="false" aria-controls="${id}-b">Numbers</button></footer>
     </div>
     <div class="co-face co-back" id="${id}-b" hidden>
@@ -172,6 +175,7 @@ function mount(el, ticker, opts) {
       </header>
       ${d ? `<div class="co-grid">${CARDS.map(([k, l, g], i) => cardHtml(k, l, g, d.cards && d.cards[k], i + 1)).join('')}</div>`
         : `<section class="co-row b-card co-off" role="status"><h2>Assessment</h2><p class="co-na">Not available: no company file for ${esc(t)} in this build (${esc(res.err && res.err.message || 'missing')}). Price and chart below still use live data.</p></section>`}
+      ${impact() ? lineRow('co-sens', 'Macro sensitivities', {line: 'Historical associations over matched daily returns; these are conditional estimates, not forecasts.', metrics: impact().sensMetrics(impact().sensitivities(row, root.SO2 && root.SO2.D && root.SO2.D().macro))}, impact().sensHtml(impact().sensitivities(row, root.SO2 && root.SO2.D && root.SO2.D().macro))) : ''}
       <section class="co-chartbox b-card co-in" style="--i:8" aria-labelledby="co-ch-h"><h2 id="co-ch-h">Chart</h2><div class="co-chart"></div></section>
       ${d ? lineRow('co-tech', 'Technical setup', d.technical) : ''}
       ${d ? lineRow('co-ev', 'Event risk', {line: d.events && d.events.line, metrics: [].concat(...((d.events && d.events.items) || []).map(x => x.metrics || []))}) : ''}
@@ -179,6 +183,7 @@ function mount(el, ticker, opts) {
         `<a class="co-strat" href="#/research/markets?t=${encodeURIComponent(t)}" data-strat="${esc(t)}">Open strategies for ${esc(t)}</a>`)}`;
     el.querySelectorAll('.co-grid .co-card, .co-row').forEach((n, i) => { n.classList.add('co-in'); n.style.setProperty('--i', String(i + 1)); });
     if (!reduced()) countUp(el.querySelector('.co-price'));
+    if (impact() && impact().flushPending) impact().flushPending();
     const chartEl = el.querySelector('.co-chart');
     const evs = d && d.events && d.events.items ? d.events.items.filter(x => x.when_et).map(x => ({date: String(x.when_et).slice(0, 10), kind: x.kind || 'earnings', label: x.kind === 'earnings' ? 'Next earnings' : x.title, source: (x.metrics && x.metrics[0] && x.metrics[0].note) || ''})) : [];
     if (FC && FC.mount) FC.mount(chartEl, t, {events: evs}).then(h => { if (st.alive) st.chart = h; else if (h && h.destroy) h.destroy(); }).catch(e => { chartEl.innerHTML = `<p class="co-na" role="alert">Chart not available: ${esc(e && e.message || e)}</p>`; });
@@ -204,9 +209,7 @@ function fmtET(ts) {
 }
 function countUp(node) {
   const v = node && parseFloat(node.dataset.v); if (!isNum(v)) return;
-  const t0 = performance.now(), dur = 600;
-  const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); node.textContent = '$' + (v * e).toFixed(2); if (k < 1) requestAnimationFrame(step); else node.textContent = '$' + v.toFixed(2); };
-  requestAnimationFrame(step);
+  if (node.animate) node.animate([{opacity: 0.4, transform: 'translateY(4px)'}, {opacity: 1, transform: 'translateY(0)'}], {duration: 220, easing: 'ease-out'});
 }
 
 const API = {CARDS, TONE, fmtMetric, headline, tally, safeURL, mount};

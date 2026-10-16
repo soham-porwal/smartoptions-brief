@@ -1,0 +1,43 @@
+/* Category identity and measured impact have distinct, accessible visual channels. */
+.imp-tag { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border: 1px solid var(--b-line) !important; border-left: 3px solid var(--ic) !important; border-radius: 6px !important; padding: 5px 7px !important; color: var(--b-ink-2); background: var(--b-card-2) !important; font-size: 12px !important; line-height: 1.4; text-align: left; }
+button.imp-tag { min-height: 44px; cursor: pointer; }
+.imp-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--ic); }
+.imp-cl { color: var(--ic); font-weight: 600; }
+.imp-mk, .imp-u { display: inline-flex; align-items: center; gap: 3px; }
+.imp-mk { border-bottom: 2px solid currentColor; }
+.imp-mk b, .imp-u b, .imp-tr b { font-size: 9px; font-weight: 400; }
+.im-helps .imp-mk, .imp-u.im-helps { color: var(--b-good); }
+.im-hurts .imp-mk, .imp-u.im-hurts { color: var(--b-bad); }
+.im-mixed .imp-mk, .imp-u.im-mixed { color: var(--b-mixed); border-bottom-style: double; }
+.im-none .imp-mk, .imp-u.im-none, .im-neutral .imp-mk, .imp-u.im-neutral { color: var(--b-none); border-bottom-style: dotted; }
+.imp-u { border-bottom: 2px solid currentColor; }
+.imp-by { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 9px; margin-top: 12px; min-width: 0; }
+.imp-by-k { color: var(--b-ink-3); font-size: 12px; }
+.imp-by-v { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.imp-tr { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--b-line-2); border-radius: 5px; padding: 3px 6px; color: var(--b-ink-2); font-size: 12px; white-space: nowrap; }
+.imp-term { text-decoration: underline dotted var(--b-ink-3); text-underline-offset: 3px; cursor: help; }
+.imp-tip { position: fixed; z-index: 160; padding: 10px 12px; border-radius: 8px; color: var(--b-ink); background: var(--b-card); border: 1px solid var(--b-line-2); box-shadow: var(--b-e3); font: 14px/1.5 var(--b-font); overflow-wrap: anywhere; pointer-events: none; }
+.imp-tip[hidden], .imp-key[hidden] { display: none; }
+.imp-key { position: absolute; z-index: 150; max-height: min(75dvh, 720px); overflow: auto; padding: 20px; background: var(--b-card); color: var(--b-ink); border: 1px solid var(--b-line-2); border-radius: 14px; box-shadow: var(--b-e3); font: 14px/1.5 var(--b-font); }
+.imp-key h3 { margin: 0 0 12px; } .imp-key h4 { margin: 20px 0 10px; }
+.imp-key p { color: var(--b-ink-2); }
+.imp-key ul { list-style: none; padding: 0; display: grid; gap: 12px; }
+.imp-key li { display: grid; gap: 5px; }
+.imp-keybtn, .imp-key-x { min-height: 44px; padding: 0 12px !important; border: 1px solid var(--b-line-2) !important; border-radius: 24px !important; color: var(--b-ink-2); font: 13px var(--b-font); background: var(--b-card); cursor: pointer; }
+.imp-key-x { width: 100%; margin-top: 12px; }
+.imp-sens { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.imp-sens-i { min-width: 0; padding: 14px; background: var(--b-card-2); border: 1px solid var(--b-line); border-radius: 10px; }
+.imp-sens-h, .imp-sens-f { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.imp-sens-n { display: none; } .imp-sens-l { font-size: 14px; color: var(--b-ink-2); }
+.imp-sens-f { font-size: 12px; } .imp-str { color: var(--b-ink-3); }
+.imp-note { color: var(--b-ink-2); font-size: 14px; }
+.imp-hl { outline: 2px solid var(--b-focus); outline-offset: 5px; transition: outline-offset 200ms ease; }
+.b-tile .b-line { flex: 1; } .b-tile .b-tile-ft { margin-top: auto; padding-top: 12px; }
+.b-risk[hidden] { display: none; }
+.bv-wrap, .b-sec, .b-names, .b-name { min-width: 0; }
+.b-name-hd > div { min-width: 0; } .b-name-hd h3 { overflow-wrap: anywhere; }
+.co-hl b { overflow-wrap: anywhere; }
+.co-flip, .so-fv .fv-tf button { min-height: 44px; }
+@media (max-width: 820px) { .imp-sens { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .imp-sens { grid-template-columns: 1fr; } .b-tile .imp-by-v { gap: 5px; } }
+@media (prefers-reduced-motion: reduce) { .imp-hl { transition: none; } }

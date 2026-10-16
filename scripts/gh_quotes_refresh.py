@@ -19,12 +19,14 @@ import re
 import sys
 import threading
 import time
+import statistics
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 ET = ZoneInfo("America/New_York")
 TAPE = ("SPY", "RSP", "^VIX", "^VIX3M", "DX-Y.NYB", "CL=F", "BZ=F", "HG=F", "^TNX")
-FINNHUB_SPACING = 1.22  # <=50 starts per rolling minute; four bounded workers.
+FINNHUB_SPACING = 1.22  # <=50 starts per rolling minute; no burst.
+QUOTE_INTERVAL_SECONDS = 450
 DEFAULT_SECRETS = Path(r"D:\soham\myeverything\Secrets")
 
 
@@ -89,25 +91,35 @@ def universe(core):
 
 
 def priority_plan(rows, previous, shortlist=(), watchlist=(), now=None):
-    """100 largest + watchlist/shortlist every cycle; remaining Finnhub hourly.
-
-    At most 190 names per cycle (~231 s dispatch + HTTP deadline), leaving room
-    for bounded Yahoo fallback. Larger watchlists rotate explicitly, never hidden.
-    """
+    """One due quote per symbol, watchlist -> shortlist -> top 100 -> remainder."""
     now = now or datetime.now(timezone.utc)
     top = sorted(rows, key=lambda t: finite(rows[t].get("mcap")) or 0, reverse=True)[:100]
     first = list(dict.fromkeys([*watchlist, *shortlist, *top, "SPY", "RSP"]))
     first = [t for t in first if (t in rows or t in {"SPY", "RSP"}) and re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", t)]
-    remaining = []
-    for t in rows:
-        if t in first or not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", t):
-            continue
-        last = stamp(previous.get(t, {}).get("realtime_checked_at"))
-        if not last or now - last >= timedelta(hours=1):
-            remaining.append(t)
-    # Oldest first; over several five-minute cycles the hourly remainder rotates.
-    remaining.sort(key=lambda t: previous.get(t, {}).get("realtime_checked_at") or "")
-    return (first + remaining)[:190], max(0, len(first) - 190)
+    remaining = [t for t in rows if t not in first and re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", t)]
+    remaining.sort(key=lambda t: previous.get(t, {}).get("asof_utc") or "")
+    def due(t, index):
+        last = stamp(previous.get(t, {}).get("retrieved_at"))
+        # Include the dispatch offset: a 7.5m sweep must not make its tail
+        # wait an extra full cycle merely because it was sampled last.
+        return not last or (now - last).total_seconds() + index * FINNHUB_SPACING >= QUOTE_INTERVAL_SECONDS
+    selected = []
+    for t in first + remaining:
+        if due(t, len(selected)):
+            selected.append(t)
+    return selected, 0
+
+
+class TokenBucket:
+    """Capacity one: no startup burst; at most 50 starts/minute with headroom."""
+    def __init__(self, spacing=FINNHUB_SPACING):
+        self.spacing, self.next_start = spacing, 0.0
+        self.lock = threading.Lock()
+
+    def take(self):
+        with self.lock:
+            time.sleep(max(0, self.next_start - time.monotonic()))
+            self.next_start = time.monotonic() + self.spacing
 
 
 def record(symbol, price, prior, observed, now, provider, delay, source_url, *, volume=None, volume_period=None, prior_date=None):
@@ -144,9 +156,13 @@ def finnhub_one(symbol, key, now, get=None):
     # Header authentication keeps the secret out of exception URLs.
     response = get("https://finnhub.io/api/v1/quote", params={"symbol": symbol.replace("-", ".")},
                    headers={"X-Finnhub-Token": key}, timeout=(4, 8), allow_redirects=False)
+    if response.status_code in (401, 403):
+        return None, "key rejected by provider"
     if response.status_code != 200:
         return None, f"HTTP {response.status_code}"
     data = response.json()
+    if "invalid api key" in str(data.get("error", "")).lower():
+        return None, "key rejected by provider"
     try:
         observed = datetime.fromtimestamp(float(data["t"]), timezone.utc)
         if float(data["t"]) <= 0:
@@ -162,35 +178,26 @@ def finnhub_one(symbol, key, now, get=None):
 
 def finnhub_batch(symbols, key, now, get=None, spacing=FINNHUB_SPACING):
     found, errors, checked = {}, {}, []
-    lock, stop = threading.Lock(), threading.Event()
+    bucket = TokenBucket(spacing)
     started = time.monotonic()
-    next_start = started
-    def job(t):
-        nonlocal next_start
-        with lock:
-            if stop.is_set():
-                return None, "Provider rate/authentication limit; remaining calls skipped", False
-            time.sleep(max(0, next_start - time.monotonic()))
-            next_start = time.monotonic() + spacing
+    stopped = False
+    for t in dict.fromkeys(symbols):
+        if stopped:
+            errors[t] = "Provider rate/authentication limit; remaining calls skipped"
+            continue
+        bucket.take()
         observed_now = now + timedelta(seconds=time.monotonic() - started)
         try:
-            quote, error = finnhub_one(t, key, observed_now, get)
-            if error in {"HTTP 429", "HTTP 401", "HTTP 403"}:
-                stop.set()
-            return quote, error, True
+            value, error = finnhub_one(t, key, observed_now, get)
+            if error in {"HTTP 429", "key rejected by provider"}:
+                stopped = True
         except Exception:
-            return None, "Request failed (details withheld to protect credentials)", True
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        pending = {pool.submit(job, t): t for t in symbols}
-        for future in as_completed(pending):
-            t = pending[future]
-            q, error, attempted = future.result()
-            if attempted:
-                checked.append(t)
-            if q is not None:
-                found[t] = q
-            if error:
-                errors[t] = error
+            value, error = None, "Request failed (details withheld to protect credentials)"
+        checked.append(t)
+        if value is not None:
+            found[t] = value
+        if error:
+            errors[t] = error
     return found, errors, checked
 
 
@@ -313,24 +320,35 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
     keys = keys if keys is not None else {n: secret(n) for n in ("FINNHUB_API_KEY", "APCA_API_KEY_ID", "APCA_API_SECRET_KEY")}
     quotes, errors, checked = {}, {}, []
     plan, overflow = priority_plan(rows, old, shortlist, watchlist, now)
-    if keys.get("FINNHUB_API_KEY"):
-        quotes, errors, checked = finnhub(plan, keys["FINNHUB_API_KEY"], now)
-    needed = [t for t in symbols if t not in quotes]
-    # Keep recent Finnhub quotes for the hourly remainder; their original timestamp
-    # remains visible, and they are never promoted to fresh by this job.
-    for t in needed[:]:
+    local = now.astimezone(ET)
+    session_date = local.date().isoformat()
+    last_close = (previous or {}).get("refresh", {}).get("close_sweep_session")
+    close_due = local.weekday() < 5 and local.hour >= 16 and last_close != session_date
+    clock_only = bool(old) and market_state(now) != "regular" and not close_due
+    if close_due:
+        plan, _ = priority_plan(rows, {}, shortlist, watchlist, now)
+    if clock_only:
+        plan = []
+    for t in symbols:
         prev = old.get(t, {})
-        seen = stamp(prev.get("asof_utc") or prev.get("ts"))
-        last_check = stamp(prev.get("realtime_checked_at"))
-        if t not in plan and keys.get("FINNHUB_API_KEY") and last_check and now - last_check < timedelta(hours=1) and seen and finite(prev.get("price"), True) is not None:
-            quotes[t] = {**prev, "retained": True, "status": "stale", "freshness": "closed" if market_state(now, seen) == "closed" else "stale", "market_state": market_state(now, seen), "reason": "Hourly remainder; original provider timestamp retained"}
-            needed.remove(t)
+        retrieved = stamp(prev.get("retrieved_at"))
+        interval = QUOTE_INTERVAL_SECONDS if prev.get("delay_minutes") == 0 else 900
+        if finite(prev.get("price"), True) is not None and (clock_only or (not close_due and retrieved and (now - retrieved).total_seconds() < interval and (not keys.get("FINNHUB_API_KEY") or t not in plan))):
+            quotes[t] = {**prev, "cached": True}
+    plan = [t for t in plan if t not in quotes]
+    if keys.get("FINNHUB_API_KEY"):
+        if plan:
+            more, errors, checked = finnhub(plan, keys["FINNHUB_API_KEY"], now)
+            quotes.update(more)
+    needed = [t for t in symbols if t not in quotes]
+    if clock_only:
+        needed = []  # Hourly off-hours checks never refetch missing symbols either.
     if needed and keys.get("APCA_API_KEY_ID") and keys.get("APCA_API_SECRET_KEY"):
         eligible = [t for t in needed if re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", t)]
         more, issues = alpaca(eligible, keys["APCA_API_KEY_ID"], keys["APCA_API_SECRET_KEY"], now)
         quotes.update(more)
         errors.update({t: errors.get(t, "") + "; " + v for t, v in issues.items()})
-    needed = [t for t in symbols if t not in quotes]
+    needed = [] if clock_only else [t for t in symbols if t not in quotes]
     if needed:
         try:
             quotes.update(yahoo(needed, now + timedelta(seconds=time.monotonic() - started)))
@@ -348,7 +366,7 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
                 quotes[t] = {"price": None, "chg_pct": None, "change": None, "change_pct": None, "volume": None,
                              "provider": None, "delay_minutes": None, "asof_utc": None, "ts": None,
                              "status": "missing", "freshness": "missing", "market_state": "closed", "series": t,
-                             "reason": "No provider returned a valid timestamped price"}
+                             "reason": "Outside regular hours; awaiting next scheduled sweep" if clock_only else "No provider returned a valid timestamped price"}
         if t in checked:
             quotes[t]["realtime_checked_at"] = utc(now)
         elif old.get(t, {}).get("realtime_checked_at"):
@@ -362,6 +380,7 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
         current.setdefault("change", None)
         current.setdefault("change_pct", current.get("chg_pct"))
         current.setdefault("volume", None)
+        current["asof_et_label"] = ("as of " + observed.astimezone(ET).strftime("%I:%M %p").lstrip("0") + " ET") if observed else "Not available: provider timestamp missing"
         if current.get("price") is not None and observed:
             state = market_state(finished_at, observed)
             age = max(0, (finished_at - observed).total_seconds() / 60)
@@ -373,17 +392,37 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
         if t in errors:
             quotes[t]["provider_warning"] = errors[t]
     served = Counter(q.get("provider") or "missing" for q in quotes.values())
-    fresh_count = sum(q.get("price") is not None and not q.get("retained") for q in quotes.values())
+    fresh_count = sum(q.get("price") is not None and not q.get("retained") and not q.get("cached") for q in quotes.values())
     success = sum(q.get("price") is not None for q in quotes.values())
+    rejected = "key rejected by provider" in errors.values()
+    prior_source = (previous or {}).get("health", {}).get("sources", [{}])[0]
+    fh_note = "key rejected by provider" if rejected else "key missing" if not keys.get("FINNHUB_API_KEY") else "configured; no request due" if not checked else "quotes received" if any("Finnhub" in str(q.get("provider")) for q in quotes.values()) else "provider unavailable"
+    old_rejection = prior_source.get("note") == "key rejected by provider" or any(q.get("provider_warning") in ("HTTP 401", "HTTP 403", "key rejected by provider") for q in old.values())
+    if not checked and keys.get("FINNHUB_API_KEY") and old_rejection:
+        fh_note = "key rejected by provider"
+    ages = [(finished_at - stamp(q.get("asof_utc"))).total_seconds() / 60 for q in quotes.values() if q.get("price") is not None and stamp(q.get("asof_utc"))]
+    eligible_count = sum(bool(re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", t)) for t in symbols)
+    sweep_minutes = round(max(QUOTE_INTERVAL_SECONDS, max(0, eligible_count - 1) * FINNHUB_SPACING) / 60, 1)
+    mix = f"real-time quotes from Finnhub, about {int(sweep_minutes)} minutes apart" if any("Finnhub" in str(q.get("provider")) for q in quotes.values()) else "Yahoo, about 15 minutes delayed" if any("Yahoo" in str(q.get("provider")) for q in quotes.values()) else "Quote provider not available"
+    median_age, oldest_age = (round(max(0, statistics.median(ages)), 1), round(max(0, max(ages)), 1)) if ages else (None, None)
+    health = {"line": mix + (f"; median age {median_age}m, oldest {oldest_age}m" if ages else ""),
+              "median_age_minutes": median_age, "oldest_age_minutes": oldest_age, "provider_mix": dict(served),
+              "estimated_sweep_minutes": sweep_minutes, "cadence_basis": "450s minimum interval or universe dispatch time at 1.22s/start; excludes slow responses",
+              "sources": [{"id": "finnhub", "status": "rejected" if fh_note == "key rejected by provider" else "missing" if not keys.get("FINNHUB_API_KEY") else "configured", "note": fh_note}]}
+    if fh_note in ("key rejected by provider", "key missing"):
+        health["line"] += "; Finnhub: " + fh_note
     return {"generated_at": utc(finished_at), "session": market_state(finished_at, stamp(quotes.get("SPY", {}).get("ts"))),
+            "health": health,
             "source": "Per-quote provider chain: Finnhub, Alpaca IEX, delayed Yahoo",
             "quotes": quotes, "session_method": "ET weekday clock; prior-date prices close holidays/data absences; no early-close calendar",
-            "refresh": {"status": "OK" if fresh_count == len(symbols) and not errors else "WARN" if fresh_count else "FAIL",
+            "refresh": {"status": "OK" if fresh_count == len(symbols) and not errors else "WARN" if success else "FAIL",
                         "requested": len(symbols), "available": success, "received": fresh_count,
+                        "cached": sum(bool(q.get("cached")) for q in quotes.values()), "clock_only": clock_only,
+                        "close_sweep_session": session_date if close_due and fresh_count else last_close,
                         "retained": sum(bool(q.get("retained")) for q in quotes.values()),
                         "elapsed_seconds": round(time.monotonic() - started, 3), "providers": dict(served),
                         "finnhub_checked": len(checked), "priority_overflow": overflow,
-                        "plan": "Top 100 + shortlist + configured watchlist each cycle; rest hourly; maximum 190 Finnhub calls/cycle",
+                        "plan": "Watchlist, shortlist, top 100, remainder; 450s real-time interval, 900s Yahoo; 50 starts/minute",
                         "warnings": ["Provider display/redistribution rights must be approved before client publication"]}}
 
 
@@ -416,8 +455,17 @@ def main(argv=None):
     parser.add_argument("--out", type=Path, default=Path("data/quotes.json"))
     parser.add_argument("--status", type=Path, default=Path("logs/quotes-status.json"))
     parser.add_argument("--watchlist", default=os.environ.get("QUOTE_WATCHLIST", ""))
+    parser.add_argument("--check-key", action="store_true", help="Check Finnhub authentication without revealing credentials")
     args = parser.parse_args(argv)
     try:
+        if args.check_key:
+            key = secret("FINNHUB_API_KEY")
+            if not key:
+                print("Finnhub: missing")
+                return 2
+            result, error = finnhub_one("SPY", key, datetime.now(timezone.utc))
+            print("Finnhub: valid" if result else "Finnhub: invalid (key rejected by provider)" if error == "key rejected by provider" else "Finnhub: unverified (provider unavailable)")
+            return 0 if result else 2 if error == "key rejected by provider" else 1
         core = optional_json(args.core)
         previous = optional_json(args.out)
         brief = optional_json(args.core.parent / "brief.json")
@@ -427,7 +475,7 @@ def main(argv=None):
         watchlist += [t for t in config.get("quotes", {}).get("watchlist", []) if isinstance(t, str)]
         result = refresh(core, previous, shortlist=shortlist, watchlist=watchlist)
         status = {**result["refresh"], "at": utc()}
-        if not status["received"]:
+        if not status["received"] and not status.get("cached") and not status.get("clock_only"):
             # Even a retained-only snapshot does not replace the previous file.
             raise RuntimeError("No new prices returned; previous quotes.json preserved")
         atomic_json(args.status, status)

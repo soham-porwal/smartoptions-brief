@@ -104,6 +104,13 @@ function sectorStats(rows, quotes, period) {
 const fmtPct = p => isNum(p) ? (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p).toFixed(2) + '%' : 'Not available';
 const fmtCap = v => !isNum(v) ? 'Not available' : v >= 1e12 ? '$' + (v / 1e12).toFixed(2) + 'T' : v >= 1e9 ? '$' + (v / 1e9).toFixed(1) + 'B' : '$' + (v / 1e6).toFixed(0) + 'M';
 const fmtPx = v => isNum(v) ? '$' + v.toFixed(2) : 'Not available';
+function memberRows(core) {
+  const rows = core.rows || [], symbols = core.meta && core.meta.constituents && core.meta.constituents.symbols;
+  const membershipKnown = rows.some(r => typeof r.sp500_member === 'boolean');
+  const members = Array.isArray(symbols) ? new Set(symbols) : null;
+  return rows.filter(r => r && r.t && isNum(r.mcap) && r.mcap > 0 &&
+    (membershipKnown ? r.sp500_member === true : members ? members.has(r.t) : true));
+}
 
 /* ---------- browser ---------- */
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
@@ -209,13 +216,13 @@ function mount(el, opts) {
   function renderLegend() {
     const P = PERIODS[st.period], stops = PALETTES[st.pal];
     const n = st.rows.length, total = st.core && st.core.meta && st.core.meta.counts && st.core.meta.counts.constituents;
-    const live = st.period === '1D' ? Object.values(st.quotes).filter(q => q && q.status === 'ok').length : 0;
+    const live = st.period === '1D' ? st.rows.filter(r => changeOf(r, st.quotes[r.t], st.period).src === 'quote').length : 0;
     const steps = [-3, -2, -1, 0, 1, 2, 3].map(k => (k * P.cap / 3));
     el.querySelector('.hm-legend').innerHTML = `
       <div class="hm-scale" aria-label="Color scale">${stops.map((c, i) => `<span style="background:${c}">${(steps[i] > 0 ? '+' : steps[i] < 0 ? '−' : '') + Math.abs(steps[i]) + '%'}</span>`).join('')}</div>
       <label class="hm-cb"><input type="checkbox" ${st.pal === 'cb' ? 'checked' : ''}> Colorblind-safe colors</label>
       <p class="hm-note">Tile size is market cap. Color is % change over ${esc(P.label)}${st.period === '1D' ? '' : ', from adjusted closes'}.
-        ${total ? `${n} of ${total} S&amp;P 500 names have data in this build; the other ${total - n} are not shown.` : ''}
+        ${total ? `${n} of ${total} S&amp;P 500 names have data in this build; ${Math.max(0, total - n)} are not shown.` : ''}
         Prices: ${esc(st.qmeta.source || 'Yahoo Finance via yfinance')}${st.period === '1D' ? `; ${live} names updated from the quote feed, the rest from the ${esc(st.core && st.core.asof_session || '')} close` : `; session ${esc(st.core && st.core.asof_session || '')}`}.</p>`;
   }
   function applyHighlight() {
@@ -232,6 +239,7 @@ function mount(el, opts) {
       <div class="hm-tip-row"><span>Change, ${esc(st.period)}</span><b class="${isNum(c.pct) ? (c.pct >= 0 ? 'up' : 'dn') : ''}">${esc(fmtPct(c.pct))}</b></div>
       <div class="hm-tip-row"><span>Market cap</span><b>${esc(fmtCap(r.mcap))}</b></div>
       <div class="hm-tip-row"><span>Sector</span><b>${esc(r.sec || 'Not available')}</b></div>
+      ${root.SmartOptionsImpact ? root.SmartOptionsImpact.tag('breadth', {what: 'sector participation'}) : ''}
       ${peers.length ? `<div class="hm-tip-peers">${peers.map(p => { const pc = changeOf(p, st.quotes[p.t], st.period); return `<span><i style="background:${colorFor(pc.pct, st.period, st.pal)}"></i>${esc(p.t)} ${esc(fmtPct(pc.pct))}</span>`; }).join('')}</div>` : ''}
       <div class="hm-tip-src">${c.src === 'quote' ? 'Quote ' + esc(fmtET(c.ts)) + ', ' + esc((st.quotes[t] && st.quotes[t].provider) || st.qmeta.source || '') : 'Close ' + esc(c.ts || '') + ', Yahoo Finance via yfinance'}</div>`;
     tip.hidden = false; moveTip(ev);
@@ -287,7 +295,7 @@ function mount(el, opts) {
   const ready = Promise.all([getCore(), getQuotes()]).then(([core, q]) => {
     if (!st.alive) return;
     st.core = core; st.quotes = q.quotes || {}; st.qmeta = q;
-    st.rows = (core.rows || []).filter(r => r && r.t && isNum(r.mcap) && r.mcap > 0);
+    st.rows = memberRows(core);
     st.rows.forEach(r => byT.set(r.t, r));
     render(true); lastW = stage.clientWidth; if (ro) ro.observe(stage); armLive();
     const ms = Math.round(((root.performance && performance.now()) || 0) - t0);
@@ -311,7 +319,7 @@ function fmtET(ts) {
 }
 function clip(s, px, cw) { const n = Math.floor(px / cw); return s.length <= n ? s : n > 3 ? s.slice(0, n - 1) + '…' : ''; }
 
-const API = {fmtET, PERIODS, PALETTES, squarify, layout, colorFor, changeOf, sectorStats, fmtPct, fmtCap, mount};
+const API = {fmtET, PERIODS, PALETTES, squarify, layout, colorFor, changeOf, sectorStats, fmtPct, fmtCap, memberRows, mount};
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 root.SmartOptionsHeatmap = API;
 })(typeof window !== 'undefined' ? window : globalThis);

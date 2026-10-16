@@ -4,9 +4,11 @@
   "quotes": {
     "providers": ["Finnhub US quote", "Alpaca IEX (single exchange)", "Yahoo Finance via yfinance"],
     "default_delay_minutes": 15,
-    "cadence_market_minutes": 5,
+    "cadence_market_minutes": 8,
+    "yahoo_min_interval_minutes": 15,
+    "browser_poll_minutes": 1,
     "cadence_other_minutes": 60,
     "watchlist": [],
-    "note": "Per-quote provider, delay and timestamp determine freshness. Scheduled refresh awaits workflow approval."
+    "note": "GitHub checks approximately every eight minutes during covered market hours. Yahoo observations are delayed about fifteen minutes and refresh at least fifteen minutes apart. GitHub timing may drift; always read each observation timestamp."
   }
 }

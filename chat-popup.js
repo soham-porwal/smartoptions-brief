@@ -79,7 +79,7 @@
 
   /* ---------------------------------------------------------------- DOM */
   const doc = root.document;
-  const ST = {cfg: null, provider: 'local', conv: null, busy: false, open: false, opener: null};
+  const ST = {cfg: null, provider: 'local', conv: null, busy: false, open: false, opener: null, controller:null};
   function store() { try { return root.localStorage; } catch (e) { return null; } }
   function getKey() { const s = store(); return (s && s.getItem(LS_KEY)) || ''; }
   function proxyUrl() { return ST.cfg && typeof ST.cfg.chat_proxy_url === 'string' && /^https:\/\//.test(ST.cfg.chat_proxy_url) ? ST.cfg.chat_proxy_url : ''; }
@@ -104,14 +104,15 @@
         <div class="cp-row"><button type="button" class="cp-save">Save key</button><button type="button" class="cp-forget">Forget key</button></div>
         <p class="cp-small">Kept only in this browser and sent only to api.anthropic.com. Avoid on a shared computer.</p></form>
       <div class="cp-log" aria-live="polite"></div>
-      <div class="cp-chips" aria-label="Quick questions">${PRESETS.map(x => `<button type="button" data-preset="${x.id}">${esc(x.q)}</button>`).join('')}</div>
+      <div class="cp-chips" aria-label="Quick questions">${['pulse','risks','shortlist','breadth','sectors','freshness'].map(id => `<button type="button" data-intent="${id}">${esc(root.SmartOptionsIntents.chipText(id))}</button>`).join('')}</div>
       <form class="cp-in"><textarea rows="1" aria-label="Your question" placeholder="Ask about prices, macro or a company"></textarea><button type="submit" class="cp-send" aria-label="Send">Send</button></form>
-      <p class="cp-disc">Research tool, not advice. Answers cite the data on this site.</p>`;
+      <button type="button" class="cp-cancel" hidden>Cancel</button><p class="cp-disc">Research tool, not advice. Answers cite the data on this site.</p>`;
     doc.body.append(btn, p);
     btn.addEventListener('click', () => toggle());
     p.querySelector('.cp-x').addEventListener('click', () => toggle(false));
     p.querySelector('.cp-prov').addEventListener('click', e => { const b = e.target.closest('[data-prov]'); if (b && !b.disabled) setProvider(b.dataset.prov, true); });
-    p.querySelector('.cp-chips').addEventListener('click', e => { const b = e.target.closest('[data-preset]'); if (b) preset(b.dataset.preset, b.textContent); });
+    p.addEventListener('click', e => { const b=e.target.closest('[data-intent]');if(b)submit(b.textContent,{intent:b.dataset.intent,entities:JSON.parse(b.dataset.entities||'{}')}); });
+    p.querySelector('.cp-cancel').addEventListener('click',()=>ST.controller?.abort());
     p.querySelector('.cp-save').addEventListener('click', () => { const i = p.querySelector('.cp-key input'); const v = i.value.trim(); const s = store(); if (v && s) s.setItem(LS_KEY, v); i.value = ''; renderProv(); });
     p.querySelector('.cp-forget').addEventListener('click', () => { const s = store(); if (s) s.removeItem(LS_KEY); renderProv(); });
     p.querySelector('.cp-in').addEventListener('submit', e => { e.preventDefault(); submit(); });
@@ -131,7 +132,7 @@
     ST.open = open; p.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.classList.toggle('on', open);
     b.setAttribute('aria-label', open ? 'Close chat' : 'Open chat');
     if (open) { renderProv(); if (!p.querySelector('.cp-log').children.length) greet(); p.querySelector('.cp-in textarea').focus(); }
-    else b.focus();
+    else { ST.controller?.abort(); b.focus(); }
   }
   function greet() {
     const log = doc.querySelector('#cp-panel .cp-log');
@@ -156,7 +157,10 @@
     kf.querySelector('.cp-forget').hidden = !key;
     if (ST.provider === 'shared') { note.textContent = 'Questions go to the shared assistant for this site. No key is stored in your browser.'; inp.hidden = false; }
     else if (ST.provider === 'key') { note.textContent = key ? 'Using your saved key.' : 'Paste your Anthropic API key to ask free-form questions.'; inp.hidden = !key; }
-    else { note.textContent = sh ? 'Quick answers come straight from today\'s brief.' : 'The shared assistant is not set up on this site yet. Quick answers below come straight from today\'s brief; add your own key for free-form questions.'; inp.hidden = true; }
+    else { note.textContent = 'Typed questions and chips use dashboard data. No model is needed.'; }
+    inp.hidden = false;
+    if(ST.provider==='shared')note.textContent='Dashboard answer first. Optional rephrasing sends selected public facts to free providers. Google may review them.';
+    if(ST.provider==='key')note.textContent='Dashboard answer first. Optional rephrasing uses your saved key and provider pricing.';
   }
   function turn(q) {
     const log = doc.querySelector('#cp-panel .cp-log');
@@ -173,51 +177,62 @@
     a.innerHTML = answerHTML(answerPreset(id, B ? B.data() : null, watch()));
     const log = doc.querySelector('#cp-panel .cp-log'); log.scrollTop = log.scrollHeight;
   }
-  async function submit() {
-    const p = doc.getElementById('cp-panel'), ta = p.querySelector('.cp-in textarea');
-    const q = ta.value.trim(); if (!q || ST.busy) return;
-    const ch = C();
-    if (!ch || typeof ch.ask !== 'function') { turn(q).innerHTML = '<p class="cp-na">Not available: the chat module did not load.</p>'; return; }
-    const shared = ST.provider === 'shared' && proxyUrl();
-    const key = ST.provider === 'key' ? getKey() : '';
-    if (!shared && !key) { turn(q).innerHTML = '<p class="cp-na">Choose the shared assistant or save your own key first. Quick questions work without either.</p>'; return; }
-    ta.value = ''; ta.style.height = '';
-    const a = turn(q);
-    ST.busy = true; p.classList.add('busy');
-    if (typeof ch.useProxy === 'function') ch.useProxy(shared ? {url: proxyUrl(), model: ST.cfg.chat_proxy_model} : null);
+  function packHTML(r) {
+    const I=root.SmartOptionsIntents;
+    return (r.na ? `<p class="cp-na">${esc(r.na)}</p>` : `<ul class="cp-lines">${r.lines.map(l=>`<li>${esc(l.text)} ${l.refs.map(id=>`<sup class="cp-ref">[${esc(id)}]</sup>`).join('')}</li>`).join('')}</ul>`) +
+      (r.facts.length ? `<details class="cp-src"><summary>Sources (${r.facts.length})</summary><ol>${r.facts.map(f=>`<li id="cp-${esc(f.id)}">[${esc(f.id)}] ${esc(f.text)}: ${esc(f.display)}. ${esc(f.period)}. ${esc(f.asof)}. ${f.url ? `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.source)}</a>`:esc(f.source)}</li>`).join('')}</ol></details>`:'') +
+      `<p class="cp-foot">From the dashboard data.</p><div class="cp-follow">${r.followups.slice(0,3).map(f=>`<button type="button" data-intent="${esc(f.intent)}" data-entities="${esc(JSON.stringify(f.entities))}">${esc(I.chipText(f.intent,{T:f.entities.tickers?.[0]}))}</button>`).join('')}</div>`;
+  }
+  async function submit(question, direct) {
+    const p=doc.getElementById('cp-panel'),ta=p.querySelector('.cp-in textarea');
+    const q=typeof question==='string'?question:ta.value.trim(); if(!q||ST.busy)return;
+    ta.value=''; ta.style.height=''; const a=turn(q), controller=new AbortController();
+    ST.controller=controller;ST.busy=true;p.classList.add('busy');p.querySelector('.cp-cancel').hidden=false;
+    const timeout=setTimeout(()=>controller.abort(),20000);
+    const cfg=()=>({url:ST.provider==='shared'?proxyUrl():'',apiKey:ST.provider==='key'?getKey():'',universe:new Set(root.SmartOptionsUniverse.rows.map(r=>r[0]))});
     try {
-      const model = await dataModel();
-      if (!ST.conv) ST.conv = ch.newConversation();
-      const snap = ST.conv.messages.length;
-      try {
-        const lsModel = (store() && store().getItem('smartoptions.chat.model')) || (ch.MODELS[0] && ch.MODELS[0].id);
-        const r = await ch.ask(q, ST.conv, model, {apiKey: key, model: lsModel}, {});
-        const id = 'cp' + Date.now();
-        a.innerHTML = ch.renderWarning(r.check) + ch.renderMarkdown(r.text || 'The assistant returned no answer.', id) + ch.renderSources(r.check.refs, ST.conv.registry, id);
-      } catch (e) {
-        ST.conv.messages.length = snap;
-        let msg = String(e && e.message || e);
-        if (shared && /Demo connection unavailable|demo relay/i.test(msg)) msg = 'The shared assistant could not be reached. Try again in a minute, or use your own key.';
-        a.innerHTML = `<p class="cp-na">${esc(msg)}</p>`;
+      const {result:r}=await root.SmartOptionsBriefChat.answer(q,direct,controller.signal);
+      a.innerHTML=packHTML(r);
+      if(r.facts.length&&!r.action&&!r.na){
+        const simple=doc.createElement('button');simple.type='button';simple.className='cp-simple';simple.textContent='Say it more simply';a.appendChild(simple);
+        const polish=async(signal)=>{
+          simple.disabled=true;
+          try{const out=await root.SmartOptionsPolish.rewrite(r,cfg(),signal);
+            if(signal.aborted)return;
+            let text=a.querySelector('.cp-polish');if(!text){text=doc.createElement('p');text.className='cp-polish';a.appendChild(text);}
+            text.textContent=out.ok?out.text:out.reason;
+            if(!out.ok)root.SmartOptionsBriefChat.record('WARN','rewrite','Verifier retained template');
+          }finally{simple.disabled=false;}
+        };
+        simple.addEventListener('click',async()=>{
+          const c=new AbortController(),t=setTimeout(()=>c.abort(),12000);ST.controller=c;
+          try{await polish(c.signal);}catch(e){const n=doc.createElement('p');n.className='cp-foot';n.textContent=e.name==='AbortError'?'Rephrasing cancelled. Dashboard answer retained.':e.message+' Dashboard answer retained.';a.appendChild(n);root.SmartOptionsBriefChat.record('WARN','rewrite',e.name==='AbortError'?'Cancelled':e.message);}finally{clearTimeout(t);if(ST.controller===c)ST.controller=null;}
+        });
+        if(cfg().url||cfg().apiKey)try{await polish(controller.signal);}catch(e){const n=doc.createElement('p');n.className='cp-foot';n.textContent=e.name==='AbortError'?'Rephrasing cancelled. Dashboard answer retained.':e.message+' Dashboard answer retained.';a.appendChild(n);root.SmartOptionsBriefChat.record('WARN','rewrite',e.name==='AbortError'?'Cancelled':e.message);}
       }
-    } catch (e) {
-      a.innerHTML = `<p class="cp-na">Not available: site data could not be loaded (${esc(e && e.message || e)}).</p>`;
-    } finally {
-      ST.busy = false; p.classList.remove('busy');
-      const log = p.querySelector('.cp-log'); log.scrollTop = log.scrollHeight;
+    }catch(e){a.innerHTML=`<p class="cp-na">${esc(e.name==='AbortError'?'Cancelled. No answer was applied.':e.message)}</p>`;root.SmartOptionsBriefChat.record('FAIL','question',e.name==='AbortError'?'Cancelled':e.message);}
+    finally{clearTimeout(timeout);ST.controller=null;ST.busy=false;p.classList.remove('busy');p.querySelector('.cp-cancel').hidden=true;const log=p.querySelector('.cp-log');log.scrollTop=log.scrollHeight;}
+  }
+  function installContextChips(){
+    const sections={'h-pulse':'pulse','h-risks':'risks','h-pos':'breadth','h-short':'shortlist','h-obs':'macro'};
+    function add(el,id,entities){if(!el||el.querySelector('.cp-context'))return;const b=doc.createElement('button');b.type='button';b.className='cp-context';b.textContent='Ask about this';b.dataset.intent=id;b.dataset.entities=JSON.stringify(entities||{});el.appendChild(b);}
+    const scan=()=>{for(const [id,intent]of Object.entries(sections))add(doc.getElementById(id)?.closest('section'),intent);const t=(root.location.hash.match(/^#\/company\/([^/]+)/)||[])[1];if(t)doc.querySelectorAll('.co-card').forEach(el=>{const card=[...el.classList].find(c=>c.startsWith('co-k-'))?.slice(5);if(card)add(el,'ticker_card',{tickers:[t],card});});};
+    doc.addEventListener('click',e=>{const b=e.target.closest('.cp-context');if(b){toggle(true);submit('Ask about this: '+root.SmartOptionsIntents.BY_ID[b.dataset.intent].label,{intent:b.dataset.intent,entities:JSON.parse(b.dataset.entities)});}});
+    let pending=false;new MutationObserver(()=>{if(pending)return;pending=true;queueMicrotask(()=>{pending=false;scan();});}).observe(doc.body,{childList:true,subtree:true});scan();
+  }
+  async function loadModules(){
+    for(const [file,key]of [['universe','SmartOptionsUniverse'],['intents','SmartOptionsIntents'],['facts','SmartOptionsFacts'],['verify','SmartOptionsVerify'],['polish','SmartOptionsPolish'],['actions','SmartOptionsActions'],['runtime','SmartOptionsBriefChat']]){
+      if(root[key])continue;await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js';s.onload=resolve;s.onerror=()=>reject(new Error('Chat module failed to load: '+file));doc.head.appendChild(s);});
     }
   }
-  let modelP = null;
-  function dataModel() { if (!modelP) modelP = C().loadData({dataBase: 'data/'}).catch(e => { modelP = null; throw e; }); return modelP; }
-
   function _start() {
     // the docked chat panel is replaced by this popup: make the old mount a no-op before the Edge init calls it
     const ch = C();
     if (ch) { ch.mount = function () { return ch; }; }
     const go = () => {
-      build();
-      if (ch) { ch.open = () => toggle(true); ch.close = () => toggle(false); ch.draft = text => { toggle(true); const ta = doc.querySelector('#cp-panel .cp-in textarea'); if (!getKey() && !proxyUrl()) setProvider('key', false); ta.value = String(text || ''); ta.focus(); }; }
-      fetch('data/config.json', {cache: 'no-store'}).then(r => r.ok ? r.json() : null).catch(() => null).then(cfg => {
+      loadModules().then(() => { build(); installContextChips(); }).catch(e => { const n=doc.createElement('p'); n.className='cp-load-error'; n.setAttribute('role','alert'); n.textContent=e.message; doc.body.appendChild(n); });
+      if (ch) { ch.open = () => toggle(true); ch.close = () => toggle(false); ch.draft = text => { toggle(true); const ta = doc.querySelector('#cp-panel .cp-in textarea');  ta.value = String(text || ''); ta.focus(); }; }
+      fetch('data/config.json', {cache: 'no-store'}).then(r => r.ok ? r.json() : null).catch(e => { root.SmartOptionsBriefChat?.record('WARN','config','Optional rephrasing configuration unavailable'); return null; }).then(cfg => {
         ST.cfg = cfg || {};
         let saved = ''; try { saved = (store() && store().getItem(LS_PROV)) || ''; } catch (e) { saved = ''; }
         setProvider(saved || (proxyUrl() ? 'shared' : getKey() ? 'key' : 'local'), false);
@@ -227,3 +242,4 @@
   }
   return {PRESETS, answerPreset, answerHTML, _start, open: () => toggle(true), close: () => toggle(false)};
 });
+

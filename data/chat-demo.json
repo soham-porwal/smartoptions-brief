@@ -1,1 +1,1 @@
-{"enabled":true,"url":"https://sohampc.tail9ff07b.ts.net:18891/v1/messages","model":"claude-sonnet-5-5","expires_at":"2026-10-16T06:59:59Z","note":"Private Tailscale demo on Soham's PC for today. Use Your key for an independent Anthropic connection."}
+{"enabled":false,"note":"Brief answers from its dashboard data. Optional shared rephrasing is configured separately in config.json."}

@@ -14,10 +14,19 @@ const LS = 'so_fv_v1';
 /* ---------- pure data prep ---------- */
 /* clean(bars): keep rows with a finite close; flag whether real OHLC exists */
 function clean(bars) {
-  const rows = (bars || []).filter(b => b && typeof b[0] === 'string' && isNum(b[4]));
+  const input = bars || [], seen = new Set();
+  let invalidOHLC = 0;
+  const rows = input.filter(b => {
+    if (!b || !/^\d{4}-\d{2}-\d{2}$/.test(b[0]) || !isNum(b[4]) || b[4] <= 0 || seen.has(b[0])) return false;
+    seen.add(b[0]);
+    if ([b[1], b[2], b[3]].every(isNum) && (!(b[3] > 0) || b[2] < Math.max(b[1], b[3], b[4]) || b[3] > Math.min(b[1], b[2], b[4]))) {
+      invalidOHLC++; return false;
+    }
+    return true;
+  }).sort((a, b) => a[0].localeCompare(b[0]));
   const hasOHLC = rows.length > 0 && rows.every(b => isNum(b[1]) && isNum(b[2]) && isNum(b[3])) && rows.some(b => b[2] !== b[3]);
   const hasV = rows.some(b => isNum(b[5]) && b[5] > 0);
-  return {rows, hasOHLC, hasV};
+  return {rows, hasOHLC, hasV, invalidOHLC, excluded: input.length - rows.length};
 }
 const weekKey = d => { const t = new Date(d + 'T00:00:00Z'), wd = (t.getUTCDay() + 6) % 7; return new Date(t - wd * 864e5).toISOString().slice(0, 10); };
 /* resample(rows, tf): 'D' unchanged; 'W' ISO weeks; 'M' calendar months. Bar time = first session of the period. */
@@ -39,6 +48,9 @@ function rsLine(rows, spy) {
   let base = null; const out = [];
   for (const b of rows) { const s = m.get(b[0]); if (!isNum(s)) { out.push(null); continue; } const r = b[4] / s; if (base == null) base = r; out.push(100 * r / base); }
   return out;
+}
+function periodSpy(spy, tf) {
+  return resample((spy || []).map(p => [p[0], p[1], p[1], p[1], p[1], 0]), tf).map(b => [b[0], b[4]]);
 }
 /* week52(rows): high / low over the last 252 sessions (daily rows) */
 function week52(rows) {
@@ -79,13 +91,17 @@ function futureDays(last, until, max) {
 }
 /* freshness(quote, quotesMeta): 'live' | 'delayed 15m' | 'closed' | 'stale' | 'missing' (contract vocabulary) */
 function freshness(q, meta, now) {
-  if (!q || !isNum(q.price)) return {word: 'missing', cls: 'missing', text: 'Not available'};
+  if (!q || !isNum(q.price) || q.price <= 0) return {word: 'missing', cls: 'missing', text: 'Not available'};
   if (q.status === 'stale' || q.status === 'missing') return {word: 'stale', cls: 'stale', text: 'Stale: last quote ' + String(q.ts || '').slice(0, 16).replace('T', ' ')};
-  const session = meta && meta.session, src = String((q.provider || (meta && meta.source) || '')).toLowerCase();
-  if (session && session !== 'regular') return {word: 'closed', cls: 'closed', text: 'Market closed: last quote ' + String(q.ts || '').slice(0, 16).replace('T', ' ') + ' ET'};
-  if (/delay/.test(src)) return {word: 'delayed 15m', cls: 'delayed', text: 'Delayed about 15 minutes'};
-  const age = q.ts ? ((now || Date.now()) - Date.parse(q.ts)) / 1000 : Infinity;
-  return age <= 60 ? {word: 'live', cls: 'fresh', text: 'Real-time quote'} : {word: 'delayed', cls: 'delayed', text: 'Quote is ' + Math.round(age / 60) + ' min old'};
+  const session = q.market_state || meta && meta.session, src = String((q.provider || (meta && meta.source) || '')).toLowerCase();
+  const timestamp = q.asof_utc || q.ts, age = timestamp ? ((now == null ? Date.now() : now) - Date.parse(timestamp)) / 1000 : Infinity;
+  if (!isFinite(age) || age < -60) return {word: 'missing', cls: 'missing', text: 'Not available: valid observation time missing'};
+  const at = new Date(timestamp).toLocaleString('en-US', {timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'}) + ' ET';
+  if (age > 72 * 3600) return {word: 'stale', cls: 'stale', text: 'Stale: last observation ' + at};
+  if (session && session !== 'regular') return {word: 'closed', cls: 'closed', text: 'Outside regular trading; last observation ' + at};
+  if (q.delay_minutes > 0 || /delay/.test(src)) return {word: q.delay_minutes == null || q.delay_minutes === 15 ? 'delayed 15m' : 'delayed', cls: 'delayed', text: `Provider delay ${q.delay_minutes || 15} minutes; observation ${at}`};
+  const eligible = q.delay_minutes === 0 || q.delay_minutes == null && /real.?time|iex/.test(src);
+  return age <= 60 && eligible ? {word: 'live', cls: 'fresh', text: 'Real-time observation ' + at + (/iex/.test(src) ? '; IEX exchange only' : '')} : {word: age > 1800 ? 'stale' : 'delayed', cls: 'delayed', text: 'Quote is ' + Math.round(age / 60) + ' min old; observation ' + at};
 }
 
 /* ---------- browser ---------- */
@@ -124,6 +140,11 @@ async function mount(el, ticker, opts) {
   }
   const prefs = Object.assign(loadPrefs(), opts.tf ? {tf: opts.tf} : {});
   const C = clean(px.bars);
+  if (C.excluded) {
+    console.warn('[brief chart] Invalid or duplicate source bars excluded', {ticker: t, count: C.excluded});
+    try { root.localStorage.setItem('so-chart-quality', JSON.stringify({status: 'WARN', ticker: t, excluded: C.excluded, at: new Date().toISOString()})); }
+    catch (e) { console.warn('[brief chart] Quality receipt storage unavailable'); }
+  }
   if (C.rows.length < 2) { el.innerHTML = `<p class="fv-err" role="alert">Chart not available for ${esc(t)}: fewer than 2 price bars.</p>`; return {destroy() { el.innerHTML = ''; }}; }
   const row = cr.row, q = quotes && quotes.quotes ? quotes.quotes[t] : null;
   const P = root.SmartOptionsPatterns;
@@ -137,6 +158,7 @@ async function mount(el, ticker, opts) {
       <div class="fv-tf" role="group" aria-label="Timeframe">${['D', 'W', 'M'].map(k => `<button type="button" data-tf="${k}" aria-pressed="${prefs.tf === k}" title="${{D: 'Daily', W: 'Weekly', M: 'Monthly'}[k]} bars">${k}</button>`).join('')}</div>
       <div class="fv-read" aria-live="off"></div>
     </div>
+    ${C.excluded ? `<p class="fv-note" role="status">${C.excluded} invalid or duplicate source bars excluded. Indicators use the remaining observations.</p>` : ''}
     ${C.hasOHLC ? '' : '<p class="fv-note">Candles are not available for this name: the data has closing prices only, so this is a line chart.</p>'}
     <div class="fv-panes"><div class="fv-main"></div></div>
     <div class="fv-evrow" hidden></div>
@@ -204,7 +226,7 @@ async function mount(el, ticker, opts) {
     };
     const wsData = arr => arr.map((v, i) => isNum(v) ? {time: times[i], value: v} : {time: times[i]}).concat(ws);
     if (prefs.rs) addSub('rs', 'Strength vs SPY (rebased to 100)', 110, c => {
-      const s = c.addLineSeries({color: COL.rs, lineWidth: 2, priceLineVisible: false}); s.setData(wsData(rsLine(rows, spy || [])));
+      const s = c.addLineSeries({color: COL.rs, lineWidth: 2, priceLineVisible: false}); s.setData(wsData(rsLine(rows, periodSpy(spy || [], tf))));
     });
     if (prefs.rsi) addSub('rsi', 'RSI 14', 100, c => {
       const s = c.addLineSeries({color: COL.rsi, lineWidth: 1.5, priceLineVisible: false}); s.setData(wsData(T.rsi(closes, 14)));
@@ -273,7 +295,7 @@ async function mount(el, ticker, opts) {
   };
 }
 
-const API = {clean, resample, sma, rsLine, week52, srLevels, patternChips, events, futureDays, freshness, mount};
+const API = {clean, resample, sma, rsLine, periodSpy, week52, srLevels, patternChips, events, futureDays, freshness, mount};
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 root.SmartOptionsChart = API;
 })(typeof window !== 'undefined' ? window : globalThis);

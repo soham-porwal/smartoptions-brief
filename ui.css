@@ -16,7 +16,7 @@
   --b-good: #1d7046;   --b-good-bg: #e6f2ea;
   --b-mixed: #946200;  --b-mixed-bg: #f8efd9;
   --b-bad: #b23a30;    --b-bad-bg: #f8e4e1;
-  --b-none: #6f7671;   --b-none-bg: #eceeea;
+  --b-none: #686f6a;   --b-none-bg: #eceeea;
   --b-info-bg: #e7eef5;
   /* heat scale for % change (BU2 heatmap may read these) */
   --b-heat-dn3: #b23a30; --b-heat-dn2: #d0685d; --b-heat-dn1: #e7aaa2;

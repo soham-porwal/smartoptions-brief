@@ -76,7 +76,10 @@
   function daysBetween(isoA, nowMs) {
     const t = Date.parse(String(isoA).slice(0, 10) + 'T00:00:00Z');
     if (!isFinite(t)) return null;
-    const n = new Date(nowMs); const today = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+    const parts = {};
+    new Intl.DateTimeFormat('en-US', {timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit'})
+      .formatToParts(new Date(nowMs)).forEach(p => { parts[p.type] = p.value; });
+    const today = Date.UTC(+parts.year, +parts.month - 1, +parts.day);
     return Math.max(0, Math.round((today - t) / 864e5));
   }
 
@@ -109,24 +112,36 @@
     return {open: wk && mins >= 570 && mins < 960, known: true};
   }
 
-  // price freshness from quotes.json: {generated_at, source}
+  // Only observation timestamps establish price age. Rewriting a cache is not a trade.
   function priceFreshness(quotes, nowMs) {
-    if (!quotes || !quotes.generated_at) return {status: 'missing', words: 'Prices not available', note: 'quotes.json did not load'};
-    const ageH = (nowMs - Date.parse(quotes.generated_at)) / 36e5;
-    if (!isFinite(ageH)) return {status: 'missing', words: 'Prices not available', note: 'quote timestamp unreadable'};
-    const src = String(quotes.source || '');
-    const delayed = /delay/i.test(src);
-    const clock = nyClock(nowMs);
+    nowMs = nowMs == null ? Date.now() : nowMs;
+    const all = Object.values(quotes && quotes.quotes || {});
+    const observed = all.filter(q => q && q.status === 'ok' && isNum(q.price) && q.price > 0 &&
+      isFinite(Date.parse(q.asof_utc || q.ts)) && Date.parse(q.asof_utc || q.ts) <= nowMs + 60000);
+    if (!observed.length) return {status: 'missing', words: 'Prices not available', note: 'No valid timestamped prices in the quote feed.'};
+    const ages = observed.map(q => Math.max(0, (nowMs - Date.parse(q.asof_utc || q.ts)) / 36e5)).sort((a, b) => a - b);
+    const mid = Math.floor(ages.length / 2), ageH = ages.length % 2 ? ages[mid] : (ages[mid - 1] + ages[mid]) / 2;
+    const oldestH = ages[ages.length - 1], missing = all.length - observed.length;
+    const providers = [...new Set(observed.map(q => q.provider || 'Provider not stated'))];
+    const delayed = observed.some(q => q.delay_minutes > 0 || /delay/i.test(q.provider || ''));
+    const realtime = observed.every(q => q.delay_minutes === 0 && /real.?time|iex/i.test(q.provider || ''));
+    const clock = nyClock(nowMs), open = quotes.session === 'closed' ? false : clock.open;
     let status, words;
-    if (clock.open) {
-      if (ageH <= 1 / 60 && !delayed) { status = 'fresh'; words = 'Prices live'; }
+    if (open) {
+      if (oldestH <= 1 / 60 && realtime && !missing) { status = 'fresh'; words = 'Prices live'; }
       else if (ageH <= 0.5) { status = delayed ? 'delayed' : 'fresh'; words = 'Prices ' + ageWords(ageH) + (delayed ? ', provider delay about 15 min' : ''); }
       else { status = 'stale'; words = 'Prices ' + ageWords(ageH); }
     } else {
       status = ageH <= 20 ? 'fresh' : ageH <= 72 ? 'delayed' : 'stale';
       words = 'Market closed, prices ' + ageWords(ageH);   // quotes may include after-hours prints, so never say "at close"
     }
-    return {status, words, ageH, note: src};
+    if (missing && status === 'fresh') status = 'delayed';
+    const sources = quotes.health && quotes.health.sources || [];
+    const notes = sources.filter(s => s.status !== 'ok').map(s => `${s.id}: ${s.note || s.status}`);
+    const note = `Median observation ${ageWords(ageH)}; oldest ${ageWords(oldestH)}. ${observed.length}/${all.length} prices available. ` +
+      providers.join('; ') + '. ' + notes.join('; ') + (quotes.health && quotes.health.estimated_sweep_minutes ?
+        ` Full real-time-provider sweep estimate: ${quotes.health.estimated_sweep_minutes} minutes; delayed fallback has its own cadence.` : '');
+    return {status, words, ageH, oldestH, note, asof: new Date(nowMs - ageH * 36e5).toISOString()};
   }
 
   const RANK = {fresh: 0, live: 0, delayed: 1, stale: 2, missing: 3};
@@ -141,7 +156,8 @@
       const st = String(macro.status || 'missing').toLowerCase();
       parts.push(st === 'fresh' ? 'macro current' : st === 'missing' ? 'macro not available' : 'macro ' + ageWords(macro.age_hours));
       if ((RANK[st] == null ? 3 : RANK[st]) > RANK[worst]) worst = st;
-    } else if (health && health.overall) {
+    }
+    if (health && health.overall) {
       const o = String(health.overall).toLowerCase();
       if ((RANK[o] == null ? 3 : RANK[o]) > RANK[worst]) worst = o;
     }
@@ -166,6 +182,17 @@
   const doc = root.document;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const safeURL = u => /^https?:\/\//i.test(u || '') ? esc(u) : '';
+  const impact = () => root.SmartOptionsImpact;
+  const drivers = (items, goFor) => {
+    if (!impact()) return '';
+    const evidence = items.map(it => {
+      const primary = (it.metrics || []).find(m => impact().catOf(m.label));
+      const cat = primary && impact().catOf(primary.label);
+      return {...it, status: it.status === 'elevated' ? 'adverse' : it.status,
+        metrics: (it.metrics || []).filter(m => impact().catOf(m.label) === cat)};
+    });
+    return impact().drivenBy(impact().drivers(evidence), {max: 4, goFor: goFor || (cat => `.b-metrics [data-impact-cat="${cat}"]`)});
+  };
   const reduced = () => !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const ICON = {
     good: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.8 8.3l2.1 2.1 4.3-4.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -196,7 +223,7 @@
     return `<table class="b-metrics"><thead><tr><th>Measure</th><th>Value</th><th>Period</th><th>As of</th><th>Source</th></tr></thead><tbody>${ms.map(m => {
       const v = fmtValue(m);
       const src = safeURL(m.source_url) ? `<a href="${safeURL(m.source_url)}" target="_blank" rel="noopener">${esc(m.source || 'source')}</a>` : esc(m.source || 'Source not stated');
-      return `<tr><td>${esc(m.label)}${m.note ? `<div class="b-mnote">${esc(m.note)}</div>` : ''}</td><td class="v">${v == null ? `<span class="b-na">Not available${m.note ? '' : ''}</span>` : esc(v)}</td><td>${esc(m.period || '')}</td><td>${esc(m.asof || '')}</td><td>${src}</td></tr>`;
+      return `<tr><td data-impact-cat="${impact() ? esc(impact().catOf(m.label) || '') : ''}">${impact() ? impact().term(m.label) : esc(m.label)}${m.note ? `<div class="b-mnote">${esc(m.note)}</div>` : ''}</td><td class="v">${v == null ? `<span class="b-na">Not available${m.note ? '' : ''}</span>` : esc(v)}</td><td>${esc(m.period || '')}</td><td>${esc(m.asof || '')}</td><td>${src}</td></tr>`;
     }).join('')}</tbody></table>`;
   }
   let flipSeq = 0;
@@ -317,8 +344,8 @@
     const now = Date.now();
     const pf = priceFreshness(ST.quotes, now);
     const rows = [];
-    rows.push({label: 'Prices (quotes.json)', asof: ST.quotes ? ST.quotes.generated_at : '', age: pf.ageH, status: pf.status,
-      note: (ST.quotes ? ST.quotes.source + '. Checked every minute while this page is open.' : 'Quotes file did not load.')});
+    rows.push({label: 'Price observations (median)', asof: pf.asof || '', age: pf.ageH, status: pf.status,
+      note: pf.note + ' This page checks the shared file every minute; provider updates are separate.'});
     // group per-category macro series and build receipts so the table stays short; worst status and oldest age win
     const groups = {};
     (h.sources || []).filter(s => !(ST.quotes && s.id === 'quotes') && s.id !== 'sam').forEach(s => {   // Sam's scores get their own line below
@@ -401,6 +428,14 @@
 
   // ---- interactions inside the Brief view
   function onMainClick(e) {
+    const more = e.target.closest('[data-risk-more]');
+    if (more) {
+      const open = more.getAttribute('aria-expanded') !== 'true';
+      more.closest('section').querySelectorAll('.b-risk-more').forEach(n => { n.hidden = !open; });
+      more.setAttribute('aria-expanded', String(open));
+      more.textContent = open ? 'Show fewer' : more.closest('section').querySelectorAll('.b-risk-more').length + ' more';
+      return;
+    }
     const f = e.target.closest('.b-flip');
     if (f) {
       const box = doc.getElementById(f.getAttribute('aria-controls'));
@@ -427,25 +462,12 @@
     if (per) { ST.period = per.dataset.period; mountHeatmap(); per.parentNode.querySelectorAll('[data-period]').forEach(b => b.setAttribute('aria-pressed', String(b === per))); }
   }
 
-  // count-up of numbers on first paint
+  // Animate the figure's arrival, preserving the exact measured value at every frame.
   function countUp(scope) {
     if (reduced()) return;
-    const els = [...scope.querySelectorAll('[data-count]')];
-    const t0 = performance.now(), D = 650;
-    const items = els.map(el => {
-      const end = +el.dataset.count; let fmt = {}; try { fmt = JSON.parse(el.dataset.fmt || '{}'); } catch (e) { fmt = {}; }
-      return {el, end, fmt, final: el.textContent};
-    }).filter(x => isNum(x.end));
-    const step = now => {
-      const p = Math.min(1, (now - t0) / D), k = 1 - Math.pow(1 - p, 3);
-      items.forEach(x => {
-        if (p >= 1) { x.el.textContent = x.final; return; }
-        const v = x.end * k;
-        x.el.textContent = x.fmt.dp === 0 ? String(Math.round(v)) : (fmtValue({value: v, unit: x.fmt.unit}) || x.final);
-      });
-      if (p < 1) root.requestAnimationFrame(step);
-    };
-    root.requestAnimationFrame(step);
+    scope.querySelectorAll('[data-count]').forEach(el => {
+      if (el.animate) el.animate([{opacity: 0.4, transform: 'translateY(4px)'}, {opacity: 1, transform: 'translateY(0)'}], {duration: 220, easing: 'ease-out'});
+    });
   }
   function stagger(scope) { [...scope.querySelectorAll('.b-enter')].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 12))); }
   function paint(view, html, key) {
@@ -475,18 +497,19 @@
     const f = flip(a.metrics);
     return `<article class="b-tile b-card b-enter"><div class="b-tile-hd"><h3>${gloss(label)}</h3>${chip(a.status || 'unavailable')}</div>
       ${extra || keyFigure(a.metrics)}<p class="b-line">${esc(a.line || 'Not available: no assessment in this brief.')}</p>
-      <div class="b-tile-ft">${f.btn}</div>${f.box}</article>`;
+      ${drivers([{status: a.status, metrics: a.metrics}])}<div class="b-tile-ft">${f.btn}</div>${f.box}</article>`;
   }
   function backdropRows(bd) {
     return `<ul class="b-dirs">${['growth', 'inflation', 'policy'].map(k => {
-      const d = (bd && bd[k]) || {}; const dir = ['up', 'down', 'flat'].includes(d.direction) ? d.direction : null;
+      const d = (bd && bd[k]) || {}; const dir = d.available === false ? null : ['up', 'down', 'flat'].includes(d.direction) ? d.direction : null;
       return `<li><span class="b-dir-k">${cap(k)}</span><span class="b-dir-a${dir ? ' d-' + dir : ''}" aria-hidden="true">${dir ? ARROW[dir] : '&#8211;'}</span><span class="b-dir-w">${dir ? DIRWORD[dir] : 'not available'}</span><span class="b-dir-l">${esc(d.line || '')}</span></li>`;
     }).join('')}</ul>`;
   }
   function macroStrip(m) {
     m = m || {};
     const bd = m.backdrop || {};
-    const bdMetrics = [].concat(...['growth', 'inflation', 'policy'].map(k => (bd[k] && bd[k].metrics) || []), bd.metrics || []);
+    const bdMetrics = [].concat(...['growth', 'inflation', 'policy'].map(k => (bd[k] && bd[k].metrics) ||
+      ((m.detail || []).find(d => d.group === k) || {}).metrics || []), bd.metrics || []);
     return `<div class="b-strip">${assessTile('Price trend', m.price_trend)}${assessTile('Participation', m.participation)}
       ${assessTile('Macro backdrop', {status: bd.status, line: bd.line, metrics: bdMetrics}, backdropRows(bd))}${assessTile('Risk conditions', m.risk)}</div>`;
   }
@@ -499,13 +522,13 @@
   function pulseSection(p) {
     p = p || {};
     return `<section class="b-sec b-pulse b-card b-enter" aria-labelledby="h-pulse">
-      <div class="b-sec-hd"><h2 id="h-pulse">Market pulse</h2>${chip(p.status || 'unavailable')}<button type="button" class="b-btn b-sm" data-flipall aria-pressed="false">Show numbers</button></div>
+      <div class="b-sec-hd"><h2 id="h-pulse">Market pulse</h2>${chip(p.status || 'unavailable')}${impact() ? impact().keyButton() : ''}<button type="button" class="b-btn b-sm" data-flipall aria-pressed="false">Show numbers</button></div>
       ${p.headline ? `<p class="b-lead">${esc(p.headline)}</p>` : ''}
       <div class="b-cols">
         <div><h3>What changed</h3>${bulletList(p.changed, 'no change measured since the previous session')}</div>
         <div><h3>Supports</h3>${bulletList(p.supports, 'no supporting reading measured')}</div>
         <div><h3>Challenges</h3>${bulletList(p.challenges, 'no challenging reading measured')}</div>
-      </div></section>`;
+      </div>${drivers([...(p.supports || []), ...(p.challenges || [])])}</section>`;
   }
   function watchSet() { try { return new Set(root.SmartOptionsWatchlist ? root.SmartOptionsWatchlist.get() : JSON.parse(root.localStorage.getItem('so_watchlist_v1') || '[]')); } catch (e) { return new Set(); } }
   function whenWords(iso) {
@@ -525,23 +548,27 @@
   function sortRisks(risks, watch, nowMs) {
     const today = nowMs == null ? '' : etDay(nowMs);
     // watchlist names and the highest-importance releases first, then by time
-    const w = r => r.watchlist || (r.tickers || []).some(t => watch.has(t)) || r.importance === 3 ? 0 : 1;
+    const shortlist = new Set((ST.brief && ST.brief.shortlist || []).map(n => n.t));
+    const w = r => impact() ? impact().riskBand(r, watch, shortlist) : r.watchlist || (r.tickers || []).some(t => watch.has(t)) || r.importance === 3 ? 0 : 1;
     return (risks || []).filter(r => !today || !/^\d{4}-\d{2}-\d{2}/.test(r.when_et || '') || String(r.when_et).slice(0, 10) >= today).sort((a, b) => w(a) - w(b) || (Date.parse(a.when_et) || 0) - (Date.parse(b.when_et) || 0));
   }
   function risksSection(risks) {
     const watch = watchSet();
     const xs = sortRisks(risks, watch, Date.now());
-    const shown = xs.slice(0, 6);
+    const shown = xs.slice(0, 6), usedReasons = new Set();
+    const core = root.SO2 && root.SO2.D && root.SO2.D();
+    const context = {totalCap: (core && core.rows || []).reduce((s, r) => s + (r.sp500_member === true && isNum(r.mcap) ? r.mcap : 0), 0)};
+    const explain = r => impact() ? impact().riskExplanation(r, (core && core.rows || []).find(n => (r.tickers || []).includes(n.t)), usedReasons) : {text: r.why, metrics: r.metrics};
     const body = !shown.length ? '<p class="b-na">Not available: no scheduled releases or earnings in this brief.</p>' :
-      `<ol class="b-risks">${shown.map(r => {
-        const w = whenWords(r.when_et), imp = [1, 2, 3].includes(r.importance) ? r.importance : 1, f = flip(r.metrics);
+      `<ol class="b-risks">${xs.map((r, ix) => {
+        const e = explain(r), w = whenWords(r.when_et), imp = [1, 2, 3].includes(r.importance) ? r.importance : 1, f = flip(e.metrics);
         const iw = imp === 3 ? 'High importance' : imp === 2 ? 'Medium importance' : 'Low importance';
         const mine = r.watchlist || (r.tickers || []).some(t => watch.has(t));
-        return `<li class="b-risk"><div class="b-risk-when"><b>${esc(w.d)}</b><span>${esc(w.h)}</span></div>
+        return `<li class="b-risk${ix >= 6 ? ' b-risk-more' : ''}"${ix >= 6 ? ' hidden' : ''}><div class="b-risk-when"><b>${esc(w.d)}</b><span>${esc(w.h)}</span></div>
           <div class="b-risk-what"><div class="b-risk-t"><span class="b-kind k-${r.kind === 'earnings' ? 'e' : 'm'}">${r.kind === 'earnings' ? 'Earnings' : 'Macro'}</span>${esc(r.title)}${mine ? '<span class="b-mine">Watchlist</span>' : ''}</div>
-          <div class="b-risk-why">${esc(r.why || '')}${(r.tickers || []).length ? ' ' + r.tickers.slice(0, 4).map(t => `<a class="b-tk" href="#/company/${esc(t)}">${esc(t)}</a>`).join(' ') : ''}</div>${f.box}</div>
+          <div class="b-risk-why">${esc(e.text || '')}${(r.tickers || []).length ? ' ' + r.tickers.slice(0, 4).map(t => `<a class="b-tk" href="#/company/${esc(t)}">${esc(t)}</a>`).join(' ') : ''}</div>${f.box}</div>
           <div class="b-risk-r"><span class="b-imp" role="img" aria-label="${iw}" title="${iw}">${[1, 2, 3].map(i => `<i class="${i <= imp ? 'on' : ''}"></i>`).join('')}</span>${f.btn}</div></li>`;
-      }).join('')}</ol>${xs.length > 6 ? `<p class="b-more">${xs.length - 6} more on the <a href="#/research/macro">macro calendar</a>.</p>` : ''}`;
+      }).join('')}</ol>${xs.length > 6 ? `<button type="button" class="b-btn b-more" data-risk-more aria-expanded="false">${xs.length - 6} more</button>` : ''}`;
     return `<section class="b-sec b-card b-enter" aria-labelledby="h-risks"><div class="b-sec-hd"><h2 id="h-risks">Upcoming risks</h2><span class="b-count">${xs.length ? 'Next ' + shown.length + ' of ' + xs.length : ''}</span></div>${body}</section>`;
   }
   function verdict(label, a, figure) {
@@ -562,7 +589,7 @@
   function positioningSection(pos) {
     pos = pos || {};
     const c = pos.concentration || {}, ro = pos.rotation || {};
-    const cFig = isNum(c.top10_share_pct) ? `<div class="b-key"><span class="b-key-v" data-count="${c.top10_share_pct}" data-fmt='{"unit":"%"}'>${esc(fmtValue({value: c.top10_share_pct, unit: '%'}))}</span><span class="b-key-l">Top 10 share of index weight</span>${meter(c.top10_share_pct, 100, '')}</div>` : '';
+    const cFig = isNum(c.top10_share_pct) ? `<div class="b-key"><span class="b-key-v" data-count="${c.top10_share_pct}" data-fmt='{"unit":"%"}'>${esc(fmtValue({value: c.top10_share_pct, unit: '%'}))}</span><span class="b-key-l">Top 10 share of covered market cap</span>${meter(c.top10_share_pct, 100, '')}</div>` : '';
     const rl = (xs, cls) => (xs || []).slice(0, 3).map(s => `<span class="b-rot ${cls}">${esc(s.sector)} ${isNum(s.ret_20d_pct) ? (s.ret_20d_pct > 0 ? '+' : '') + s.ret_20d_pct.toFixed(1) + '%' : ''}</span>`).join('');
     const rFig = (ro.leaders || []).length || (ro.laggards || []).length ? `<div class="b-rots"><div><span class="b-rot-k">Leading, 20 days</span>${rl(ro.leaders, 'up')}</div><div><span class="b-rot-k">Lagging, 20 days</span>${rl(ro.laggards, 'dn')}</div></div>` : '';
     return `<section class="b-sec b-card b-enter" aria-labelledby="h-pos"><div class="b-sec-hd"><h2 id="h-pos">S&amp;P positioning</h2>
@@ -589,7 +616,10 @@
       `<div class="b-names">${xs.map(n => {
         const st = n.status || {}, why = (n.why || []).filter(Boolean).slice(0, 3);
         const dims = DIMS.filter(([k]) => st[k]).map(([k, l]) => `<span class="b-dim t-${tone(st[k])}" title="${esc(l + ': ' + st[k])}"><i aria-hidden="true"></i>${esc(l)}<span class="b-vh"> ${esc(st[k])}</span></span>`).join('');
-        const allM = [].concat(...why.map(b => b.metrics || []), (n.counter && n.counter.metrics) || []);
+        const core = root.SO2 && root.SO2.D && root.SO2.D();
+        const row = core && core.rows && core.rows.find(r => r.t === n.t);
+        const counter = impact() ? impact().caution(n, row) : n.counter;
+        const allM = [].concat(...why.map(b => b.metrics || []), (counter && counter.metrics) || []);
         const f = flip(allM);
         const more = why.slice(1).map(b => `<li>${esc(b.text)}</li>`).join('');
         const lead = why[0] ? esc(why[0].text) : '<span class="b-na">Not available: no reasons recorded.</span>';
@@ -597,7 +627,8 @@
         return `<article class="b-name b-card b-enter"><div class="b-name-hd"><div><h3><a href="#/company/${esc(n.t)}">${esc(n.name || n.t)}</a></h3><div class="b-name-sub">${esc(n.t)}${n.sector ? ' · ' + esc(n.sector) : ''}</div></div>${gauge(n.score, n.score_basis)}</div>
           ${!shared && n.score_basis ? `<p class="b-basis">Score basis: ${esc(n.score_basis)}</p>` : ''}
           <p class="b-why"><span class="b-mark tn-good" aria-label="For">&#9650;</span>${lead}${why.length > 1 ? ` <span class="b-plus">+${why.length - 1} more</span>` : ''}</p>
-          <p class="b-against"><span class="b-counter-k">Against</span>${n.counter && n.counter.text ? esc(n.counter.text) : '<span class="b-na">Not available: no counter-argument recorded.</span>'}</p>
+          <p class="b-against"><span class="b-counter-k">Caution</span>${counter && counter.text ? esc(counter.text) : '<span class="b-na">Not available: no counter-argument recorded.</span>'}</p>
+          ${impact() ? impact().drivenBy(impact().statusDrivers(st), {max: 3, goFor: cat => `#/company/${n.t}|.co-k-${cat}`}) : ''}
           ${dims ? `<div class="b-dims">${dims}</div>` : ''}
           ${box}
           <div class="b-name-ft"><a class="b-btn b-open" href="#/company/${esc(n.t)}">Open ${esc(n.t)}</a>${f.btn.replace('<span class="b-flip-on">Numbers</span>', '<span class="b-flip-on">Details</span>')}</div></article>`;

@@ -253,7 +253,7 @@ body.bv-research .bv-hdr { position: relative; }
 .b-name { padding: var(--b-s4) var(--b-s4) var(--b-s3); gap: 10px; }
 @media (max-width: 820px) {
   /* phone: shortlist becomes a swipeable row so the section stays about one screen tall */
-  .b-names { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 84%; overflow-x: auto; scroll-snap-type: x mandatory;
+  .b-names { min-width: 0; width: 100%; max-width: 100%; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 84%; overflow-x: auto; scroll-snap-type: x mandatory;
     padding: 2px 2px 10px; margin: 0 -2px; overscroll-behavior-x: contain; }
   .b-name { scroll-snap-align: start; }
 }
