@@ -16,14 +16,22 @@
     const wl=root.SmartOptionsWatchlist;
     return {brief,core,quotes:quotes?.quotes||{},quotesMeta:quotes,universe:rows,covered:new Set(Object.keys(core)),watch:wl?wl.get():[],company:{},now:new Date(),page:{ticker:(root.location?.hash.match(/^#\/company\/([^/]+)/)||[])[1]},get};
   }
-  async function answer(question,direct,signal){
+  async function answer(question,direct,signal,plannerConfig){
+    if(!direct&&root.SmartOptionsMyDashboard){
+      const d=await root.SmartOptionsMyDashboard.command(question,plannerConfig);
+      if(d.handled){const receipt=d.receipt;return {result:{intent:'dashboard',title:'My Dash',lines:[{text:receipt.text,refs:[]}],facts:[],na:null,action:{kind:'dashboard'},receipt,followups:[]},ctx:null,route:null};}
+    }
     const ctx=await context(signal),I=root.SmartOptionsIntents,F=root.SmartOptionsFacts;
     const route=direct ? I.validate(direct,ctx) : I.route(question,ctx);
     if(!route)throw new Error('That question chip is invalid.');
     if(!direct && !route.entities.tickers.length && ctx.page.ticker && /\b(this company|this stock|this card)\b/i.test(question))route.entities.tickers=[ctx.page.ticker];
     await Promise.all(F.needs(route.intent,route.entities).map(async t=>{const c=await ctx.get('brief/company/'+encodeURIComponent(t)+'.json',true);if(c)ctx.company[t]=c;}));
     if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
-    const result=F.answer(route.intent,route.entities,ctx);
+    let result;
+    if(!direct&&root.SmartOptionsRelationships?.matches(question)){
+      const intelligence=await ctx.get('intelligence.json',true);
+      result=root.SmartOptionsRelationships.answer(route.entities.tickers[0]||ctx.page.ticker||null,intelligence);
+    }else result=F.answer(route.intent,route.entities,ctx);
     if(result.action){try{const receipt=await root.SmartOptionsActions.execute(result.action);result.lines=[{text:receipt.text,refs:[]}];result.receipt=receipt;}catch(e){record('FAIL','action',e.message);result.na='Action not completed: '+e.message;result.lines=[];} }
     if(result.intent==='unknown'){
       const ids=[...(route.suggestions||[]),'pulse','risks','shortlist'].filter((v,i,a)=>a.indexOf(v)===i).slice(0,3);

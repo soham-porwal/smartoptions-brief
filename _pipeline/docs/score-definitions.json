@@ -1,0 +1,77 @@
+{
+  "_meta": {
+    "snapshot": "SmartOptions snapshot 2026-07-25 (origin/main of samsej/sp500-screener, code at ec6b36e/10da1ee)",
+    "note": "Definitions read from source code, not recomputed. Paths are in samsej/sp500-screener; line numbers are on origin/main.",
+    "audit": "docs/baseline-audit.md"
+  },
+  "Opportunity Score": {
+    "plain": "Ranks a put-selling setup 0-100: return, volatility, nearness to 52-week high and delta fit, scaled by company quality and risk.",
+    "formula": "Score = (35*AnnualReturnScore + 25*IVScore + 20*DistanceScore + 20*DeltaFitScore)/100; Opportunity (CompositeScore) = min(100, Score x QualityMult x RiskMult), 0 if RiskTier=AVOID. QualityMult GREAT 1.15, GOOD 1.05, OK 1.00, WEAK 0.80, other/missing 1.0. RiskMult SAFE 1.10, WATCH 1.00, RISKY 0.75, missing 1.0.",
+    "source": "src/sp500_screener/scorer.py:24-25,104-120,198-200,213 ; config/config.yaml:60-78"
+  },
+  "AnnualReturnScore (component, 35%)": {
+    "plain": "Put premium yield, annualized, scaled from 0 at 15% to 100 at 50%.",
+    "formula": "clamp((annual_return - 15) / (50 - 15) * 100, 0, 100)",
+    "source": "src/sp500_screener/scorer.py:21,41-43 ; config.yaml:15"
+  },
+  "IVScore (component, 25%)": {
+    "plain": "Implied volatility scaled from 0 at 30% to 100 at 120%; outside 30-120% scores 0.",
+    "formula": "0 if IV% < 30 or > 120 else (IV% - 30) / (120 - 30) * 100",
+    "source": "src/sp500_screener/scorer.py:46-52 ; config.yaml:9-10"
+  },
+  "DistanceScore (component, 20%)": {
+    "plain": "Closer to the 52-week high scores higher: 100 at the high, 0 at 25% below it or when unknown.",
+    "formula": "clamp((1 - DistanceFrom52WHigh% / 25) * 100, 0, 100); missing -> 0",
+    "source": "src/sp500_screener/scorer.py:55-59 ; config.yaml:7"
+  },
+  "DeltaFitScore (component, 20%)": {
+    "plain": "How close the put's delta is to the 0.20 target: 100 on target, 0 when 0.15 or more away.",
+    "formula": "clamp((1 - abs(abs(delta) - 0.20) / 0.15) * 100, 0, 100); missing -> 0",
+    "source": "src/sp500_screener/scorer.py:22,62-67 ; config.yaml:13"
+  },
+  "Quality score/tier": {
+    "plain": "0-100 company health from profitability, growth, debt and valuation. Tiers: GREAT 80+, GOOD 65+, OK 50+, WEAK 35+, else AVOID.",
+    "formula": "round(0.30*Profitability + 0.30*Growth + 0.25*BalanceSheet + 0.15*Valuation). Profitability=avg(ROE score, operating margin score); Growth=avg(EPS growth score, revenue growth score); BalanceSheet from debt/equity; Valuation from trailing (else forward) P/E. Missing input -> neutral sub-score (ROE/margin/revenue/valuation 50, EPS growth 40, debt 60). Data: yfinance .info.",
+    "source": "src/sp500_screener/quality_scorer.py:98-247,292-322 ; fundamentals.py:66-88 ; config.yaml:31-37"
+  },
+  "TrendScore": {
+    "plain": "0-100 price-trend health: above 200- and 50-day averages, RSI in a healthy range, and distance from those averages.",
+    "formula": "round(0.35*SMA200pos + 0.25*SMA50pos + 0.20*RSIhealth + 0.10*pctVsSMA200 + 0.10*pctVsSMA50). Position: above 80, below 20, unknown 50. RSI sweet spot 45-65 scores 65-85, extremes lower. Any missing input -> 50.",
+    "source": "src/sp500_screener/risk_trend.py:115-195 ; config.yaml:49-54"
+  },
+  "Risk level": {
+    "plain": "SAFE, WATCH, RISKY or AVOID from trend and flags. AVOID means earnings within 14 days or weak fundamentals, and zeroes the Opportunity Score.",
+    "formula": "AVOID if EARNINGS_NEAR or LOW_QUALITY; else RISKY if BELOW_SMA200 or TrendScore<40; else WATCH if BELOW_SMA50, RSI_OVERBOUGHT, RSI_OVERSOLD or TrendScore<60; else SAFE.",
+    "source": "src/sp500_screener/risk_trend.py:246-262"
+  },
+  "Risk Flags": {
+    "plain": "Warnings on a stock: earnings within 14 days, below 200/50-day average, RSI over 75 or under 30, beta 1.8+, quality under 50. CLEAR if none.",
+    "formula": "EARNINGS_NEAR: 0<=DaysToEarnings<=14 | BELOW_SMA200: price<SMA200 | BELOW_SMA50: price<SMA50 | RSI_OVERBOUGHT: RSI14>=75 | RSI_OVERSOLD: RSI14<=30 | HIGH_BETA: Beta>=1.8 | LOW_QUALITY: QualityScore<50. Missing data never raises a flag. Pipe-delimited; none = CLEAR.",
+    "source": "src/sp500_screener/risk_trend.py:202-243 ; config.yaml:44-48"
+  },
+  "Earnings In": {
+    "plain": "Calendar days from the screener run date to the next earnings date. Fixed at run time, so it ages on a static page.",
+    "formula": "(NextEarningsDate - date.today() at run time).days; yfinance earningsTimestampStart (else earningsTimestamp); blank if unavailable; negative = date already passed.",
+    "source": "src/sp500_screener/risk_trend.py:99-108,315 ; fundamentals.py:73"
+  },
+  "IV": {
+    "plain": "Implied volatility of the selected put, shown in percent, as quoted by MarketData.app.",
+    "formula": "Contract 'iv' field from /options/chain (decimal) x 100.",
+    "source": "src/sp500_screener/options_fetcher.py:52-58 ; scorer.py:191,230"
+  },
+  "Delta target": {
+    "plain": "The screener picks the put whose absolute delta is closest to 0.20, at the expiry closest to 30 days.",
+    "formula": "Puts with bid>0 in a 15-45 day window; pick expiry with DTE nearest 30, then contract with abs(delta) nearest 0.20.",
+    "source": "src/sp500_screener/options_fetcher.py:12-45 ; config.yaml:12-13"
+  },
+  "annual_return": {
+    "plain": "Put bid premium divided by strike, scaled up to a full year, in percent. Uses the bid, not the midpoint.",
+    "formula": "(bid / strike) * (365 / DTE) * 100",
+    "source": "src/sp500_screener/scorer.py:37-38"
+  },
+  "Market regime card": {
+    "plain": "Market-wide 0-100 favorability for selling puts. Tiers: AVOID <30, DEFENSIVE <50, NORMAL <70, FAVORABLE <85, OPTIMAL 85+. Not shown on the 2026-07-25 page.",
+    "formula": "round(0.40*VIXScore + 0.25*ADScore + 0.15*NewHLScore + 0.10*UpVolScore + 0.10*TRINScore). VIX is ^VIX via yfinance (peak score near VIX 20; <12 scores 15, >40 scores 10). A/D, New H/L, volume and TRIN come from MarketData.app quotes/candles for the whole S&P 500 universe (price_pass frame keeps all rows; PricePass is only a flag). Missing -> 50.",
+    "source": "src/sp500_screener/market_regime.py:84-114,117-135,138-160,241-250,298-305 ; config.yaml:39-42"
+  }
+}

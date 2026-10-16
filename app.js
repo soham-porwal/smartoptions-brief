@@ -28,8 +28,8 @@ function save() { try { localStorage.setItem('so2-settings', JSON.stringify(S));
 
 /* ---------- formatting ---------- */
 function na(reason) { return `<span class="na" data-tip="${esc(reason || 'not available')}">—</span>`; }
-// plain-language date label for Sam's screener scores (shared with the Brief shell, brief.js screenerLabel)
-function samLabel(mode) { return window.SmartOptionsBrief ? window.SmartOptionsBrief.screenerLabel(mode) : "Sam's screener scores from Jul 25, 2026"; }
+// plain-language date label for Historical screener scores (shared with the Brief shell, brief.js screenerLabel)
+function samLabel(mode) { return window.SmartOptionsBrief ? window.SmartOptionsBrief.screenerLabel(mode) : "Historical screener scores from Jul 25, 2026"; }
 function num(v, dp, reason) { return isNum(v) ? v.toLocaleString('en-US', {minimumFractionDigits: dp, maximumFractionDigits: dp}) : na(reason); }
 function pct(v, dp, reason, unit) {
   if (!isNum(v)) return na(reason);
@@ -100,7 +100,7 @@ function renderHeader() {
   const st = {};
   for (const k in D.macro) for (const o of D.macro[k]) st[o.status] = (st[o.status] || 0) + 1;
   const fr = `macro ${st.ok || 0} ok${st.stale ? ` · <span style="color:var(--warn)">${st.stale} stale</span>` : ''}${st.missing ? ` · ${st.missing} missing` : ''}${st.error ? ` · ${st.error} error` : ''}`;
-  $('#hstat').innerHTML = `Session ${esc(D.asof_session)} · updated ${etTime(ex)} ET · delayed · ${fr} · <span class="dim">${esc(samLabel('short'))}</span>`;
+  $('#hstat').innerHTML = `Session ${esc(D.asof_session)} · updated ${etTime(ex)} ET · delayed · ${fr} · <span class="dim">Historical scores are optional in Settings</span>`;
   $('#hstat').dataset.tip = `exported ${ex}\nmacro ${g.macro}\nequities ${g.equities}\nrelations ${g.relations}\ncrosscheck ${g.crosscheck}`;
 }
 function renderTape() {
@@ -109,7 +109,7 @@ function renderTape() {
   $('#tape').innerHTML = items.map(x => {
     const stale = x.status && x.status !== 'ok';
     let val;
-    if (x.id === 'regime') val = isNum(x.v) ? `${x.v} <span class="tier">${esc(x.tier || '')}</span>` : na('regime not computed');
+    if (x.id === 'regime') val = isNum(x.v) ? `${x.v} <span class="tier">${esc(({FAVORABLE:'Supportive',BULLISH:'Supportive',NEUTRAL:'Mixed',ADVERSE:'Adverse',BEARISH:'Adverse'})[x.tier] || x.tier || '')}</span>` : na('regime not computed');
     else val = isNum(x.v) ? num(x.v, x.unit === '$' || Math.abs(x.v) < 1000 ? 2 : 0) + (x.unit === '%' ? '%' : '') : na(`${x.label}: ${x.status || 'missing'}`);
     const pp = x.chgu === 'bp' && S.fmt === 'pct';   // Settings: rate changes in percentage points instead of bp (value / 100)
     const chg = x.id === 'regime' ? `<span class="dim">30/50/70/85</span>` : pp ? pct(isNum(x.chg) ? x.chg / 100 : null, 2, 'no prior value', ' pp') : pct(x.chg, x.chgu === '%' ? 2 : 1, 'no prior value', x.chgu === '%' ? '%' : ' ' + (x.chgu || ''));
@@ -118,7 +118,7 @@ function renderTape() {
     const sel = V.sel.kind === 's' && V.sel.id === tapeSeries(x.id) ? ' sel' : '';
     return `<div class="ti${stale ? ' stale' : ''}${sel}" data-s="${esc(x.id)}" data-tip="${esc(tip)}">
       <div class="l"><span>${esc(x.label)}</span>${stale ? '<span class="stale-tag">stale</span>' : ''}</div>
-      <div class="v">${val}</div><div class="c">${chg}${extra}</div>${spark(x.spark, 94, 18)}</div>`;
+      <div class="v">${val}</div><small class="tape-observed">Observed ${esc(x.date || 'date unavailable')} · ${esc(x.src || 'provider unavailable')}</small><div class="c">${chg}${extra}</div>${spark(x.spark, 94, 18)}</div>`;
   }).join('');
 }
 const tapeSeries = id => id;
@@ -134,7 +134,7 @@ const COLS = [
   {k: 'pct', h: '52w', ph: 1, tip: 'Position in 52-week range (unadjusted high/low)'},
   {k: 'ern', h: 'Earn', ph: 1, tip: 'Days until next earnings (Yahoo; may be an estimate)'},
   {k: 'iv', h: 'ATM IV', ph: 1, tip: 'At-the-money implied vol, nearest weekly expiry (Yahoo chain, delayed)'},
-  {k: 'opp', h: 'Opp', ph: 1, tip: "Opportunity: " + samLabel('tip')},
+  {k: 'opp', h: 'Historical score', ph: 1, opt: 1, tip: "Opportunity: " + samLabel('tip')},
   {k: 'b10', h: 'β10Y', ph: 1, tip: '% stock move per +10bp 10Y yield (OLS, 252 sessions). Bright = |t| at or above your threshold'},
   {k: 'boil', h: 'βOil', ph: 1, tip: '% stock move per +1% WTI (OLS, 252 sessions)'},
   {k: 'scen', h: 'Scen', tip: 'Scenario impact %: sum(coef x your shock). Historical association, not a forecast'},
@@ -153,7 +153,7 @@ const COLS = [
   {k: 'qual', h: 'Qual', ph: 1, opt: 1, tip: "Quality label: " + samLabel('tip')},
   {k: 'res20d', h: '20d α', ph: 1, tip: '20-session idiosyncratic return (%) = actual 20d return minus 5-factor OLS macro-explained move'},
   {k: 'pefrel', h: 'vs Sec', ph: 1, tip: 'Forward P/E relative to GICS sector median (1.00x = sector median)'},
-  {k: 'epsg', h: 'EPS g%', ph: 1, opt: 1, tip: 'Implied forward EPS growth % = (Trailing P/E / Forward P/E - 1) * 100'},
+  {k: 'epsg', h: 'P/E ratio gap %', ph: 1, opt: 1, tip: 'P/E ratio comparison = 100 * (trailing P/E / forward P/E - 1); not expected growth. Extreme values may reflect small bases or one-off charges.'},
   {k: 'res5d', h: '5d α', ph: 1, opt: 1, tip: '5-session idiosyncratic return (%) after stripping 5-factor OLS macro move'},
   {k: 'rv20', h: 'RV20', ph: 1, opt: 1, tip: '20-session annualized realized volatility (%) from Adj Close log returns'},
   {k: 'ivrv', h: 'IV/RV', ph: 1, opt: 1, tip: 'ATM IV (or sector median IV proxy) / 20d realized volatility'},
@@ -199,7 +199,7 @@ const PRESETS = [
   {id: 'garpmacro', h: 'Macro Tailwind + Cheap', f: r => isNum(r.pef_sec_rel) && r.pef_sec_rel <= 0.95 && ((scenOn() && r.rel && (scenarioImpact(r.rel.c, S.shock) || 0) >= 0) || (!scenOn() && isNum(r.res20d) && r.res20d >= 0)), sort: {k: 'pefrel', dir: 1}},
   {id: 'volcheap', h: 'Cheap Vol (Catalyst)', f: r => isNum(r.ivrv_eff) && r.ivrv_eff <= 1.05 && ((isNum(r.ern) && r.ern >= 0 && r.ern <= 21) || (isNum(r.res20d) && Math.abs(r.res20d) >= 3)), sort: {k: 'ivrv', dir: 1}},
   {id: 'volrich', h: 'Rich Premium (Sell Vol)', f: r => isNum(r.ivrv_eff) && r.ivrv_eff >= 1.25 && (!isNum(r.ern) || r.ern > 14), sort: {k: 'ivrv', dir: -1}},
-  {id: 'sam', h: 'Sam top', f: r => r.sam && isNum(r.sam.opp), sort: {k: 'opp', dir: -1}},
+  {id: 'sam', h: 'Historical scores', f: r => r.sam && isNum(r.sam.opp), sort: {k: 'opp', dir: -1}},
   {id: 'earn7', h: 'Earnings 7d', f: r => isNum(r.ern) && r.ern >= 0 && r.ern <= 7, sort: {k: 'ern', dir: 1}},
   {id: 'rate', h: 'Rate-sensitive', f: r => r.rel && Math.abs(r.rel.t.us10y_bps) >= S.minT, sort: {k: 'b10', dir: 1}},
   {id: 'iv', h: 'High IV', f: r => isNum(r.iv), sort: {k: 'iv', dir: -1}},
@@ -245,19 +245,19 @@ function cell(r, c) {
   switch (c.k) {
     case 't': {
       const a = r.sets.includes('A'), b = r.sets.includes('B');
-      const badge = `<span class="badge${a ? ' a' : ''}" data-tip="${a ? 'A = top S&P 500 mover today' : ''}${a && b ? '\n' : ''}${b ? "B = in Sam's 2026-07-25 universe" : ''}">${a && b ? 'A+B' : a ? 'A' : 'B'}</span>`;
+      const badge = `<span class="badge${a ? ' a' : ''}" data-tip="${a ? 'A = top S&P 500 mover today' : ''}${a && b ? '\n' : ''}${b ? "B = in Historical 2026-07-25 universe" : ''}">${a && b ? 'A+B' : a ? 'A' : 'B'}</span>`;
       return `<td class="l"><span class="tk" data-tip="${esc((r.n || '') + '\n' + (r.sec || '') + (r.ind ? ' · ' + r.ind : ''))}">${esc(r.t)}</span>${badge}</td>`;
     }
-    case 'd1': return `<td class="${stl(r, 'chg')}" data-tip="${esc(provTip(r, 'chg'))}">${pct(r.d1, 2, stReason(r, 'chg', '1d change'))}</td>`;
-    case 'px': return `<td data-tip="${esc(provTip(r, 'price'))}">${num(r.px, 2, stReason(r, 'price', 'price'))}</td>`;
+    case 'd1': return `<td data-live="${esc(r.t)}" data-live-f="chg" class="${stl(r, 'chg')}" data-tip="${esc(provTip(r, 'chg'))}">${pct(r.d1, 2, stReason(r, 'chg', '1d change'))}</td>`;
+    case 'px': return `<td data-tip="${esc(provTip(r, 'price'))}"><span data-live="${esc(r.t)}" data-live-f="price">${num(r.px, 2, stReason(r, 'price', 'price'))}</span><small style="display:block;font-size:10px" data-live="${esc(r.t)}" data-live-f="asof">${esc(r.pxd || 'date unavailable')}</small></td>`;
     case 'spark': return `<td>${spark(r.spark, 56, 16)}</td>`;
-    case 'pef': return `<td class="ph${stl(r, 'pe_forward')}" data-tip="${esc(fundTip(r, 'Forward P/E'))}">${num(r.pef, 1, stReason(r, 'pe_forward', 'forward P/E'))}</td>`;
+    case 'pef': return `<td data-live="${esc(r.t)}" data-live-f="pef" class="ph${stl(r, 'pe_forward')}" data-tip="${esc(fundTip(r, 'Forward P/E'))}">${num(r.pef, 1, stReason(r, 'pe_forward', 'forward P/E'))}</td>`;
     case 'peg': return `<td class="ph${stl(r, 'peg')}" data-tip="${esc(fundTip(r, 'PEG') + '\n' + (r.pegm || ''))}">${num(r.peg, 2, stReason(r, 'peg', 'PEG'))}</td>`;
     case 'pct': return `<td class="ph" data-tip="52w low ${r.lo} · high ${r.hi} · ${isNum(r.pct) ? r.pct.toFixed(0) + ' pctile' : ''}">${isNum(r.pct) ? `<span class="rng"><i style="left:${Math.max(0, Math.min(100, r.pct)) * .42}px"></i></span>` : na(stReason(r, 'range_52w', '52w range'))}</td>`;
     case 'ern': return `<td class="ph" data-tip="${esc((r.er || '') + ' ' + (r.ert || '') + '\n' + (r.ers || ''))}">${isNum(r.ern) ? r.ern + 'd' : na(stReason(r, 'earnings', 'earnings date'))}</td>`;
     case 'iv': return `<td class="ph" data-tip="${esc(r.ivs ? `${r.ivs}\nexpiry ${r.ivx}, strike ${r.ivk}${r.ivspan ? '\nexpiry spans earnings' : ''}` : '')}">${isNum(r.iv) ? r.iv.toFixed(1) : na('ATM IV only fetched for movers + nearest-earnings names (status: ' + ((r.st || {}).atm_iv || 'not fetched') + ')')}</td>`;
-    case 'opp': return `<td class="ph sam" data-tip="${esc(r.sam ? `Sam snapshot 2026-07-25 · quality ${r.sam.q || '-'} · risk ${r.sam.risk || '-'}
-flags ${r.sam.flags || '-'}${r.sam.risk === 'AVOID' ? '\nAVOID -> his composite is 0 by rule' : ''}` : '')}">${r.sam ? num(r.sam.opp, 1, 'no score in snapshot') : na("not in Sam's 2026-07-25 snapshot")}</td>`;
+    case 'opp': return `<td class="ph sam" data-tip="${esc(r.sam ? `Historical snapshot 2026-07-25 · quality ${r.sam.q || '-'} · risk ${r.sam.risk || '-'}
+flags ${r.sam.flags || '-'}${r.sam.risk === 'AVOID' ? '\nAVOID -> his composite is 0 by rule' : ''}` : '')}">${r.sam ? num(r.sam.opp, 1, 'no score in snapshot') : na("not in Historical 2026-07-25 snapshot")}</td>`;
     case 'b10': case 'boil': {
       const f = c.k === 'b10' ? 'us10y_bps' : 'wti';
       if (!r.rel) return `<td class="ph">${na('no regression (insufficient history)')}</td>`;
@@ -267,7 +267,7 @@ flags ${r.sam.flags || '-'}${r.sam.risk === 'AVOID' ? '\nAVOID -> his composite 
     case 'scen': if (!scenOn()) return ''; return `<td class="scen" data-tip="${esc(r.rel ? 'sum(coef x shock), 252-session OLS, n ' + r.rel.n + '\nhistorical association, not a forecast' : '')}">${r.rel ? pct(val(r, 'scen'), 2) : na('no regression')}</td>`;
     case 'd5': return `<td data-tip="${esc(provTip(r, 'chg'))}">${pct(r.d5, 1, stReason(r, 'chg_5d', '5d change'))}</td>`;
     case 'm1': return `<td data-tip="${esc(provTip(r, 'chg'))}">${pct(r.m1, 1, stReason(r, 'chg_1m', '1M change'))}</td>`;
-    case 'pe': return `<td class="ph${stl(r, 'pe_trailing')}" data-tip="${esc(fundTip(r, 'Trailing P/E'))}">${num(r.pe, 1, stReason(r, 'pe_trailing', 'trailing P/E'))}</td>`;
+    case 'pe': return `<td data-live="${esc(r.t)}" data-live-f="pe" class="ph${stl(r, 'pe_trailing')}" data-tip="${esc(fundTip(r, 'Trailing P/E'))}">${num(r.pe, 1, stReason(r, 'pe_trailing', 'trailing P/E'))}</td>`;
     case 'vr': return `<td class="ph" data-tip="volume / 20-day avg volume\nYahoo Finance via yfinance, session ${esc(r.pxd || '')}">${isNum(r.vr) ? r.vr.toFixed(2) + 'x' : na(stReason(r, 'vol_ratio_20d', 'volume ratio'))}</td>`;
     case 'beta': return `<td class="ph" data-tip="provider beta, Yahoo Finance via yfinance\nretrieved ${esc(r.rat || 'n/a')}">${num(r.beta, 2, stReason(r, 'beta_provider', 'beta'))}</td>`;
     case 'up': return `<td class="ph" data-tip="Yahoo analyst mean target ${esc(isNum(r.tgt) ? r.tgt : 'n/a')} vs price\nnot consensus EPS (no licensed source)">${pct(r.up, 0, stReason(r, 'analyst', 'analyst target'))}</td>`;
@@ -278,15 +278,15 @@ flags ${r.sam.flags || '-'}${r.sam.risk === 'AVOID' ? '\nAVOID -> his composite 
       return `<td class="ph ${Math.abs(t) >= S.minT ? 'sig' : 'nsig'}" data-tip="coef ${r.rel.c[f]} · t ${t} · R² ${r.rel.r2} · n ${r.rel.n}">${pct(r.rel.c[f], 2)}</td>`;
     }
     case 'r2': return `<td class="ph" data-tip="${esc(r.rel ? '5-factor OLS, n ' + r.rel.n : '')}">${r.rel ? num(r.rel.r2, 2) : na('no regression (insufficient history)')}</td>`;
-    case 'risk': return `<td class="ph sam" data-tip="${esc(samLabel('tip'))}">${r.sam && r.sam.risk ? esc(r.sam.risk) : na("not in Sam's 2026-07-25 snapshot")}</td>`;
-    case 'qual': return `<td class="ph sam" data-tip="${esc(samLabel('tip'))}">${r.sam && r.sam.q ? esc(r.sam.q) : na("not in Sam's 2026-07-25 snapshot")}</td>`;
+    case 'risk': return `<td class="ph sam" data-tip="${esc(samLabel('tip'))}">${r.sam && r.sam.risk ? esc(r.sam.risk) : na("not in Historical 2026-07-25 snapshot")}</td>`;
+    case 'qual': return `<td class="ph sam" data-tip="${esc(samLabel('tip'))}">${r.sam && r.sam.q ? esc(r.sam.q) : na("not in Historical 2026-07-25 snapshot")}</td>`;
     case 'res20d': return `<td class="ph" data-tip="${esc(r.att ? `20d actual ${r.att.actual_20d}% = factors ${r.att.explained_20d}% + idiosyncratic ${r.res20d}%` : '20d idiosyncratic residual')}">${pct(r.res20d, 1, 'no 20d attribution')}</td>`;
     case 'res5d': return `<td class="ph" data-tip="${esc(r.att ? `5d actual ${r.att.actual_5d}% = factors ${r.att.explained_5d}% + idiosyncratic ${r.res5d}%` : '5d idiosyncratic residual')}">${pct(r.res5d, 1, 'no 5d attribution')}</td>`;
     case 'pefrel': return `<td class="ph" data-tip="${esc(`Fwd P/E ${r.pef || 'n/a'} vs ${r.sec || 'sector'} median ${r.pef_sec_med || 'n/a'}x`)}">${isNum(r.pef_sec_rel) ? `<span class="${r.pef_sec_rel <= 0.9 ? 'up' : r.pef_sec_rel >= 1.2 ? 'dn' : ''}">${r.pef_sec_rel.toFixed(2)}x</span>` : na('forward P/E missing')}</td>`;
-    case 'epsg': return `<td class="ph" data-tip="Implied forward EPS growth % = (Trailing P/E / Forward P/E - 1) * 100">${pct(r.eps_g_imp, 1, 'requires positive trailing and forward P/E')}</td>`;
+    case 'epsg': return `<td title="${esc(r.eps_ratio_note || 'Ratio comparison, not expected growth')}" class="ph" data-tip="P/E ratio comparison = 100 * (trailing P/E / forward P/E - 1); not expected growth. Extreme values may reflect small bases or one-off charges.">${pct(r.eps_g_imp, 1, 'requires positive trailing and forward P/E')}</td>`;
     case 'rv20': return `<td class="ph" data-tip="20-session annualized realized volatility from Adj Close log returns">${isNum(r.rv20) ? r.rv20.toFixed(1) + '%' : na('insufficient bars')}</td>`;
     case 'ivrv': return `<td class="ph" data-tip="${esc(isNum(r.ivrv) ? `ATM IV ${r.iv}% / RV20 ${r.rv20}%` : `Sector median IV proxy ${r.iv_sec_med}% / RV20 ${r.rv20}%`)}">${isNum(r.ivrv) ? r.ivrv.toFixed(2) + 'x' : isNum(r.ivrv_eff) ? `<span class="dim" title="Sector IV proxy">${r.ivrv_eff.toFixed(2)}p</span>` : na('vol missing')}</td>`;
-    case 'drift': return `<td class="ph sam" data-tip="${esc(r.sam_drift && isNum(r.sam_drift.px_pct) ? `Price change since 2026-07-25 snapshot ($${r.sam ? r.sam.px : ''} -> $${r.px})` : 'Not in snapshot')}">${pct(r.sam_drift ? r.sam_drift.px_pct : null, 1, 'not in Sam snapshot')}</td>`;
+    case 'drift': return `<td class="ph sam" data-tip="${esc(r.sam_drift && isNum(r.sam_drift.px_pct) ? `Price change since 2026-07-25 snapshot ($${r.sam ? r.sam.px : ''} -> $${r.px})` : 'Not in snapshot')}">${pct(r.sam_drift ? r.sam_drift.px_pct : null, 1, 'not in Historical snapshot')}</td>`;
   }
   return '<td></td>';
 }
@@ -303,7 +303,8 @@ function renderTable() {
   $('#tbody').innerHTML = rows.map(r => `<tr data-t="${esc(r.t)}"${r.t === selT ? ' class="sel"' : ''}>${activeCols().map(c => cell(r, c)).join('')}</tr>`).join('');
   const sc = scenOn() ? ' · scenario on: ' + FACTORS.filter(f => S.shock[f]).map(f => `${FLABEL[f]} ${S.shock[f] > 0 ? '+' : ''}${S.shock[f]}${SHOCK_U[f]}`).join(', ') + ' (historical association, not a forecast)' : '';
   const sk = V.sort.k.startsWith('c:') ? ` · sorted by ${FLABEL[V.sort.k.slice(2)]} coef` : '';
-  $('#tmeta').innerHTML = `<span>${rows.length} of ${D.rows.length}${V.sector ? ' · ' + esc(V.sector) : ''}${sk}${sc}</span><span>${esc(samLabel('short'))}</span>`;
+  if (window.SmartOptionsLive) window.SmartOptionsLive.paint(document.getElementById('tbody'));
+  $('#tmeta').innerHTML = `<span>${rows.length} of ${D.rows.length}${V.sector ? ' · ' + esc(V.sector) : ''}${sk}${sc}</span><span>Historical scores are optional in Settings</span>`;
 }
 
 /* ---------- chart ---------- */
@@ -542,7 +543,7 @@ function attrBlock(r) {
     <svg width="100%" viewBox="0 0 ${W} ${H + 2}"><line x1="0" x2="${W}" y1="${sy(0)}" y2="${sy(0)}" stroke="#232a31"/>${bars}${tot}</svg>${mh}</div>`;
 }
 function samBlock(r, d) {
-  if (!r.sam) return `<div class="blk"><div class="sech">Sam's score</div><div class="evl">${na("not in Sam's 2026-07-25 snapshot")}</div></div>`;
+  if (!r.sam) return `<div class="blk"><div class="sech">Historical score</div><div class="evl">${na("not in Historical 2026-07-25 snapshot")}</div></div>`;
   const s = r.sam, c = d && d.sam_components;
   let bar = '';
   if (c && c.reproduced) {
@@ -553,7 +554,7 @@ function samBlock(r, d) {
     bar = `<svg width="100%" viewBox="0 0 ${W} 12" preserveAspectRatio="none" style="height:12px">${segs.join('')}</svg>
       <div class="sub" style="padding:3px 0">${c.parts.map((p, i) => `<span style="color:${cols[i]}">■</span> ${p.k} ${p.score.toFixed(0)}`).join(' · ')}<br>base ${c.base_score == null ? (c.parts.reduce((a, p) => a + p.w * p.score, 0) / 100).toFixed(2) : c.base_score.toFixed(2)} x Q ${c.qmult} x R ${c.rmult} = ${c.derived} (published ${c.published})</div>`;
   } else if (c) bar = `<div class="sub">components not shown: could not reproduce published score from EXPLAIN</div>`;
-  return `<div class="blk"><div class="sech" data-tip="${esc("Sam's own scores, read-only. SmartOptions snapshot " + (s.asof || '2026-07-25') + '. Component split uses his documented formula and is shown only when it reproduces his published number.')}">Sam's score <span class="dim">${esc(samLabel('short'))}</span></div>
+  return `<div class="blk"><div class="sech" data-tip="${esc("Historical own scores, read-only. SmartOptions snapshot " + (s.asof || '2026-07-25') + '. Component split uses his documented formula and is shown only when it reproduces his published number.')}">Historical score <span class="dim">Historical scores are optional in Settings</span></div>
     <div style="padding:0 12px">
     <div class="grid" style="grid-template-columns:repeat(4,1fr);border:0">${stat('Opp', num(s.opp, 1))}${stat('Quality', esc(s.q || '—'))}${stat('Trend', num(s.trend, 0))}${stat('Risk', esc(s.risk || '—'))}</div>
     ${bar}<div class="sub">flags: ${esc(s.flags || '—')} · snapshot price ${num(s.px, 2)}${r.sam_drift && isNum(r.sam_drift.px_pct) ? ` · <b>drift since 07-25: ${pct(r.sam_drift.px_pct, 1)} px${isNum(r.sam_drift.pef_chg) ? ', ' + (r.sam_drift.pef_chg > 0 ? '+' : '') + r.sam_drift.pef_chg.toFixed(1) + 'x fP/E' : ''}</b>` : ''}${r.sam_drift && (isNum(r.sam_drift.roe) || isNum(r.sam_drift.de)) ? `<br>retained quality inputs (07-25): ROE ${num(r.sam_drift.roe, 1)}% · D/E ${num(r.sam_drift.de, 2)} · Rev g ${num(r.sam_drift.rev_g, 1)}% · EPS g ${num(r.sam_drift.eps_g, 1)}%` : ''}</div></div></div>`;
@@ -696,10 +697,12 @@ async function boot() {
   readHash();
   if (V.sel.kind === 't' && V.sel.id !== 'SPY' && !rowOf(V.sel.id)) V.sel = {kind: 't', id: 'SPY'};
   selfCheck();
-  window.SO2 = {D: () => D, S: () => S, V, renderTable, renderAll, renderDetail, select, save, scenarioImpact, FACTORS, FLABEL, SHOCK_U, DEFAULTS, filtered, num, pct, na, esc, spark, isNum, seriesData, obsOf, showTab,
+  const priorSO2 = window.SO2 || {};   // keep modules that attached before this file (Live, MoneyFlow)
+  window.SO2 = {...priorSO2, Live: window.SmartOptionsLive, D: () => D, S: () => S, V, renderTable, renderAll, renderDetail, select, save, scenarioImpact, FACTORS, FLABEL, SHOCK_U, DEFAULTS, filtered, num, pct, na, esc, spark, isNum, seriesData, obsOf, showTab,
     COLS, DEFAULT_COLS, activeCols, PRESETS, OVERLAYS, renderTape, drawChart, setRange, writeHash, toggleDrawer, rowOf, setS: x => { S = x; }, chartObj: () => chart};
   wire();
   renderAll();
+  if (window.SmartOptionsLive) { window.SmartOptionsLive.paint(document); window.SmartOptionsLive.subscribe(() => window.SmartOptionsLive.paint(document)); }
   const op = new URLSearchParams(location.hash.slice(1)).get('open');
   showTab(V.tab);
   if (op === 'controls' || op === 'about') toggleDrawer(op);

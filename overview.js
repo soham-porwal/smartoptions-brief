@@ -1,4 +1,4 @@
-/* R5: one-view watchlist. Sam's scores are read-only snapshot values. */
+/* R5: one-view watchlist. Historical scores are read-only snapshot values. */
 (function (root) {
   'use strict';
   const KEY = 'so_watchlist_v1';
@@ -212,11 +212,11 @@
   function openTicker(t) { show(false); api.showTab('markets'); api.select('t',t); }
   function mount() {
     api=root.SO2;
-    root.SmartOptionsWatchlist=createWatchlist(localStorage,()=>api.D().rows.filter(r=>r.sam&&finite(r.sam.opp)).sort((a,b)=>b.sam.opp-a.sam.opp||a.t.localeCompare(b.t)).slice(0,25).map(r=>r.t),notice);
+    root.SmartOptionsWatchlist=createWatchlist(localStorage,()=>[],notice);
     const tab=document.createElement('button');tab.id='ov-tab';tab.textContent='Overview';tab.dataset.tab='overview';{const fl=$('#fl-tab');if(fl)fl.after(tab);else $('#tabs').prepend(tab);}
     const analyst=$('#tabs [data-tab="markets"]');if(analyst) analyst.textContent='Analyst';
     page=document.createElement('main');page.id='pg-overview';page.hidden=true;
-    page.innerHTML=`<section class="ov-watch"><div class="ov-toolbar"><div><h1>Watchlist <span id="ov-count"></span></h1><p>Price & fundamentals · Initially Sam’s top 25 Opportunity scores (2026-07-25). Select a ticker to explore; pin your own names.</p></div><div class="ov-tools"><button id="ov-edge-desk" type="button" style="background:rgba(229,173,76,.18);border-color:#e5ad4c;color:#ffd885;font-weight:700" title="Open the lean Premium Pocket + Edge & Alpha Finder + Macro Stress Desk">★ Edge Desk (Pocket)</button><div class="ov-scope-bar" role="group" aria-label="Universe scope" style="display:inline-flex;gap:4px"><button type="button" data-ov-scope="watch" class="on">Watchlist</button><button type="button" data-ov-scope="book">My Book</button><button type="button" data-ov-scope="movers">Movers</button><button type="button" data-ov-scope="all">Full S&amp;P (365)</button></div><input id="ov-search" type="search" aria-label="Filter watchlist" placeholder="Filter ticker / sector"><form id="ov-add"><input id="ov-symbol" aria-label="Ticker to pin" list="ov-datalist" placeholder="Pin ticker" maxlength="15"><datalist id="ov-datalist"></datalist><button type="submit" title="Pin ticker to watchlist">+</button></form><button id="ov-demo-book" type="button" title="Load or undo a 6-stock sample portfolio with share counts and cost basis">Load Demo Book</button><button id="ov-add-data">Add data</button></div></div><div id="ov-book-stress"></div><div id="ov-warning" role="status"></div><div class="ov-table-scroll"><table id="ov-table"><thead id="ov-thead"></thead><tbody id="ov-tbody"></tbody></table><div id="ov-empty" hidden>No matching watchlist symbols. Pin a ticker or add a file.</div></div></section><section class="ov-macro-section"><div class="ov-section-label">Macro context <span>Observation periods shown · source details on hover · changes are not trading signals</span></div><div id="ov-macro"></div></section><footer class="ov-foot">Snapshot data, not live quotes · missing = unavailable · educational analysis <span id="ov-local-status">Your imports stay in this browser</span> · <a href="legacy/index.html" target="_blank" rel="noopener">Original screener</a></footer>`;
+    page.innerHTML=`<section class="ov-watch"><div class="ov-toolbar"><div><h1>Watchlist <span id="ov-count"></span></h1><p>Price & fundamentals · Pin the companies you want to follow. Select a ticker to explore; pin your own names.</p></div><div class="ov-tools"><button id="ov-edge-desk" type="button" style="background:rgba(229,173,76,.18);border-color:#e5ad4c;color:#ffd885;font-weight:700" title="Open the lean Options income + Edge & Alpha Finder + Macro Stress Desk">Options and risk tools</button><div class="ov-scope-bar" role="group" aria-label="Universe scope" style="display:inline-flex;gap:4px"><button type="button" data-ov-scope="watch" class="on">Watchlist</button><button type="button" data-ov-scope="book">My Book</button><button type="button" data-ov-scope="movers">Movers</button><button type="button" data-ov-scope="all">Covered S&amp;P universe</button></div><input id="ov-search" type="search" aria-label="Filter watchlist" placeholder="Filter ticker / sector"><form id="ov-add"><input id="ov-symbol" aria-label="Ticker to pin" list="ov-datalist" placeholder="Pin ticker" maxlength="15"><datalist id="ov-datalist"></datalist><button type="submit" title="Pin ticker to watchlist">+</button></form><button id="ov-demo-book" type="button" title="Load or undo a 6-stock sample portfolio with share counts and cost basis">Load Demo Book</button><button id="ov-add-data">Add data</button></div></div><div id="ov-book-stress"></div><div id="ov-warning" role="status"></div><div class="ov-table-scroll"><table id="ov-table"><thead id="ov-thead"></thead><tbody id="ov-tbody"></tbody></table><div id="ov-empty" hidden>No matching watchlist symbols. Pin a ticker or add a file.</div></div></section><section class="ov-macro-section"><div class="ov-section-label">Macro context <span>Observation periods shown · source details on hover · changes are not trading signals</span></div><div id="ov-macro"></div></section><footer class="ov-foot">Snapshot data, not live quotes · missing = unavailable · educational analysis <span id="ov-local-status">Your imports stay in this browser</span> · <a href="legacy/index.html" target="_blank" rel="noopener">Original screener</a></footer>`;
     $('#pg-markets').before(page);
     page.insertAdjacentHTML('afterbegin', '<div id="ov-today"></div>');
     // Keep body class / page in step with whichever tab is on (Flow and app.js switch tabs without telling us).
@@ -240,12 +240,12 @@
     const demoBtn = $('#ov-demo-book');
     if (demoBtn) demoBtn.addEventListener('click', () => {
       try {
-        const raw = localStorage.getItem('so_local_imports_v1');
+        const raw = localStorage.getItem('so_import_v1');
         const cur = raw ? JSON.parse(raw) : {book: {}, metrics: null, series: []};
         if (prevBookBackup !== null) {
           cur.book = prevBookBackup;
           prevBookBackup = null;
-          localStorage.setItem('so_local_imports_v1', JSON.stringify(cur));
+          localStorage.setItem('so_import_v1', JSON.stringify(cur));
           demoBtn.textContent = 'Load Demo Book';
           if (ovScope === 'book' && !Object.keys(cur.book || {}).length) ovScope = 'watch';
           notice('Restored previous My Book state.');
@@ -253,7 +253,7 @@
           prevBookBackup = cur.book || {};
           cur.book = {};
           for (const item of DEMO_BOOK) cur.book[item.t] = {qty: item.qty, cost: item.cost};
-          localStorage.setItem('so_local_imports_v1', JSON.stringify(cur));
+          localStorage.setItem('so_import_v1', JSON.stringify(cur));
           root.SmartOptionsWatchlist.add(DEMO_BOOK.map(x => x.t));
           demoBtn.textContent = 'Undo Demo Book';
           notice('Loaded 6-position sample book (NVDA, MSFT, AAPL, JPM, XOM, LLY) with portfolio factor betas & stress test.');

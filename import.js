@@ -209,7 +209,24 @@
   /* ---- local store (localStorage only) ---- */
   function createStore(storage) {
     const empty = () => ({book: null, metrics: null, series: []});
-    function get() { try { const v = JSON.parse(storage.getItem(KEY)); return v && typeof v === 'object' ? Object.assign(empty(), v) : empty(); } catch (e) { return empty(); } }
+    function get() {
+      try {
+        let raw = storage.getItem(KEY);
+        if (raw == null) {
+          const legacy = storage.getItem('so_local_imports_v1');
+          if (legacy) {
+            const old = JSON.parse(legacy);
+            if (old && typeof old === 'object' && old.book) { storage.setItem(KEY, legacy); raw = legacy; }
+          }
+        }
+        const v = JSON.parse(raw);
+        return v && typeof v === 'object' ? Object.assign(empty(), v) : empty();
+      } catch (e) {
+        console.warn('[import] WARN local data could not be read; original retained');
+        try { storage.setItem('so_import_diagnostic_v1', JSON.stringify({status:'WARN', at:new Date().toISOString(), reason:'Local holdings could not be read; original storage retained.'})); } catch (loggingError) { console.warn('[import] diagnostic storage unavailable'); }
+        return {...empty(), storageWarning:'Local holdings could not be read; original data retained.'};
+      }
+    }
     function put(v) { storage.setItem(KEY, JSON.stringify(v)); }
     return {get, put, clear: () => storage.removeItem(KEY)};
   }

@@ -43,3 +43,38 @@
 .so-fv .fv-chip.failed { opacity: .75; }
 .so-fv .fv-src { font-size: 12px; color: var(--fv-dim); margin: 10px 0 0; }
 @media (prefers-reduced-motion: reduce) { .so-fv .fv-draw, .so-fv .fv-skel { animation: none !important; } }
+.so-fv { min-width:0; max-width:100%; }.so-fv .fv-panes { overflow:hidden; }
+.so-fv .fv-tf button { min-height:44px; }.so-fv .fv-quote-note { line-height:1.5; overflow-wrap:anywhere; }
+@media(max-width:640px) { .so-fv .fv-top { align-items:flex-start; flex-direction:column; gap:8px; }.so-fv .fv-read { font-size:12px; gap:2px 9px; }.so-fv .fv-chips { grid-template-columns:minmax(0,1fr); }.so-fv .fv-toggles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 8px; }.so-fv .fv-tg { font-size:13px; }.so-fv .fv-tg input { flex:none; } }
+/* lane UI2: compact quote line, tapped-day details, macro overlay picker, series detail */
+.so-fv .fv-quote-note { background: transparent; padding: 0; margin: 0 0 6px; font-size: 12px; color: var(--fv-dim); }
+.so-fv .fv-day { margin: 8px 0 4px; padding: 10px 12px; border: 1px solid var(--fv-line); border-left: 3px solid var(--fv-accent); border-radius: 10px; background: var(--b-card-2, #f8f9f7); font-size: 14px; animation: fv-in .18s ease-out; }
+.so-fv .fv-day[hidden] { display: none; }
+@keyframes fv-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.so-fv .fv-dh { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.so-fv .fv-dh b { font-size: 15px; }
+.so-fv .fv-prov { font-size: 12px; color: var(--b-mixed, #946200); }
+.so-fv .fv-dx { margin-left: auto; min-height: 36px; padding: 0 12px; border: 1px solid var(--fv-line); border-radius: 999px; background: transparent; color: var(--fv-accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; position: relative; }
+.so-fv .fv-dx::after { content: ""; position: absolute; inset: -4px; }
+.so-fv .fv-dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 16px; margin: 0; }
+.so-fv .fv-dl div { min-width: 0; }
+.so-fv .fv-dl dt { font-size: 11px; color: var(--fv-dim); }
+.so-fv .fv-dl dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.so-fv em { font-style: normal; font-weight: 500; font-size: 12px; color: var(--fv-dim); }
+.so-fv em.up { color: var(--b-good, #1f8a4c); } .so-fv em.dn { color: var(--b-bad, #c8363b); }
+.so-fv .fv-dm { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 6px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.so-fv .fv-dm i { font-style: normal; font-size: 11px; color: var(--fv-dim); }
+.so-fv .fv-dmh { flex-basis: 100%; font-size: 11px; color: var(--fv-dim); }
+.so-fv .fv-mac { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; color: var(--fv-dim); }
+.so-fv .fv-mac select { font: inherit; font-size: 16px; min-height: 40px; padding: 0 8px; border: 1px solid var(--fv-line); border-radius: 8px; background: var(--fv-card); color: var(--fv-ink); max-width: 220px; }
+.so-fv .fv-sh { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.so-fv .fv-sh > div { display: flex; flex-direction: column; }
+.so-fv .fv-sh b { font-size: 17px; } .so-fv .fv-sh span { font-size: 12px; color: var(--fv-dim); }
+.so-fv .fv-sv { text-align: right; } .so-fv .fv-sv b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.so-fv .fv-schg { margin: 8px 0; }
+.so-fv .fv-corr { margin-top: 8px; }
+[data-bt="dark"] .so-fv .fv-note, [data-bt="dark"] .so-fv .fv-chip { background: rgba(255,255,255,.05); }
+[data-bt="dark"] .so-fv .fv-sublab { background: rgba(20,24,22,.8); }
+@media (max-width: 640px) { .so-fv .fv-dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } .so-fv .fv-mac { width: 100%; } .so-fv .fv-mac select { flex: 1; max-width: none; } }
+.so-fv .fv-quote-note, [data-bt="dark"] .so-fv .fv-quote-note { background: transparent; }
+.so-fv .fv-sw { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }

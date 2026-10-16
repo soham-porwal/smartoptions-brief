@@ -9,7 +9,7 @@
 
   /* ---------- rule defaults (all tunable; these are OUR chosen defaults, not market standards) ---------- */
   const DEFAULT_RULES = {
-    regimeBull: 60, regimeBear: 40,          // Sam's regime score (0-100)
+    regimeBull: 60, regimeBear: 40,          // Historical regime score (0-100)
     breadthPP: 1.0,                          // RSP-SPY 20d, pp: > +x broad, < -x narrow
     rate20dBp: 15,                           // 10Y 20-session change, bp: rising fast = headwind
     hy20dBp: 25,                             // HY OAS 20-session change, bp: widening = risk-off
@@ -102,7 +102,7 @@
   function marketVerdict(inputs, R) {
     const voting = inputs.filter(i => fin(i.vote)); const sum = voting.reduce((a, i) => a + i.vote, 0);
     if (voting.length < R.minInputs) return {word: 'Insufficient data', cls: 'na', sum, n: voting.length};
-    const word = sum >= R.leanVotes ? 'Lean bullish' : sum <= -R.leanVotes ? 'Lean bearish' : 'Neutral';
+    const word = sum >= R.leanVotes ? 'Supportive' : sum <= -R.leanVotes ? 'Adverse' : 'Mixed';
     return {word, cls: sum >= R.leanVotes ? 'up' : sum <= -R.leanVotes ? 'dn' : 'neu', sum, n: voting.length};
   }
   // "What could shake it": the macro factors moving most vs their own 1y distribution of 20-session moves.
@@ -214,15 +214,15 @@
     if (!catalyst && fin(ivrv) && ivrv >= R.ivRich && (nv.word === 'MIXED' || mv.word === 'Neutral') && vv.word !== 'Stress')
       return Object.assign(base, {setup: 'Iron condor candidate', cls: 'up', short: `IV/RV ${ivrv.toFixed(2)} rich · no earnings ≤ ${R.catalystDays}d · no clear direction`, why: `IV/RV ${ivrv.toFixed(2)} >= ${R.ivRich} (premium rich), no earnings inside ${R.catalystDays}d, and direction is not decided (${nv.word} name / ${mv.word} market): range-bound premium with defined risk.`,
         invalid: 'close outside the band, an earnings/news catalyst appears, or VIX term ratio goes above 1.0'});
-    if (nv.word === 'STRONG' && mv.word !== 'Lean bearish' && !catalyst)
+    if (nv.word === 'STRONG' && !['Lean bearish','Adverse'].includes(mv.word) && !catalyst)
       return Object.assign(base, {setup: 'CSP / covered call (baseline)', cls: 'neu', short: `STRONG name · market ${mv.word.toLowerCase()} · no earnings ≤ ${R.catalystDays}d`, why: `STRONG name, market ${mv.word.toLowerCase()}, no earnings inside ${R.catalystDays}d: the baseline income setup (cash-secured put on a name you would own, or covered call if held).`,
-        invalid: `name drops to MIXED/WEAK, market turns Lean bearish, or price closes below the lower band${band ? ' (' + band[0].toFixed(2) + ')' : ''}`});
+        invalid: `name drops to MIXED/WEAK, market turns adverse, or price closes below the lower band${band ? ' (' + band[0].toFixed(2) + ')' : ''}`});
     const miss = [];
     if (!fin(iv)) miss.push('no ATM IV stored for this name (IV/RV cannot be judged)');
     if (catalyst) miss.push(r.ern === 0 ? 'earnings today' : `earnings in ${r.ern}d`);
     if (fin(ivrv) && ivrv > R.ivCheap && ivrv < R.ivRich) miss.push(`IV/RV ${ivrv.toFixed(2)} between ${R.ivCheap} and ${R.ivRich}`);
     if (nv.word === 'WEAK') miss.push('WEAK name: no bullish-premium baseline');
-    if (mv.word === 'Lean bearish') miss.push('market Lean bearish');
+    if (['Lean bearish','Adverse'].includes(mv.word)) miss.push('market adverse');
     const why = miss.join('; ') || 'conditions for strangle / condor / baseline not met';
     return Object.assign(base, {setup: 'No rule matched', cls: 'na', short: why, why, invalid: null});
   }
@@ -233,7 +233,7 @@
     const r = rules || DEFAULT_RULES, mi = marketInputs(D, r), mv = marketVerdict(mi, r);
     const vi = volInputs(D), vv = volVerdict(vi, r);
     const covered = mv.n > 0 && mv.n >= Math.max(1, r.minInputs);
-    const market = covered ? ({'Lean bullish': 'Measured market inputs lean bullish', 'Lean bearish': 'Measured market inputs lean bearish', Neutral: 'Measured market inputs are mixed / neutral'}[mv.word] || 'The market assessment is unavailable') : 'Insufficient coverage for a market assessment';
+    const market = covered ? ({Supportive: 'Measured market inputs are supportive', Adverse: 'Measured market inputs are adverse', Mixed: 'Measured market inputs are mixed', 'Lean bullish': 'Measured market inputs lean bullish', 'Lean bearish': 'Measured market inputs lean bearish', Neutral: 'Measured market inputs are mixed / neutral'}[mv.word] || 'The market assessment is unavailable') : 'Insufficient coverage for a market assessment';
     const volatility = vv.word === 'Unknown' ? 'volatility data is unavailable' : `volatility is ${vv.word.toLowerCase()}${vv.trend ? ' and ' + vv.trend : ''}`;
     const sources = mi.filter(i => fin(i.vote) && i.source).map(i => i.source).concat(vi.source ? [vi.source] : []);
     const providers = [...new Set(sources.map(s => s.provider).filter(Boolean))];

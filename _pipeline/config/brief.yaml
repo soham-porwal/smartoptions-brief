@@ -1,0 +1,46 @@
+# Inclusive strong, strict weak boundaries. Percentages are percentage units.
+cache_ttl_hours: 24
+request_spacing_seconds: 0.20
+retry_backoff_seconds: 1.0
+workers: 4
+company:
+  growth_weak: 0
+  growth_strong: 10
+  margin_weak: 5
+  margin_strong: 20
+  margin_direction_pp: 0.5
+  cash_conversion_weak: 0.5
+  cash_conversion_strong: 1.0
+  debt_equity_weak: 2.0
+  debt_equity_strong: 0.5
+  net_debt_ebitda_weak: 4
+  net_debt_ebitda_strong: 1.5
+  current_ratio_weak: 1
+  current_ratio_strong: 1.5
+  interest_coverage_weak: 2
+  interest_coverage_strong: 5
+  valuation_weak: 1.5
+  valuation_strong: 0.8
+  roe_weak: 5
+  roe_strong: 15
+  roa_weak: 0.3
+  roa_strong: 1
+  max_statement_age_days: 210
+  shortlist_min_dimensions: 5
+  shortlist_count: 8
+  event_penalty: 10
+  momentum_weight: 0.15
+macro:
+  gdp_acceleration_pp: 0.1
+  payroll_acceleration_thousands: 5
+  policy_change_pp: 0.1
+  breadth_strong: 60
+  breadth_weak: 40
+  eq_gap_pp: 0.5
+  vix_elevated: 20
+  vix_stressed: 30
+  hy_elevated_bps: 450
+  hy_stressed_bps: 600
+  hy_change_elevated_bps: 30
+  concentration_pct: 40
+  inflation_flat_pp: 0.25

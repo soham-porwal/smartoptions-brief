@@ -10,8 +10,8 @@
 })(typeof window !== 'undefined' ? window : globalThis, function (root) {
 
   /* ================================================================ pure helpers */
-  const VIEWS = ['brief', 'company', 'macro', 'research'];
-  const SCREENER_ASOF_FALLBACK = '2026-07-25';   // release.json notes: Sam scores remain the dated 2026-07-25 snapshot
+  const VIEWS = ['brief', 'company', 'macro', 'research', 'my-dash', 'flows'];
+  const SCREENER_ASOF_FALLBACK = '2026-07-25';   // release.json notes: Historical scores remain the dated 2026-07-25 snapshot
 
   // '#/brief', '#/company/AAPL', '#/macro', '#/research/flow?t=AAPL', legacy '#tab=overview&t=AAPL'
   function parseRoute(hash) {
@@ -32,6 +32,7 @@
     }
     if (view === 'research') return {view: 'research', tab: (path[1] || '').toLowerCase().replace(/[^a-z0-9_-]/g, ''), legacy: false, params};
     if (view === 'macro') return {view: 'macro'};
+    if (view === 'my-dash' || view === 'flows') return {view};
     return {view: 'brief'};
   }
   // the Edge modules read '#tab=x&...' at startup; translate a research route to that form
@@ -55,6 +56,16 @@
   function tone(word) { return TONE[String(word || '').toLowerCase()] || 'none'; }
   function cap(s) { s = String(s == null ? '' : s); return s ? s[0].toUpperCase() + s.slice(1) : s; }
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  // A partial selected-name feed must never replace newer observations with a stale sweep.
+  function mergeQuotes(previous,incoming,nowMs) {
+    const now=nowMs==null?Date.now():nowMs, out={...(previous||{}),...(incoming||{}),quotes:{...(previous&&previous.quotes||{})}};
+    for(const [t,q] of Object.entries(incoming&&incoming.quotes||{})) {
+      const n=q&&Date.parse(q.asof_utc||q.ts), p=out.quotes[t], old=p&&Date.parse(p.asof_utc||p.ts);
+      if(q && q.status==='ok' && isNum(q.price) && q.price>0 && isFinite(n) && n<=now+60000 && (!isFinite(old)||n>=old)) out.quotes[t]=q;
+      else if(!p && q && q.status!=='ok') out.quotes[t]=q;
+    }
+    return out;
+  }
 
   // 0.05 h -> "3 min old"; 30 h -> "1 day old"
   function ageWords(hours) {
@@ -83,7 +94,7 @@
     return Math.max(0, Math.round((today - t) / 864e5));
   }
 
-  // The shared plain-language label for Sam's screener scores. Replaces "Sam columns: snapshot 2026-07-25".
+  // The shared plain-language label for Historical screener scores. Replaces "Historical columns: snapshot 2026-07-25".
   // mode 'short' -> "Screener scores from Jul 25 (82 days old)"; 'long' adds what they are.
   let screenerInfo = null;
   function screenerLabel(mode, info, nowMs) {
@@ -92,10 +103,10 @@
     const days = daysBetween(asof, nowMs == null ? Date.now() : nowMs);
     const age = days == null ? '' : days === 0 ? ' (today)' : ' (' + days + (days === 1 ? ' day' : ' days') + ' old)';
     if (mode === 'long') {
-      return "Sam's screener scores (Opportunity, Quality, Risk) were last calculated on " + shortDate(asof, true) + age +
+      return "Historical screener scores (Opportunity, Quality, Risk) were last calculated on " + shortDate(asof, true) + age +
         '. Prices, fundamentals and macro data on this site update separately and carry their own dates.';
     }
-    if (mode === 'tip') return "Sam's screener score, calculated " + shortDate(asof, true) + age + '. Read-only.';
+    if (mode === 'tip') return "Historical screener score, calculated " + shortDate(asof, true) + age + '. Read-only.';
     return 'Screener scores from ' + shortDate(asof, false) + age;
   }
   function setScreener(info) { screenerInfo = info && info.asof ? info : screenerInfo; }
@@ -144,7 +155,7 @@
     return {status, words, ageH, oldestH, note, asof: new Date(nowMs - ageH * 36e5).toISOString()};
   }
 
-  const RANK = {fresh: 0, live: 0, delayed: 1, stale: 2, missing: 3};
+  const RANK = {fresh: 0, live: 0, closed: 0.5, delayed: 1, mixed: 1, stale: 2, missing: 3};
   function pickSource(sources, re) { return (sources || []).find(s => re.test(String(s.id || '') + ' ' + String(s.label || ''))); }
   // pill text: "Prices 3 min old, macro current"
   function pillText(health, quotes, nowMs) {
@@ -217,8 +228,9 @@
   function gloss(label) { return GLOSS[label] ? `<span class="b-gloss" tabindex="0" data-gloss="${esc(GLOSS[label])}">${esc(label)}</span>` : esc(label); }
 
   // ---- metrics flip
-  function metricRows(metrics) {
+  function metricRows(metrics, full) {
     const ms = (metrics || []).filter(Boolean);
+    if (!full && ms.length > 3) return metricRows(ms.slice(0, 3), true) + `<details><summary>All ${ms.length} sourced inputs</summary>${metricRows(ms.slice(3), true)}</details>`;
     if (!ms.length) return '<p class="b-na">No measured inputs were attached to this line.</p>';
     return `<table class="b-metrics"><thead><tr><th>Measure</th><th>Value</th><th>Period</th><th>As of</th><th>Source</th></tr></thead><tbody>${ms.map(m => {
       const v = fmtValue(m);
@@ -229,7 +241,7 @@
   let flipSeq = 0;
   function flip(metrics) {
     const id = 'bf' + (++flipSeq);
-    return {btn: `<button type="button" class="b-flip" aria-expanded="false" aria-controls="${id}"><span class="b-flip-on">Numbers</span><span class="b-flip-off">Hide</span></button>`,
+    return {btn: `<button type="button" class="b-flip" aria-expanded="false" aria-controls="${id}" title="Numbers and sources"><span class="b-flip-on">Numbers</span><span class="b-flip-off">Hide</span></button>`,
       box: `<div class="b-flipbox" id="${id}"><div><div class="b-flipin">${metricRows(metrics)}</div></div></div>`};
   }
   function bullet(b) {
@@ -269,7 +281,7 @@
   }
 
   // ---- state
-  const ST = {brief: null, briefSrc: '', briefErr: '', quotes: null, route: {view: 'brief'}, painted: {}, period: '1D', detailOpen: false};
+  const ST = {brief: null, briefSrc: '', briefErr: '', quotes: null, route: {view: 'brief'}, painted: {}, period: '1D', detailOpen: false, nextBrief:null, coreRevision:null, quotesProxy:'', quoteErr:'', quoteErrSource:'', polling:false};
 
   async function getJSON(p) { const r = await fetch(p, {cache: 'no-store'}); if (!r.ok) throw new Error(p + ' returned ' + r.status); return r.json(); }
   async function loadBrief() {
@@ -280,7 +292,32 @@
     }
     if (ST.brief && ST.brief.health) setScreener(ST.brief.health.screener);
   }
-  async function loadQuotes() { try { ST.quotes = await getJSON('data/quotes.json'); } catch (e) { ST.quotes = null; } }
+  // Prices come from SO2.Live (app/live.js): Worker fast path for on-screen names, shared file fallback.
+  const live = () => root.SmartOptionsLive || (root.SO2 && root.SO2.Live);
+  async function loadQuotes() { if (live()) await live().loadFile(); }
+  function acceptQuotes() {
+    const L = live(); if (!L) return;
+    ST.quotes = L.snapshot();
+    const I=root.SmartOptionsIntelligence;if(I)I.onQuotes(ST.quotes);
+    const company=doc&&doc.getElementById('bv-company');
+    if(company&&company.__soCo&&company.__soCo.updateQuotes)company.__soCo.updateQuotes(ST.quotes);
+  }
+  function watchOnScreen() {
+    const L = live(); if (!L) return;
+    const r = ST.route || {};
+    L.watch('company', r.view === 'company' && r.ticker ? [r.ticker] : []);
+    L.watch('index', ['SPY', 'RSP']);
+    L.watch('shortlist', r.view === 'brief' ? (ST.brief && ST.brief.shortlist || []).map(x => x.t) : []);
+    L.watch('watchlist', r.view === 'brief' || r.view === 'company' ? [...watchSet()].slice(0, 12) : []);
+  }
+  function startLive() {
+    const L = live();
+    if (!L) { ST.quoteErr = 'Price engine did not load; prices show the session close.'; return; }
+    L.subscribe(ev => { acceptQuotes(); if (ST.route.view === 'brief') liveBrief(ev.changed); renderPill(); });
+    root.addEventListener('so:live-health', () => renderPill());
+    watchOnScreen();
+    L.start();
+  }
 
   // ---- shell
   function buildShell() {
@@ -289,7 +326,7 @@
     hdr.innerHTML = `<div class="bv-hdr-in">
       <a class="bv-mark" href="#/brief" aria-label="SmartOptions Brief, home">SmartOptions<span>Brief</span></a>
       <nav class="bv-nav" aria-label="Main">
-        <a href="#/brief" data-nav="brief">Brief</a><a href="#/company" data-nav="company">Companies</a><a href="#/macro" data-nav="macro">Macro</a><a href="#/research/overview" data-nav="research">Research</a>
+        <a href="#/brief" data-nav="brief">Brief</a><a href="#/company" data-nav="company"><span class="nav-wide">Companies</span><span class="nav-small">Company</span></a><a href="#/flows" data-nav="flows"><span class="nav-wide">Capital &amp; news</span><span class="nav-small">Capital</span></a><a href="#/my-dash" data-nav="my-dash">My Dash</a><a href="#/macro" data-nav="macro" class="nav-secondary">Macro</a><a href="#/research/overview" data-nav="research" class="nav-secondary">Research</a><button type="button" class="bv-more" id="bv-more" aria-expanded="false" aria-controls="bv-more-menu">More</button>
       </nav>
       <div class="bv-hdr-r">
         <button type="button" class="bv-pill" id="bv-pill" aria-haspopup="dialog" aria-expanded="false"><span class="bv-dot"></span><span class="bv-pill-t">Checking data</span><span class="bv-pill-s" aria-hidden="true"></span></button>
@@ -298,17 +335,31 @@
     doc.body.prepend(hdr);
     const main = doc.createElement('main');
     main.className = 'bv'; main.id = 'bv-main';
-    main.innerHTML = '<div class="bv-view" id="bv-view" aria-live="polite"></div>';
+    main.innerHTML = '<div id="bv-update-banner" class="bv-update-banner" role="status" hidden></div><div class="bv-view" id="bv-view" aria-live="polite"></div>';
     hdr.after(main);
     const pop = doc.createElement('div');
     pop.className = 'bv-pop'; pop.id = 'bv-pop'; pop.hidden = true;
     pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Data freshness');
     doc.body.appendChild(pop);
+    const menu = doc.createElement('nav'); menu.id = 'bv-more-menu'; menu.className = 'bv-more-menu'; menu.hidden = true; menu.setAttribute('aria-label','More pages');
+    menu.innerHTML = '<a href="#/macro">Macro</a><a href="#/research/overview">Research</a>'; doc.body.appendChild(menu);
+    const more = hdr.querySelector('#bv-more');
+    more.addEventListener('click', () => {menu.hidden=!menu.hidden; more.setAttribute('aria-expanded',String(!menu.hidden));});
+    doc.addEventListener('click', e => {if (!more.contains(e.target) && !menu.contains(e.target)) {menu.hidden=true;more.setAttribute('aria-expanded','false');}});
+    doc.addEventListener('keydown',e => {if(e.key==='Escape' && !menu.hidden){menu.hidden=true;more.setAttribute('aria-expanded','false');more.focus();}});
     hdr.querySelector('#bv-pill').addEventListener('click', e => { e.stopPropagation(); togglePop(); });
     hdr.querySelector('#bv-theme').addEventListener('click', () => setTheme(theme() === 'dark' ? 'light' : 'dark', true));
     doc.addEventListener('click', e => { if (!pop.hidden && !pop.contains(e.target)) togglePop(false); });
     doc.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) { togglePop(false); hdr.querySelector('#bv-pill').focus(); } });
     main.addEventListener('click', onMainClick);
+    // phone keyboard: when the visual viewport shrinks a lot, hide the bottom tab bar so the focused field keeps the space
+    const vv = root.visualViewport;
+    if (vv) {
+      const kb = () => doc.body.classList.toggle('bv-kb-open', root.innerWidth <= 820 && (root.innerHeight - vv.height > 140 || (doc.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(doc.activeElement.tagName) && vv.height < 560)));
+      vv.addEventListener('resize', kb); doc.addEventListener('focusin', kb); doc.addEventListener('focusout', () => setTimeout(kb, 50));
+    }
+    let seatQueued = false;
+    new MutationObserver(() => { if (seatQueued) return; seatQueued = true; setTimeout(() => { seatQueued = false; seatAskButtons(main); }, 0); }).observe(main, {childList: true, subtree: true});
     root.addEventListener('resize', () => { if (!pop.hidden) placePop(); });
   }
   function theme() { try { return root.localStorage.getItem('so-brief-theme') === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; } }
@@ -327,49 +378,89 @@
     if (A && A.S && A.save) { const S = A.S(); const want = t === 'dark' ? 'dark' : 'light'; if (S.theme !== want) { S.theme = want; doc.documentElement.classList.toggle('light', want === 'light'); try { A.save(); } catch (e) { console.warn('[brief] theme sync', e); } } }
   }
 
-  // ---- health pill + popover
+  // ---- health pill + data-health sheet
+  // Refresh receipt (data/refresh-status.json, written by the scheduled refresh). Absent means "not published yet", shown in the sheet.
+  async function loadReceipt() {
+    try {
+      const r = await fetch('data/refresh-status.json', {cache: 'no-store'});
+      if (!r.ok) { ST.receipt = null; ST.receiptErr = r.status === 404 ? 'No refresh receipt has been published with this build yet.' : 'Refresh receipt returned HTTP ' + r.status + '.'; return; }
+      const d = await r.json();
+      if (!d || d.schema !== 'smartoptions.refresh.v1') throw new Error('unsupported receipt schema');
+      ST.receipt = d; ST.receiptErr = '';
+    } catch (e) { ST.receipt = null; ST.receiptErr = 'Refresh receipt could not be read: ' + (e.message || e) + '.'; }
+  }
+  const RECEIPT_WORD = {ok: 'fresh', degraded: 'delayed', failed: 'stale', running: 'delayed'};
+  const PILL_WORD = {live: 'Live', fresh: 'Current', closed: 'Closed', delayed: 'Delayed', stale: 'Stale', missing: 'Not available'};
+  // worst of: on-screen prices, every brief dataset, the refresh receipt
+  function healthRows(nowMs) {
+    const L = live(), h = (ST.brief && ST.brief.health) || {}, rows = [];
+    const lh = L ? L.health(nowMs) : null;
+    if (lh) {
+      const f = lh.feed, w = lh.worker;
+      rows.push({label: 'Prices on this screen', asof: f.words.replace(/^[^,]*, /, ''), status: f.word === 'live' ? 'live' : f.word,
+        cadence: w.enabled ? 'Every 20 seconds in market hours' : 'Shared file, checked every minute',
+        provider: (f.providers || []).join('; ') || 'Not available',
+        note: (w.enabled ? 'Fast path: ' + w.reason + '.' : w.reason + '.') + (w.error ? ' ' + w.error : '') + (f.missing ? ' ' + f.missing + ' of ' + f.of + ' names have no price.' : '') +
+          (Object.keys(w.errors || {}).length ? ' ' + Object.entries(w.errors).slice(0, 3).map(([t, e]) => t + ': ' + e).join('; ') + '.' : '')});
+      const fh = lh.fileHealth;
+      if (fh || lh.file.error) rows.push({label: 'All S&P prices (shared file)', asof: L.snapshot().generated_at ? fmtAsof(L.snapshot().generated_at) : '',
+        status: lh.file.error ? 'stale' : L.feedSummary(L.snapshot().quotes, null, nowMs).word, cadence: 'About every 8 minutes in market hours',
+        provider: fh && fh.provider_mix ? Object.keys(fh.provider_mix).filter(k => k !== 'missing').join('; ') : 'Not available', note: lh.file.error || (fh && fh.line) || ''});
+    } else rows.push({label: 'Prices', status: 'missing', note: ST.quoteErr || 'Price engine not available.'});
+    const groups = {};
+    (h.sources || []).filter(s => s.id !== 'quotes' && s.id !== 'sam').forEach(s => {
+      const g = /^macro_/.test(s.id) ? 'macro_obs' : /receipt/i.test(s.label || '') ? 'build' : s.id;
+      (groups[g] = groups[g] || []).push(s);
+    });
+    const NAME = {macro_obs: n => 'Macro releases (' + n + ' groups)', build: n => 'Site build (' + n + ' steps)'};
+    const CAD = {macro_obs: 'Daily, on release days', build: 'Daily build'};
+    Object.keys(groups).forEach(g => {
+      const xs = groups[g];
+      const worst = xs.reduce((a, s) => ((RANK[String(s.status).toLowerCase()] ?? 3) > (RANK[String(a.status).toLowerCase()] ?? 3) ? s : a), xs[0]);
+      const oldest = xs.reduce((a, s) => (isNum(s.age_hours) && (!isNum(a.age_hours) || s.age_hours > a.age_hours) ? s : a), xs[0]);
+      rows.push({label: NAME[g] ? NAME[g](xs.length) : (xs[0].label || g), asof: fmtAsof(oldest.asof), age: oldest.age_hours, status: String(worst.status || 'missing').toLowerCase(),
+        cadence: CAD[g] || 'Daily', provider: xs[0].provider || xs[0].source || '', note: worst.note || ''});
+    });
+    const rc = ST.receipt;
+    rows.push(rc ? {label: 'Scheduled refresh', asof: fmtAsof(rc.finished_at || rc.attempted_at), status: RECEIPT_WORD[rc.status] || 'missing', cadence: 'Daily, GitHub Actions',
+      provider: 'Refresh receipt', note: 'Last run ' + rc.status + '.' + Object.entries(rc.stages || {}).filter(([, v]) => v && v.status && !/^ok$/i.test(v.status)).map(([k, v]) => ' ' + k + ': ' + v.status + (v.error || v.note ? ' (' + (v.error || v.note) + ')' : '') + '.').join('')}
+      : {label: 'Scheduled refresh', status: 'missing', cadence: 'Daily', provider: 'Refresh receipt', note: ST.receiptErr || 'Not available.'});
+    return rows;
+  }
+  function pillState(nowMs) {
+    const rows = healthRows(nowMs);
+    const word = rows.reduce((w, r) => ((RANK[r.status] ?? 3) > (RANK[w] ?? 3) ? r.status : w), 'fresh');
+    const prices = rows[0];
+    return {rows, word, prices};
+  }
   function renderPill() {
-    const h = ST.brief && ST.brief.health;
-    const p = pillText(h, ST.quotes, Date.now());
     const el = doc.getElementById('bv-pill'); if (!el) return;
-    el.querySelector('.bv-pill-t').textContent = p.text;
-    el.querySelector('.bv-pill-s').textContent = p.short;
-    el.dataset.st = tone(p.status);
-    el.setAttribute('aria-label', 'Data freshness: ' + p.text + '. Show details.');
+    const now = Date.now(), L = live();
+    const st = pillState(now), f = L ? L.health(now).feed : null;
+    const lead = f ? f.words : 'Prices not available';
+    const worst = st.word, others = st.rows.slice(1).filter(r => (RANK[r.status] ?? 3) >= 2);
+    el.querySelector('.bv-pill-t').textContent = lead + (others.length ? ' · ' + others.length + (others.length === 1 ? ' dataset needs attention' : ' datasets need attention') : '');
+    const when = lead.replace(/^[^,]*, as of /, '').replace(/ ET$/, '');
+    el.querySelector('.bv-pill-s').textContent = f ? (PILL_WORD[f.word] || f.word) + (f.word === 'missing' ? '' : ' ' + (when.includes(',') ? when.split(',')[0] : when)) : 'Prices n/a';
+    el.dataset.st = ['live', 'fresh', 'closed'].includes(worst) ? 'good' : worst === 'delayed' ? 'mixed' : 'bad';
+    el.dataset.fresh = f ? f.word : 'missing';
+    el.title = 'Data health: ' + lead + '. Show details.';
+    el.setAttribute('aria-label', 'Data health: ' + lead + (others.length ? '; ' + others.length + ' datasets need attention' : '') + '. Show details.');
     if (!doc.getElementById('bv-pop').hidden) renderPop();
   }
   function renderPop() {
     const pop = doc.getElementById('bv-pop');
     const h = (ST.brief && ST.brief.health) || {};
-    const now = Date.now();
-    const pf = priceFreshness(ST.quotes, now);
-    const rows = [];
-    rows.push({label: 'Price observations (median)', asof: pf.asof || '', age: pf.ageH, status: pf.status,
-      note: pf.note + ' This page checks the shared file every minute; provider updates are separate.'});
-    // group per-category macro series and build receipts so the table stays short; worst status and oldest age win
-    const groups = {};
-    (h.sources || []).filter(s => !(ST.quotes && s.id === 'quotes') && s.id !== 'sam').forEach(s => {   // Sam's scores get their own line below
-      const g = /^macro_/.test(s.id) ? 'macro_obs' : /receipt/i.test(s.label || '') ? 'build' : s.id;
-      (groups[g] = groups[g] || []).push(s);
-    });
-    const NAME = {macro_obs: n => 'Macro observations (' + n + ' groups)', build: n => 'Site build (' + n + ' steps)'};
-    Object.keys(groups).forEach(g => {
-      const xs = groups[g];
-      if (xs.length === 1 && !NAME[g]) { const s = xs[0]; rows.push({label: s.label || s.id, asof: s.asof, age: s.age_hours, status: s.status, note: s.note}); return; }
-      const worst = xs.reduce((a, s) => ((RANK[String(s.status).toLowerCase()] ?? 3) > (RANK[String(a.status).toLowerCase()] ?? 3) ? s : a), xs[0]);
-      const oldest = xs.reduce((a, s) => (isNum(s.age_hours) && (!isNum(a.age_hours) || s.age_hours > a.age_hours) ? s : a), xs[0]);
-      rows.push({label: NAME[g] ? NAME[g](xs.length) : (xs[0].label || g), asof: oldest.asof, age: oldest.age_hours, status: worst.status, note: worst.note || xs[0].note});
-    });
+    const st = pillState(Date.now());
     const scr = h.screener || {asof: SCREENER_ASOF_FALLBACK, status: 'stale'};
-    pop.innerHTML = `<div class="bv-pop-hd"><h2>Data freshness</h2><button type="button" class="bv-x" aria-label="Close">&times;</button></div>
+    pop.innerHTML = `<div class="bv-sheet-grab" aria-hidden="true"></div><div class="bv-pop-hd"><h2>Data health</h2><button type="button" class="bv-x" aria-label="Close">&times;</button></div>
       ${ST.briefSrc && ST.briefSrc.indexOf('test/') === 0 ? '<p class="bv-sample">This page is showing sample data for layout checks, not today\'s figures.</p>' : ''}
       ${!ST.brief ? `<p class="bv-sample">Brief data not available: ${esc(ST.briefErr || 'not built yet')}.</p>` : ''}
-      <div class="bv-pop-tw"><table class="b-metrics bv-ht"><thead><tr><th>Source</th><th>As of</th><th>Age</th><th>Status</th><th>Note</th></tr></thead><tbody>
-      ${rows.map(r => `<tr><td>${esc(r.label)}</td><td>${esc(fmtAsof(r.asof))}</td><td>${esc(isNum(r.age) ? ageWords(r.age) : '')}</td><td>${chip(r.status || 'missing', 'sm')}</td><td>${esc(r.note || '')}</td></tr>`).join('')}
-      </tbody></table></div>
-      <div class="bv-scr">${chip(scr.status || 'stale', 'sm')}<p>${esc(screenerLabel('long'))}${scr.note ? ' ' + esc(scr.note) : ''}</p></div>
-      ${h.line ? `<p class="bv-pop-line">${esc(h.line)}</p>` : ''}
-      <p class="bv-pop-foot">Session ${esc(ST.brief ? ST.brief.asof_session : 'not known')}. Market hours are New York time; exchange holidays are not modelled.</p>`;
+      <ul class="bv-hl">${st.rows.map(r => `<li class="bv-hr"><div class="bv-hr-top"><b>${esc(r.label)}</b><span class="bv-fresh" data-fresh="${esc(r.status)}">${esc(r.status === 'delayed' && /^Prices/.test(r.label) ? 'delayed 15m' : r.status)}</span></div>
+        <div class="bv-hr-meta"><span>${esc(r.asof || 'Time not available')}</span>${r.cadence ? `<span>${esc(r.cadence)}</span>` : ''}${r.provider ? `<span>${esc(r.provider)}</span>` : ''}</div>
+        ${r.note ? `<p class="bv-hr-note">${esc(r.note)}</p>` : ''}</li>`).join('')}</ul>
+      <details class="bv-scr"><summary>Historical score reference</summary>${chip(scr.status || 'stale', 'sm')}<p>${esc(screenerLabel('long'))}${scr.note ? ' ' + esc(scr.note) : ''}</p></details>
+      <p class="bv-pop-foot">Live means a real-time price no more than one minute old. Delayed means the provider states a delay. Closed means the regular session has ended; the last print is shown with its time. Market hours are New York time; exchange holidays are not modelled.</p>`;
     pop.querySelector('.bv-x').addEventListener('click', () => togglePop(false));
     placePop();
   }
@@ -381,38 +472,59 @@
   }
   function placePop() {
     const pop = doc.getElementById('bv-pop'), pill = doc.getElementById('bv-pill');
+    // phones: bottom sheet (CSS); wider screens: anchored under the pill, fixed so it never scrolls away
+    if (root.innerWidth <= 640) { pop.classList.add('is-sheet'); pop.style.width = pop.style.top = pop.style.left = ''; return; }
+    pop.classList.remove('is-sheet');
     const r = pill.getBoundingClientRect();
-    const w = Math.min(720, root.innerWidth - 24);
+    const w = Math.min(560, root.innerWidth - 24);
     pop.style.width = w + 'px';
-    pop.style.top = (r.bottom + 10 + root.scrollY) + 'px';
+    pop.style.top = (r.bottom + 8) + 'px';
     pop.style.left = Math.max(12, Math.min(root.innerWidth - w - 12, r.right - w)) + 'px';
   }
   function togglePop(force) {
     const pop = doc.getElementById('bv-pop'), pill = doc.getElementById('bv-pill');
     const open = force == null ? pop.hidden : force;
-    pop.hidden = !open; pill.setAttribute('aria-expanded', String(open));
+    pop.hidden = !open; pill.setAttribute('aria-expanded', String(open)); doc.body.classList.toggle('bv-sheet-open', open && root.innerWidth <= 640);
     if (open) { renderPop(); const x = pop.querySelector('.bv-x'); if (x) x.focus(); }
   }
 
   // ---- router
   function applyRoute(fromLoad) {
     const r = parseRoute(root.location.hash);
+    const mountedCompany=doc.getElementById('bv-company');
+    if(mountedCompany&&mountedCompany.__soCo&&(r.view!=='company'||r.ticker!==ST.route.ticker))mountedCompany.__soCo.destroy();
     ST.route = r;
+    const menu = doc.getElementById('bv-more-menu'), more = doc.getElementById('bv-more');
+    if (menu) menu.hidden=true;
+    if (more) {more.setAttribute('aria-expanded','false');more.classList.toggle('is-current',r.view==='macro'||r.view==='research');}
     const research = r.view === 'research';
     doc.body.classList.toggle('bv-on', !research);
     doc.body.classList.toggle('bv-research', research);
+    if (doc.getElementById('bv-research-bridge')) doc.getElementById('bv-research-bridge').hidden = !research;
     doc.querySelectorAll('.bv-nav a').forEach(a => { if (a.dataset.nav === r.view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (research) {
+      if (!doc.getElementById('bv-research-bridge')) { const bridge = doc.createElement('p'); bridge.id = 'bv-research-bridge'; bridge.className = 'b-reason'; bridge.innerHTML = '<a href="#/brief">Back to the two-minute Brief</a> · Research exposes full source tables, optional historical references and modeled strategies. Start with a company, then expand the evidence you need.<details><summary>Terms used here</summary>IV: volatility inferred from option prices. RV: measured historical volatility. Beta: fitted sensitivity to a market move. OLS: a least-squares statistical fit. Residual: the return left unexplained by that fit. Basis point: 0.01 percentage point. These describe inputs and associations, not validated forecasts.</details>'; doc.getElementById('hdr').after(bridge); }
       if (!r.legacy) { try { root.history.replaceState(null, '', legacyHash(r)); } catch (e) { /* file:// may refuse; Edge reads the tab below */ } }
       if (!fromLoad && r.tab) openEdgeTab(r.tab);
       doc.title = 'Research | SmartOptions Brief';
       return;
     }
     const view = doc.getElementById('bv-view');
+    if (ST.receipt === undefined) loadReceipt().then(renderPill);
     if (r.view === 'brief') { renderBrief(view); doc.title = 'Brief | SmartOptions'; }
     else if (r.view === 'macro') { renderMacroPage(view); doc.title = 'Macro | SmartOptions Brief'; }
     else if (r.view === 'company') { if (r.ticker) renderCompany(view, r.ticker); else renderCompanies(view); doc.title = (r.ticker ? r.ticker + ' | ' : 'Companies | ') + 'SmartOptions Brief'; }
+    else if (r.view === 'my-dash') { mountPage(view,'SmartOptionsMyDashboard','My Dash'); }
+    else if (r.view === 'flows') { mountPage(view,'MoneyFlow','Capital & news'); }
     if (!fromLoad) root.scrollTo(0, 0);
+    watchOnScreen();
+  }
+  function mountPage(view,name,label) {
+    const module = root[name] || root.SO2 && root.SO2[name];
+    doc.title=label+' | SmartOptions Brief';
+    if (module && typeof module.mount==='function') {
+      try { module.mount(view); } catch(e) {console.error('[brief] '+label+' failed',e);view.innerHTML=`<div class="bv-wrap"><section class="b-card"><h1 class="b-h1">${esc(label)}</h1><p role="alert">Not available: ${esc(e.message || e)}</p></section></div>`;}
+    } else view.innerHTML=`<div class="bv-wrap"><section class="b-card"><h1 class="b-h1">${esc(label)}</h1><p role="status">Not available: this page module did not load.</p><a class="b-link-btn" href="#/brief">Return to Brief</a></section></div>`;
   }
   function openEdgeTab(tab) {
     let n = 0;
@@ -522,8 +634,8 @@
   function pulseSection(p) {
     p = p || {};
     return `<section class="b-sec b-pulse b-card b-enter" aria-labelledby="h-pulse">
-      <div class="b-sec-hd"><h2 id="h-pulse">Market pulse</h2>${chip(p.status || 'unavailable')}${impact() ? impact().keyButton() : ''}<button type="button" class="b-btn b-sm" data-flipall aria-pressed="false">Show numbers</button></div>
-      ${p.headline ? `<p class="b-lead">${esc(p.headline)}</p>` : ''}
+      <div class="b-sec-hd"><h2 id="h-pulse">Market pulse</h2>${chip(p.status || 'unavailable')}${impact() ? impact().keyButton() : ''}<button type="button" class="b-btn b-sm" data-flipall aria-pressed="false">Show numbers</button><span class="b-ask-slot"></span></div>
+      ${p.headline ? `<p class="b-lead">${esc(p.headline)}</p>` : ''}<p class="b-reason">Price trend describes recent trading; macro backdrop tracks slower economic releases; risk tracks volatility, credit and upcoming events. Supportive prices can coexist with adverse macro inputs and elevated risk.</p>
       <div class="b-cols">
         <div><h3>What changed</h3>${bulletList(p.changed, 'no change measured since the previous session')}</div>
         <div><h3>Supports</h3>${bulletList(p.supports, 'no supporting reading measured')}</div>
@@ -569,7 +681,7 @@
           <div class="b-risk-why">${esc(e.text || '')}${(r.tickers || []).length ? ' ' + r.tickers.slice(0, 4).map(t => `<a class="b-tk" href="#/company/${esc(t)}">${esc(t)}</a>`).join(' ') : ''}</div>${f.box}</div>
           <div class="b-risk-r"><span class="b-imp" role="img" aria-label="${iw}" title="${iw}">${[1, 2, 3].map(i => `<i class="${i <= imp ? 'on' : ''}"></i>`).join('')}</span>${f.btn}</div></li>`;
       }).join('')}</ol>${xs.length > 6 ? `<button type="button" class="b-btn b-more" data-risk-more aria-expanded="false">${xs.length - 6} more</button>` : ''}`;
-    return `<section class="b-sec b-card b-enter" aria-labelledby="h-risks"><div class="b-sec-hd"><h2 id="h-risks">Upcoming risks</h2><span class="b-count">${xs.length ? 'Next ' + shown.length + ' of ' + xs.length : ''}</span></div>${body}</section>`;
+    return `<section class="b-sec b-card b-enter" aria-labelledby="h-risks"><div class="b-sec-hd"><h2 id="h-risks">Upcoming risks</h2><span class="b-count">${xs.length ? 'Next ' + shown.length + ' of ' + xs.length : ''}</span><span class="b-ask-slot"></span></div>${body}</section>`;
   }
   function verdict(label, a, figure) {
     a = a || {}; const f = flip(a.metrics);
@@ -593,9 +705,10 @@
     const rl = (xs, cls) => (xs || []).slice(0, 3).map(s => `<span class="b-rot ${cls}">${esc(s.sector)} ${isNum(s.ret_20d_pct) ? (s.ret_20d_pct > 0 ? '+' : '') + s.ret_20d_pct.toFixed(1) + '%' : ''}</span>`).join('');
     const rFig = (ro.leaders || []).length || (ro.laggards || []).length ? `<div class="b-rots"><div><span class="b-rot-k">Leading, 20 days</span>${rl(ro.leaders, 'up')}</div><div><span class="b-rot-k">Lagging, 20 days</span>${rl(ro.laggards, 'dn')}</div></div>` : '';
     return `<section class="b-sec b-card b-enter" aria-labelledby="h-pos"><div class="b-sec-hd"><h2 id="h-pos">S&amp;P positioning</h2>
-      <div class="b-seg" role="group" aria-label="Period">${['1D', '1W', '1M'].map(p => `<button type="button" data-period="${p}" aria-pressed="${p === ST.period}">${p}</button>`).join('')}</div></div>
+      <div class="b-seg" role="group" aria-label="Period">${['1D', '1W', '1M'].map(p => `<button type="button" data-period="${p}" aria-pressed="${p === ST.period}">${p}</button>`).join('')}</div><span class="b-ask-slot"></span></div>
       <div class="b-pos"><div class="b-hm" id="bv-heatmap"></div>
-      <div class="b-verdicts">${verdict('Breadth', pos.breadth)}${verdict('Concentration', c, cFig)}${verdict('Rotation', ro, rFig)}</div></div></section>`;
+      <div class="b-verdicts">${verdict('Breadth', pos.breadth)}${verdict('Concentration', c, cFig)}${verdict('Rotation', ro, rFig)}</div></div>
+      <details class="b-shock"><summary>Sector shock sensitivity · historical association</summary><div id="so-shock-grid"></div></details></section>`;
   }
   function mountHeatmap() {
     const el = doc.getElementById('bv-heatmap'); if (!el) return;
@@ -607,70 +720,193 @@
     el.innerHTML = `<div class="b-hm-fb"><h3>Sector returns, ${ST.period}</h3>${sectorBars(ST.brief && ST.brief.positioning && ST.brief.positioning.sectors, ST.period)}</div>`;
   }
   const DIMS = [['growth', 'Growth'], ['profitability', 'Profitability'], ['cash', 'Cash'], ['resilience', 'Resilience'], ['valuation', 'Valuation'], ['expectations', 'Expectations']];
-  // compact card: first reason and the counter line up front; all reasons with their numbers behind one flip
+  // live cell: the Live engine fills and refreshes it; the server value is the first paint
+  function liveCell(t, f, first, cls) { return `<span class="lv-${f}${cls ? ' ' + cls : ''}" data-live="${esc(t)}" data-live-f="${f}">${esc(first)}</span>`; }
+  function coreRows() { const A = root.SO2; const d = A && A.D && A.D(); return d && d.rows || []; }
+  function rowOf(t) { return coreRows().find(r => r.t === t) || null; }
+  // one compact row per name: identity, live price strip, score gauge, first reason, caution, depth behind one flip
   function shortlistSection(list) {
     const xs = (list || []).slice(0, 8);
     const bases = [...new Set(xs.map(n => n.score_basis || ''))];
     const shared = bases.length === 1 && bases[0] ? bases[0] : '';
+    const L = live();
     const body = !xs.length ? '<p class="b-na">Not available: no names passed the shortlist rules in this brief.</p>' :
       `<div class="b-names">${xs.map(n => {
         const st = n.status || {}, why = (n.why || []).filter(Boolean).slice(0, 3);
         const dims = DIMS.filter(([k]) => st[k]).map(([k, l]) => `<span class="b-dim t-${tone(st[k])}" title="${esc(l + ': ' + st[k])}"><i aria-hidden="true"></i>${esc(l)}<span class="b-vh"> ${esc(st[k])}</span></span>`).join('');
-        const core = root.SO2 && root.SO2.D && root.SO2.D();
-        const row = core && core.rows && core.rows.find(r => r.t === n.t);
+        const row = rowOf(n.t);
+        const d = L ? L.derive(row, L.get(n.t)) : {};
         const counter = impact() ? impact().caution(n, row) : n.counter;
         const allM = [].concat(...why.map(b => b.metrics || []), (counter && counter.metrics) || []);
         const f = flip(allM);
         const more = why.slice(1).map(b => `<li>${esc(b.text)}</li>`).join('');
         const lead = why[0] ? esc(why[0].text) : '<span class="b-na">Not available: no reasons recorded.</span>';
         const box = f.box.replace('<div class="b-flipin">', `<div class="b-flipin">${more ? `<ul class="b-more-why">${more}</ul>` : ''}`);
-        return `<article class="b-name b-card b-enter"><div class="b-name-hd"><div><h3><a href="#/company/${esc(n.t)}">${esc(n.name || n.t)}</a></h3><div class="b-name-sub">${esc(n.t)}${n.sector ? ' · ' + esc(n.sector) : ''}</div></div>${gauge(n.score, n.score_basis)}</div>
-          ${!shared && n.score_basis ? `<p class="b-basis">Score basis: ${esc(n.score_basis)}</p>` : ''}
-          <p class="b-why"><span class="b-mark tn-good" aria-label="For">&#9650;</span>${lead}${why.length > 1 ? ` <span class="b-plus">+${why.length - 1} more</span>` : ''}</p>
-          <p class="b-against"><span class="b-counter-k">Caution</span>${counter && counter.text ? esc(counter.text) : '<span class="b-na">Not available: no counter-argument recorded.</span>'}</p>
-          ${impact() ? impact().drivenBy(impact().statusDrivers(st), {max: 3, goFor: cat => `#/company/${n.t}|.co-k-${cat}`}) : ''}
+        const fmt = L ? L : {fmtPx: v => String(v), fmtPct: v => String(v)};
+        const px = row || d.price != null ? `<div class="b-px" aria-label="${esc(n.t)} price">
+            ${liveCell(n.t, 'price', fmt.fmtPx(d.price))}${liveCell(n.t, 'chg', fmt.fmtPct(d.chg_pct), 'b-chg')}
+            ${liveCell(n.t, 'fresh', 'closed', 'bv-fresh')}<span class="b-px-asof">${liveCell(n.t, 'asof', '')}</span></div>
+          <dl class="b-facts">
+            <div><dt>P/E now</dt><dd>${liveCell(n.t, 'pe', isNum(d.pe) ? d.pe.toFixed(1) : 'Not available')}</dd></div>
+            <div><dt>52-week range</dt><dd><span class="b-rng" data-live="${esc(n.t)}" data-live-f="range"><span class="b-rng-t"><i style="left:${isNum(d.range_pct) ? d.range_pct.toFixed(1) : 50}%"></i></span><b>${isNum(d.range_pct) ? Math.round(d.range_pct) + '% of range' : 'Not available'}</b></span></dd></div>
+            <div><dt>From high</dt><dd>${liveCell(n.t, 'hi', isNum(d.from_hi_pct) ? fmt.fmtPct(d.from_hi_pct, 1) : 'Not available')}</dd></div>
+          </dl>` : '<p class="b-na">Price not available: this name is not in the covered universe file.</p>';
+        return `<article class="b-name b-card b-enter" data-t="${esc(n.t)}"><div class="b-name-hd"><div class="b-name-id"><h3><a href="#/company/${esc(n.t)}">${esc(n.t)}</a></h3><div class="b-name-sub">${esc(n.name || n.t)}${n.sector ? ' · ' + esc(n.sector) : ''}</div></div>${gauge(n.score, n.score_basis)}</div>
+          ${px}
+          <p class="b-why"><span class="b-mark tn-good" aria-label="For">&#9650;</span><span>${lead}${why.length > 1 ? ` <span class="b-plus">+${why.length - 1} more</span>` : ''}</span></p>
+          <p class="b-against"><span class="b-mark tn-bad" aria-label="Against">&#9660;</span><span>${counter && counter.text ? esc(counter.text) : '<span class="b-na">Not available: no counter-argument recorded.</span>'}</span></p>
           ${dims ? `<div class="b-dims">${dims}</div>` : ''}
           ${box}
           <div class="b-name-ft"><a class="b-btn b-open" href="#/company/${esc(n.t)}">Open ${esc(n.t)}</a>${f.btn.replace('<span class="b-flip-on">Numbers</span>', '<span class="b-flip-on">Details</span>')}</div></article>`;
       }).join('')}</div>`;
-    return `<section class="b-sec" aria-labelledby="h-short"><div class="b-sec-hd b-sec-hd-out"><h2 id="h-short">Research shortlist</h2><span class="b-count">${xs.length ? xs.length + ' names' : ''}</span></div>
-      ${shared ? `<p class="b-basis b-basis-all">Score basis: ${esc(shared)}</p>` : ''}${body}</section>`;
+    const asof = ST.brief && ST.brief.asof_session ? shortDate(ST.brief.asof_session, false) : 'the last build';
+    return `<section class="b-sec" aria-labelledby="h-short"><div class="b-sec-hd b-sec-hd-out"><h2 id="h-short">Research shortlist</h2><span class="b-count">${xs.length ? xs.length + ' names' : ''}</span><span class="b-ask-slot"></span></div>
+      <p class="b-basis b-basis-all">${shared ? 'Score 0 to 100: ' + esc(shared) + ' ' : ''}Scores use the ${esc(asof)} close; price, P/E and range update with each new price.</p>${body}</section>`;
+  }
+  // core.json (company rows) arrives after the brief; redraw only the shortlist so open panels elsewhere stay open
+  function refreshShortlist() {
+    const h = doc.getElementById('h-short'), sec = h && h.closest('section');
+    if (!sec || !ST.brief) return;
+    const wrap = doc.createElement('div'); wrap.innerHTML = shortlistSection(ST.brief.shortlist);
+    const next = wrap.firstElementChild; next.querySelectorAll('.b-enter').forEach(el => { el.style.animation = 'none'; });
+    sec.replaceWith(next);
+    if (live()) live().paint(next, null);
+  }
+  // ---- live "right now" strip: S&P 500 and equal weight, recomputed on every quote
+  function spyAverages() {
+    const ms = [].concat(...['changed', 'supports', 'challenges'].map(k => (ST.brief && ST.brief.pulse && ST.brief.pulse[k] || []).map(b => b.metrics || [])).flat());
+    const find = re => (ms.find(m => re.test(m.label || '') && isNum(m.value)) || {}).value;
+    return {sma50: find(/SPY 50-session average/i), sma200: find(/SPY 200-session average/i)};
+  }
+  function nowLines() {
+    const L = live(); if (!L) return [];
+    const spy = L.get('SPY'), rsp = L.get('RSP'), avg = spyAverages(), out = [];
+    if (spy && isNum(spy.price) && isNum(avg.sma50) && isNum(avg.sma200)) {
+      const a50 = 100 * (spy.price / avg.sma50 - 1), a200 = 100 * (spy.price / avg.sma200 - 1);
+      const where = a50 >= 0 && a200 >= 0 ? 'above both' : a50 < 0 && a200 < 0 ? 'below both' : a50 < 0 ? 'below its 50-session but above its 200-session' : 'above its 50-session but below its 200-session';
+      out.push({tone: a50 >= 0 && a200 >= 0 ? 'good' : a50 < 0 && a200 < 0 ? 'bad' : 'neutral',
+        text: `S&P 500 (SPY) is ${where} average${/both/.test(where) ? 's' : ''}: ${L.fmtPct(a50, 1)} vs 50-session, ${L.fmtPct(a200, 1)} vs 200-session.`,
+        why: 'Price above its averages means the trend is still up; below means buyers have stepped back.'});
+    }
+    const sc = spy && (isNum(spy.chg_pct) ? spy.chg_pct : spy.change_pct), rc = rsp && (isNum(rsp.chg_pct) ? rsp.chg_pct : rsp.change_pct);
+    if (isNum(sc) && isNum(rc)) {
+      const gap = rc - sc;
+      out.push({tone: Math.abs(gap) < 0.1 ? 'neutral' : gap > 0 ? 'good' : 'bad',
+        text: Math.abs(gap) < 0.1 ? `Equal weight and the S&P 500 are moving together today (${L.fmtPct(rc)} vs ${L.fmtPct(sc)}).` :
+          `Equal weight is ${gap > 0 ? 'ahead of' : 'behind'} the S&P 500 by ${Math.abs(gap).toFixed(2)} points today.`,
+        why: gap > 0 ? 'The average stock is doing better than the giants, so the move is broad.' : Math.abs(gap) < 0.1 ? 'The typical stock and the largest names are moving together.' : 'A few large names carry the index while the average stock trails.'});
+    }
+    return out;
+  }
+  function nowStrip() {
+    const L = live();
+    const tick = (t, label) => {
+      const q = L && L.get(t);
+      return `<div class="b-tick"><span class="b-tick-k">${esc(label)}</span>${liveCell(t, 'price', q ? L.fmtPx(q.price) : 'Not available', 'b-tick-v')}${liveCell(t, 'chg', q ? L.fmtPct(isNum(q.chg_pct) ? q.chg_pct : q.change_pct) : '', 'b-chg')}${liveCell(t, 'fresh', q ? q.freshness_label : 'missing', 'bv-fresh')}<span class="b-tick-asof">${liveCell(t, 'asof', q ? q.asof_label : '')}</span></div>`;
+    };
+    const lines = nowLines();
+    return `<section class="b-sec b-now b-card b-enter" aria-labelledby="h-now"><div class="b-sec-hd"><h2 id="h-now">Right now</h2><span class="b-count">Recomputed on every price</span></div>
+      <div class="b-ticks">${tick('SPY', 'S&P 500 (SPY)')}${tick('RSP', 'Equal weight (RSP)')}</div>
+      <ul class="b-buls b-now-l" id="bv-now-lines">${lines.length ? lines.map(nowLine).join('') : '<li class="b-na">Not available: index prices have not arrived yet.</li>'}</ul></section>`;
+  }
+  function nowLine(b) {
+    const mark = b.tone === 'good' ? '&#9650;' : b.tone === 'bad' ? '&#9660;' : '&#9679;';
+    return `<li class="b-bul tn-${b.tone}"><div class="b-bul-row"><span class="b-mark" aria-hidden="true">${mark}</span><span class="b-txt">${esc(b.text)}<span class="b-reason">${esc(b.why)}</span></span></div></li>`;
+  }
+  // called by the Live subscription: numbers are already repainted by data-live; refresh the derived sentences
+  function liveBrief(changed) {
+    if (!changed || !changed.some(t => t === 'SPY' || t === 'RSP')) return;
+    const ul = doc.getElementById('bv-now-lines'); if (!ul) return;
+    const lines = nowLines();
+    const html = lines.length ? lines.map(nowLine).join('') : '<li class="b-na">Not available: index prices have not arrived yet.</li>';
+    if (ul.innerHTML !== html) { ul.innerHTML = html; if (!reduced() && ul.animate) ul.animate([{opacity: 0.55}, {opacity: 1}], {duration: 200, easing: 'ease-out'}); }
+  }
+  // ---- mounts owned by other lanes: shock grid (QUANT), money summary (MONEY)
+  function mountOptional() {
+    const shock = doc.getElementById('so-shock-grid');
+    if (shock) {
+      const S = root.SO2 && root.SO2.Shocks || root.SmartOptionsShocks;
+      if (S && typeof S.renderGrid === 'function') { try { S.renderGrid(shock); } catch (e) { console.error('[brief] shock grid failed', e); shock.innerHTML = `<p class="b-na">Not available: the shock grid failed to draw (${esc(e.message || e)}).</p>`; } }
+      else shock.innerHTML = '<p class="b-na">Not available: the sector shock grid is not part of this build yet.</p>';
+    }
+    const money = doc.getElementById('so-money-summary');
+    if (money) {
+      const M = root.SO2 && root.SO2.MoneyFlow || root.MoneyFlow;
+      if (M && typeof M.renderSummary === 'function') { try { M.renderSummary(money); } catch (e) { console.error('[brief] money summary failed', e); money.innerHTML = `<p class="b-na">Not available: ${esc(e.message || e)}.</p>`; } }
+      else moneyFallback(money);
+    }
+  }
+  // until the money lane ships its summary: the three newest dated items from the tracker file, each with its one-line reason
+  async function moneyFallback(el) {
+    try {
+      const d = await getJSON('data/money-flow.json');
+      const xs = (d.news || []).filter(n => n && n.headline && isFinite(Date.parse(n.published_at))).sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at)).slice(0, 3);
+      if (!el.isConnected) return;
+      el.innerHTML = xs.length ? `<ul class="b-mf">${xs.map(n => `<li><div class="b-mf-top"><span class="b-mf-d">${esc(fmtAsof(n.published_at))}</span>${n.category ? `<span class="b-kind">${esc(n.category)}</span>` : ''}</div>
+        <a href="${safeURL(n.url) || '#/flows'}"${safeURL(n.url) ? ' target="_blank" rel="noopener"' : ''}>${esc(n.headline)}</a><p class="b-reason">${esc(n.reason || '')}${n.source ? ' Source: ' + esc(n.source) + '.' : ''}</p></li>`).join('')}</ul>`
+        : '<p class="b-na">Not available: the tracker file has no dated items.</p>';
+    } catch (e) { if (el.isConnected) el.innerHTML = `<p class="b-na">Not available: the capital and news file could not be read (${esc(e.message || e)}).</p>`; }
+  }
+  // chat-popup.js appends its "Ask about this" button to each section; move it into the header slot so it never overlaps an edge
+  function seatAskButtons(scope) {
+    (scope || doc).querySelectorAll('.b-sec > .cp-context, .b-card > .cp-context').forEach(btn => {
+      const slot = btn.parentElement.querySelector('.b-ask-slot');
+      if (slot && !slot.contains(btn)) { btn.setAttribute('aria-label', btn.textContent); btn.title = btn.textContent; btn.textContent = 'Ask'; slot.appendChild(btn); }
+    });
   }
   function renderBrief(view) {
     const b = ST.brief;
     if (!b) return missingPage(view);
-    const html = `<div class="bv-wrap">${notice()}
+    const html = `<div class="bv-wrap b-v3">${notice()}
       <div class="b-title b-enter"><h1 class="b-h1">Market brief</h1><p class="b-date">${esc(sessionWords(b))}</p></div>
+      ${nowStrip()}
       ${pulseSection(b.pulse)}
       <section class="b-sec b-macro" aria-labelledby="h-macro"><h2 id="h-macro" class="b-vh">Macro assessment</h2>${macroStrip(b.macro)}
         <button type="button" class="b-detail-btn b-enter" data-detail aria-expanded="${ST.detailOpen}" aria-controls="bv-detail"><span class="bd-lbl">${ST.detailOpen ? 'Hide detailed macro observations' : 'Detailed macro observations'}</span><span class="bd-car" aria-hidden="true">&#9662;</span></button>
         <div class="b-flipbox${ST.detailOpen ? ' open' : ''}" id="bv-detail"><div><div class="b-card b-detail">${detailList(b.macro)}<p class="b-more"><a href="#/research/macro">Open the full macro grid</a></p></div></div></div>
       </section>
-      ${risksSection(b.risks)}
+      <div class="b-pair">${risksSection(b.risks)}
+        <section class="b-sec b-card b-enter b-money" aria-labelledby="h-money"><div class="b-sec-hd"><h2 id="h-money">Where money is moving</h2><span class="b-ask-slot"></span></div>
+          <div id="so-money-summary"></div><p class="b-more"><a href="#/flows">Open the capital and news tracker</a></p></section></div>
       ${positioningSection(b.positioning)}
       ${shortlistSection(b.shortlist)}
-      <footer class="b-foot">Research tool, not investment advice. ${esc(screenerLabel('short'))}. Brief built ${esc(fmtAsof(typeof b.generated_at === 'string' ? b.generated_at : (b.generated_at && (b.generated_at.equities || b.generated_at.macro)) || ''))}.</footer>
+      <details class="b-sec b-card b-rel b-enter" id="bv-rel"${ST.relOpen ? ' open' : ''}><summary><h2>Macro and company links</h2><span class="b-count">Measured historical associations, with counterarguments</span></summary><div class="in-host" id="bv-intelligence"></div></details>
+      <footer class="b-foot">Research tool, not investment advice. Each input carries its observation date. Brief built ${esc(fmtAsof(typeof b.generated_at === 'string' ? b.generated_at : (b.generated_at && (b.generated_at.equities || b.generated_at.macro)) || ''))}.</footer>
       </div>`;
     paint(view, html, 'brief');
+    const rel = doc.getElementById('bv-rel');
+    const drawRel = () => { if (rel.open && root.SmartOptionsIntelligence && !rel.dataset.drawn) { rel.dataset.drawn = '1'; root.SmartOptionsIntelligence.renderMarket(doc.getElementById('bv-intelligence')); } };
+    rel.addEventListener('toggle', () => { ST.relOpen = rel.open; drawRel(); });
+    drawRel();
     mountHeatmap();
+    mountOptional();
+    if (!(root.SO2 && root.SO2.Shocks) && doc.readyState !== 'complete') root.addEventListener('load', mountOptional, {once: true});   // modules loaded after this file
+    if (live()) live().paint(view, null);
+    seatAskButtons(view);
   }
   function renderMacroPage(view) {
     const b = ST.brief;
     if (!b) return missingPage(view);
     paint(view, `<div class="bv-wrap">${notice()}<div class="b-title b-enter"><h1 class="b-h1">Macro</h1><p class="b-date">${esc(sessionWords(b))}</p></div>
       <section class="b-sec b-macro">${macroStrip(b.macro)}</section>
-      <section class="b-sec b-card b-enter" aria-labelledby="h-obs"><div class="b-sec-hd"><h2 id="h-obs">Detailed observations</h2><button type="button" class="b-btn b-sm" data-flipall aria-pressed="false">Show numbers</button></div>${detailList(b.macro)}
+      <section class="b-sec b-card b-enter" aria-labelledby="h-obs"><div class="b-sec-hd"><h2 id="h-obs">Detailed observations</h2><span class="b-ask-slot"></span><button type="button" class="b-btn b-sm" data-flipall aria-pressed="false">Show numbers</button></div>${detailList(b.macro)}
       <p class="b-more"><a href="#/research/macro">Open the full macro grid and calendar</a></p></section>
+      <section class="b-sec" aria-label="Conditional shock scenarios"><div id="so-shock-scenario"></div></section>
       ${risksSection(b.risks)}</div>`, 'macro');
+    const shocks = root.SO2 && root.SO2.Shocks || root.SmartOptionsShocks;
+    if (shocks && shocks.renderScenario) shocks.renderScenario(doc.getElementById('so-shock-scenario'));
   }
   function renderCompany(view, t) {
+    const previous=doc.getElementById('bv-company');
+    const open=previous&&previous.dataset.ticker===t?[...previous.querySelectorAll('.co-card[open]')].map(el=>el.id):[];
+    if(previous&&previous.__soCo)previous.__soCo.destroy();
     view.innerHTML = `<div class="bv-wrap"><p class="b-crumb"><a href="#/company">Companies</a> / ${esc(t)}</p><div id="bv-company" class="bv-company"><p class="b-na">Loading ${esc(t)}.</p></div></div>`;
     const el = doc.getElementById('bv-company');
     let n = 0;
     const go = () => {
       if (ST.route.view !== 'company' || ST.route.ticker !== t) return;
       const C = root.SmartOptionsCompany;
-      if (C && typeof C.mount === 'function') { try { C.mount(el, t); } catch (e) { console.error('[brief] company mount failed', e); el.innerHTML = `<p class="b-na">Not available: the company view failed to load (${esc(e.message || e)}).</p>`; } return; }
+      if (C && typeof C.mount === 'function') { try { const handle=C.mount(el, t);handle.ready.then(()=>{if(el.isConnected)open.forEach(id=>{const node=doc.getElementById(id);if(node)node.open=true;});}).catch(e=>console.error('[brief] company ready failed',e)); } catch (e) { console.error('[brief] company mount failed', e); el.innerHTML = `<p class="b-na">Not available: the company view failed to load (${esc(e.message || e)}).</p>`; } return; }
       if (++n < 40) { setTimeout(go, 75); return; }
       el.innerHTML = `<section class="b-card"><h1 class="b-h1">${esc(t)}</h1><p class="b-na">Not available: the company workspace is not part of this build yet.</p><p><a class="b-link-btn" href="#t=${esc(t)}">Open ${esc(t)} in the research desk</a></p></section>`;
     };
@@ -698,6 +934,27 @@
   }
 
   // ---- start
+  async function checkRevision() {
+    if (doc.visibilityState !== 'visible' || ST.briefSrc !== 'data/brief.json') return;
+    try {
+      const next = await getJSON('data/brief.json');
+      const revision = x => JSON.stringify(x && [x.asof_session,x.generated_at]);
+      const core = root.SO2 && root.SO2.D && root.SO2.D(), coreRevision = core && core.exported_at;
+      const changed = revision(next)!==revision(ST.brief) || ST.coreRevision && coreRevision && coreRevision!==ST.coreRevision;
+      if(!ST.coreRevision) ST.coreRevision=coreRevision;
+      if(changed) {
+        ST.nextBrief=next;
+        const banner=doc.getElementById('bv-update-banner');
+        banner.hidden=false;banner.innerHTML='<span>A newer data snapshot is available. Your current view retains its dates.</span><button type="button" class="b-btn" data-load-latest>Load latest</button>';
+        banner.querySelector('button').onclick=()=>{
+          ST.brief=ST.nextBrief;ST.nextBrief=null;ST.coreRevision=coreRevision;banner.hidden=true;
+          if(root.SmartOptionsIntelligence) root.SmartOptionsIntelligence.load({refresh:true}).then(()=>applyRoute(true));
+          else applyRoute(true);
+          renderPill();if(root.CustomEvent) root.dispatchEvent(new root.CustomEvent('so:data-update',{detail:{brief:ST.brief,coreRevision}}));
+        };
+      }
+    } catch(e) { console.warn('[brief] snapshot check failed; retaining current view',e); }
+  }
   async function start() {
     const r0 = parseRoute(root.location.hash);
     ST.route = r0;
@@ -708,15 +965,19 @@
       setTheme(theme(), false);
       doc.body.classList.toggle('bv-on', r0.view !== 'research');
       doc.body.classList.toggle('bv-research', r0.view === 'research');
-      Promise.all([loadBrief(), loadQuotes()]).then(() => { applyRoute(true); renderPill(); });
+      // the research desk has no health sheet; the receipt is read only where the pill and sheet are shown
+      Promise.all([loadBrief(), r0.view === 'research' ? null : loadReceipt()]).then(() => { applyRoute(true); startLive(); renderPill(); });
       root.addEventListener('hashchange', () => applyRoute(false));
-      setInterval(() => { if (doc.visibilityState === 'visible') loadQuotes().then(renderPill); }, 60 * 1000);
+      setInterval(() => { if (doc.visibilityState === 'visible' && ST.route.view !== 'research') loadReceipt().then(renderPill); }, 5 * 60 * 1000);
+      setInterval(checkRevision,5*60*1000);
+
+      doc.addEventListener('visibilitychange',()=>{if(doc.visibilityState==='visible')checkRevision();});
       // once the Edge desk is ready: sync theme, refresh the company list
-      let n = 0; const w = setInterval(() => { if (root.SO2_ready) { clearInterval(w); setTheme(theme(), false); if (ST.route.view === 'company' && !ST.route.ticker) applyRoute(true); } else if (++n > 300) clearInterval(w); }, 100);
+      let n = 0; const w = setInterval(() => { if (root.SO2_ready) { clearInterval(w); setTheme(theme(), false); if(root.SmartOptionsIntelligence) root.SO2.Intelligence=root.SmartOptionsIntelligence;ST.coreRevision=root.SO2.D().exported_at; if (ST.route.view === 'company' && !ST.route.ticker) applyRoute(true); if (ST.route.view === 'brief') refreshShortlist(); } else if (++n > 300) clearInterval(w); }, 100);
     };
     if (doc.body) go(); else doc.addEventListener('DOMContentLoaded', go);
   }
 
-  return {parseRoute, legacyHash, routeHash, tone, ageWords, shortDate, screenerLabel, setScreener, pillText, priceFreshness, fmtValue, sortRisks, nyClock,
+  return {parseRoute, legacyHash, routeHash, tone, ageWords, shortDate, screenerLabel, setScreener, pillText, priceFreshness, fmtValue, sortRisks, nyClock,mergeQuotes,
     isResearch, data: () => ST.brief, dataSource: () => ST.briefSrc, chip: w => chip(w), metricRows, esc, SCREENER_ASOF_FALLBACK, _start: start};
 });

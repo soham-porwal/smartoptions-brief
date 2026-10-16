@@ -1,0 +1,61 @@
+/* Lane UI1: live price cells, freshness chips, data-health sheet, header ask slots. Reads app/ui.css tokens. */
+
+/* freshness chip: word always shown, color only reinforces it */
+.bv-fresh { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: var(--b-r-pill);
+  font: 600 12px/1 var(--b-font); letter-spacing: .1px; white-space: nowrap; background: var(--b-none-bg); color: var(--b-none); }
+.bv-fresh::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.bv-fresh[data-fresh="live"] { background: var(--b-good-bg); color: var(--b-good); }
+.bv-fresh[data-fresh="live"]::before { animation: lv-pulse 2s ease-in-out infinite; }
+.bv-fresh[data-fresh="fresh"] { background: var(--b-good-bg); color: var(--b-good); }
+.bv-fresh[data-fresh="delayed"] { background: var(--b-mixed-bg); color: var(--b-mixed); }
+.bv-fresh[data-fresh="closed"] { background: var(--b-info-bg); color: var(--b-link); }
+.bv-fresh[data-fresh="stale"], .bv-fresh[data-fresh="missing"] { background: var(--b-bad-bg); color: var(--b-bad); }
+@keyframes lv-pulse { 50% { opacity: .35; } }
+
+/* live numbers: tabular so a tick never shifts the line */
+[data-live] { font-variant-numeric: tabular-nums; border-radius: 4px; }
+.lv-chg[data-dir="up"], .b-chg[data-dir="up"] { color: var(--b-good); }
+.lv-chg[data-dir="dn"], .b-chg[data-dir="dn"] { color: var(--b-bad); }
+
+/* header pill: dot carries the freshness word's color */
+.bv-pill[data-fresh="live"] .bv-dot { background: var(--b-good); animation: lv-pulse 2s ease-in-out infinite; }
+.bv-pill[data-fresh="closed"] .bv-dot { background: var(--b-link); }
+.bv-pill[data-fresh="delayed"] .bv-dot { background: var(--b-mixed); }
+.bv-pill[data-fresh="stale"] .bv-dot, .bv-pill[data-fresh="missing"] .bv-dot { background: var(--b-bad); }
+
+/* data-health list (popover on wide screens, bottom sheet on phones) */
+.bv-pop { position: fixed; max-height: min(78vh, 680px); overflow-y: auto; overscroll-behavior: contain; padding: 16px 18px 18px; box-shadow: var(--b-e3); }
+.bv-hl { list-style: none; margin: 10px 0 0; padding: 0; }
+.bv-hr { padding: 10px 0; border-top: 1px solid var(--b-line); }
+.bv-hr-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bv-hr-top b { font-size: 15px; color: var(--b-ink); }
+.bv-hr-meta { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 3px; font-size: 13px; color: var(--b-ink-2); }
+.bv-hr-note { margin: 4px 0 0; font-size: 13px; color: var(--b-ink-3); line-height: 1.45; }
+.bv-sheet-grab { display: none; }
+.bv-pop.is-sheet { left: 0 !important; right: 0; bottom: 0; top: auto !important; width: auto !important; max-height: 82dvh; border-radius: 16px 16px 0 0;
+  padding: 8px 16px calc(18px + env(safe-area-inset-bottom)); z-index: 120; animation: lv-sheet .22s var(--b-ease) both; }
+.bv-pop.is-sheet .bv-sheet-grab { display: block; width: 40px; height: 4px; margin: 2px auto 10px; border-radius: 2px; background: var(--b-line-2); }
+.bv-pop.is-sheet .bv-x { min-width: 44px; min-height: 44px; }
+body.bv-sheet-open::after { content: ""; position: fixed; inset: 0; z-index: 110; background: rgba(15, 20, 18, .32); animation: lv-fade .2s ease both; }
+@keyframes lv-sheet { from { transform: translateY(24px); opacity: 0; } }
+@keyframes lv-fade { from { opacity: 0; } }
+
+/* "Ask about this" moved into each card header: a small labelled button, never over an edge */
+.b-ask-slot:empty { display: none; }
+.b-ask-slot { display: inline-flex; }
+.b-ask-slot .cp-context { margin: 0 !important; min-height: 32px; padding: 0 10px 0 30px !important; position: relative; font-size: 13px; font-weight: 600;
+  color: var(--b-link); border-radius: var(--b-r-pill) !important; background: var(--b-card) !important; white-space: nowrap; }
+.b-ask-slot .cp-context::before { content: ""; position: absolute; left: 10px; top: 50%; width: 14px; height: 12px; margin-top: -7px; border: 1.6px solid currentColor; border-radius: 4px; }
+.b-ask-slot .cp-context::after { content: ""; position: absolute; inset: -6px -2px; }   /* 44px touch area */
+
+/* phone shell: keyboard open hides the tab bar; an open sheet locks the page behind it */
+@media (max-width: 820px) {
+  body.bv-kb-open .bv-nav { display: none; }
+  body.bv-kb-open .bv-wrap { padding-bottom: 16px; }
+}
+body.bv-sheet-open { overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bv-fresh[data-fresh="live"]::before, .bv-pill[data-fresh="live"] .bv-dot { animation: none; }
+  .bv-pop.is-sheet, body.bv-sheet-open::after { animation: none; }
+}

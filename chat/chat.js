@@ -195,7 +195,7 @@
       series: t.symbol, as_of: m.generated.equities || m.exported_at, url: yahooUrl(t.symbol)});
   }
   function citeSam(m, t, ctx) {
-    return ctx.cite({label: (t.sam && t.sam.label) || 'SmartOptions snapshot 2026-07-25', source: "Sam's SmartOptions screener snapshot (read-only)",
+    return ctx.cite({label: (t.sam && t.sam.label) || 'SmartOptions snapshot 2026-07-25', source: "Historical SmartOptions screener snapshot (read-only)",
       series: t.symbol, as_of: t.sam && t.sam.asof, url: null});
   }
   function citeRel(m, sym, ctx) {
@@ -248,7 +248,7 @@
     };
     const cites = [cp, cf];
     if (t.sam) { const cs = citeSam(m, t, ctx); out.sam_snapshot = t.sam; out.cite_map.sam_snapshot = cs.id; cites.push(cs); }
-    else out.sam_snapshot = 'not in the data (ticker not in Sam\'s 2026-07-25 snapshot)';
+    else out.sam_snapshot = 'not in the data (ticker not in Historical\'s 2026-07-25 snapshot)';
     if (t.relations) {
       const cr = citeRel(m, t.symbol, ctx);
       out.relations = Object.assign({}, t.relations, {units: m.units, window: m.rel_window});
@@ -290,7 +290,7 @@
     if (f.min_iv != null) need('min_iv (missing ATM IV also excluded)', t => t.atm_iv && num(t.atm_iv.iv_pct) != null && t.atm_iv.iv_pct >= f.min_iv);
     if (f.earnings_within_days != null) need('earnings_within_days (unknown date excluded)', t => { const d = earningsDays(t, ctx); return d != null && d >= 0 && d <= f.earnings_within_days; });
     if (f.min_days_to_earnings != null) need('min_days_to_earnings (unknown date excluded)', t => { const d = earningsDays(t, ctx); return d != null && d >= f.min_days_to_earnings; });
-    if (f.min_sam_opp != null) need('min_sam_opp (not in Sam snapshot excluded)', t => t.sam && num(t.sam.opp) != null && t.sam.opp >= f.min_sam_opp);
+    if (f.min_sam_opp != null) need('min_sam_opp (not in Historical snapshot excluded)', t => t.sam && num(t.sam.opp) != null && t.sam.opp >= f.min_sam_opp);
     if (f.sam_risk && f.sam_risk.length) need('sam_risk', t => t.sam && f.sam_risk.map(lc).includes(lc(t.sam.risk)));
     if (f.sam_quality && f.sam_quality.length) need('sam_quality', t => t.sam && f.sam_quality.map(lc).includes(lc(t.sam.q)));
     if (f.min_upside != null) need('min_upside (missing target excluded)', t => num(t.analyst.upside_pct) != null && t.analyst.upside_pct >= f.min_upside);
@@ -332,7 +332,7 @@
     });
     const cites = [ctx.cite({label: 'Screen over dashboard tickers: price, valuation, analyst, earnings, ATM IV', source: 'Yahoo Finance via yfinance',
       series: 'all tickers', as_of: m.asof_session, url: 'https://finance.yahoo.com/'})];
-    if (f.min_sam_opp != null || f.sam_risk || f.sam_quality || sortKey.startsWith('sam')) cites.push(ctx.cite({label: 'SmartOptions snapshot 2026-07-25', source: "Sam's SmartOptions screener snapshot (read-only)", series: 'all tickers', as_of: '2026-07-25', url: null}));
+    if (f.min_sam_opp != null || f.sam_risk || f.sam_quality || sortKey.startsWith('sam')) cites.push(ctx.cite({label: 'SmartOptions snapshot 2026-07-25', source: "Historical SmartOptions screener snapshot (read-only)", series: 'all tickers', as_of: '2026-07-25', url: null}));
     if (fac) cites.push(citeRel(m, null, ctx));
     return {matched: total, shown: out.length, sort: (desc ? '-' : '+') + sortKey, filters: f, excluded_by_filter: excluded, notes,
       days_reference: 'days_to_earnings counted from ' + etToday(ctx.now) + ' (ET)', factor_units: fac ? m.units[fac] : undefined,
@@ -415,7 +415,7 @@
 
   function get_regime(m, args, ctx) {
     if (!m.regime) return {error: 'not in the data: regime'};
-    const cites = [ctx.cite({label: 'Market regime score (Sam\'s market_regime.py method, recomputed)', source: 'SmartOptions V2 relations (VIX, A/D, new highs/lows)', series: 'regime', as_of: m.asof_session, url: null})];
+    const cites = [ctx.cite({label: 'Market regime score (Historical\'s market_regime.py method, recomputed)', source: 'SmartOptions V2 relations (VIX, A/D, new highs/lows)', series: 'regime', as_of: m.asof_session, url: null})];
     const vb = m.vol_breadth;
     let vol = null;
     if (vb) {
@@ -553,13 +553,13 @@
     {name: 'strategy_library', description: 'Educational strategy library: view, fit, risks, payoff formulas and assignment caveats.', input_schema:S({})},
     {name: 'get_confidence', description: 'Explain a ticker evidence-support score, every component, weight, rule and dated input. This heuristic score measures signal agreement and data quality, NOT a calibrated probability of profit or forecast accuracy.', input_schema:S({symbol:{type:'string'}},['symbol'])},
     {name: 'open_ticker_tab', description: 'UI: show a ticker Overview, Technicals or Strategies tab. Use when asked to show strategies for a ticker.', input_schema:S({symbol:{type:'string'},tab:{type:'string',enum:['overview','technicals','strategies']}},['symbol','tab'])},
-    {name: 'get_ticker', description: 'All dashboard fields for one ticker with provenance: price/returns, valuation, analyst, earnings date, ATM IV, Sam snapshot scores, macro sensitivities, last-session attribution, delayed quote. Use cite_map ids.',
+    {name: 'get_ticker', description: 'All dashboard fields for one ticker with provenance: price/returns, valuation, analyst, earnings date, ATM IV, Historical snapshot scores, macro sensitivities, last-session attribution, delayed quote. Use cite_map ids.',
       input_schema: S({symbol: {type: 'string'}}, ['symbol'])},
     {name: 'screen', description: 'Filter and sort dashboard tickers. Rows with a missing value are excluded by any filter on that value (counts reported). Earnings days are counted from today ET.',
       input_schema: S({filters: S({sector: {type: 'string', description: 'GICS sector or industry substring'}, max_pe_fwd: {type: 'number'}, max_peg: {type: 'number'},
         min_iv: {type: 'number', description: 'min ATM implied vol, percent'}, earnings_within_days: {type: 'integer'}, min_days_to_earnings: {type: 'integer', description: 'earnings at least N days away'},
-        min_sam_opp: {type: 'number', description: "Sam's Opportunity score (2026-07-25 snapshot)"}, sam_risk: {type: 'array', items: {type: 'string'}}, sam_quality: {type: 'array', items: {type: 'string'}},
-        sets: {type: 'array', items: {type: 'string', enum: ['A', 'B']}, description: 'A = top movers, B = Sam universe'},
+        min_sam_opp: {type: 'number', description: "Historical Opportunity score (2026-07-25 snapshot)"}, sam_risk: {type: 'array', items: {type: 'string'}}, sam_quality: {type: 'array', items: {type: 'string'}},
+        sets: {type: 'array', items: {type: 'string', enum: ['A', 'B']}, description: 'A = top movers, B = Historical universe'},
         significant_factor: factorEnum, min_abs_t: {type: 'number', description: 'default 2'}, factor_sign: {type: 'string', enum: ['positive', 'negative']},
         min_upside: {type: 'number'}, min_chg_1d: {type: 'number'}, max_chg_1d: {type: 'number'}, symbols: {type: 'array', items: {type: 'string'}}}),
       sort: {type: 'string', description: 'field, prefix "-" desc (default) or "+" asc: ' + Object.keys(SORTS).join(', ') + ', days_to_earnings, abs_t'},
@@ -593,13 +593,13 @@
     const c = m.meta.counts || {};
     return [
       'You are the analyst assistant inside the SmartOptions V2 dashboard (daily macro + market fundamentals for options sellers).',
-      'Data loaded: as-of session ' + m.asof_session + ', exported ' + m.exported_at + '. ' + (c.tickers || Object.keys(m.tickers).length) + ' tickers (set A = top S&P 500 movers, set B = Sam\'s universe). Macro groups: ' + m.groups.join(', ') + '. Relations factors: ' + m.factors.join(', ') + ' (' + Object.entries(m.units).map(([k, v]) => k + ': ' + v).join('; ') + '), window ' + m.rel_window + '.',
+      'Data loaded: as-of session ' + m.asof_session + ', exported ' + m.exported_at + '. ' + (c.tickers || Object.keys(m.tickers).length) + ' tickers (set A = top S&P 500 movers, set B = Historical\'s universe). Macro groups: ' + m.groups.join(', ') + '. Relations factors: ' + m.factors.join(', ') + ' (' + Object.entries(m.units).map(([k, v]) => k + ': ' + v).join('; ') + '), window ' + m.rel_window + '.',
       'RULES (hard):',
       '1. Use tools for every fact. Never invent or estimate numbers, consensus, forecasts, formulas or thresholds. If a value is missing or not in the tools, write "not in the data".',
       '2. Every number you write (prices, %, scores, dates, counts, coefficients, t-stats, shocks) must be followed by its citation marker [n], using the cite ids returned by the tool (cite_map / cite_id / cite[].id). Put the marker in the same line or table row as the number. Never make up a marker.',
       '3. This is a research tool, not personalized advice. No recommendations to buy/sell, no "optimal", no orders. You may rank by stated criteria and describe conditional playbooks.',
       '4. Regression coefficients are associations over a stated window, not causes. Say so when you use them.',
-      "5. Sam's scores (Opportunity, Quality, Trend, Risk, Flags) are a read-only snapshot from 2026-07-25 - label them as such.",
+      "5. Historical scores (Opportunity, Quality, Trend, Risk, Flags) are a read-only snapshot from 2026-07-25 - label them as such.",
       '6. Monthly/quarterly macro values carry their observation period; never imply they are new today.',
       '7. Start with the plain-language assessment and the most decision-relevant evidence. Keep the initial answer compact; do not dump indicators. Separate observation, conditional interpretation, alternatives and what could invalidate the thesis. The source entries and Data & dashboard actions retain detailed tool data and calculations; give the full math when the user asks for it.',
       '8. UI action tools change what the user sees on the dashboard. Use them when asked to organize, set up, filter or show something; call ui_capabilities first to learn the available panels/columns/presets. If a UI action returns "' + NOT_AVAILABLE + '", say so plainly.',

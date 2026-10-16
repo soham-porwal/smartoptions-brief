@@ -19,7 +19,7 @@ const SCREEN = [
   {k: 'minIV', h: 'Min ATM IV %', min: 10, max: 120, step: 5},
   {k: 'earnN', h: 'Earnings within N days', min: 1, max: 60, step: 1},
   {k: 'minEarnAway', h: 'Earnings at least N days away', min: 1, max: 60, step: 1},
-  {k: 'minOpp', h: "Min Sam Opp score", min: 0, max: 100, step: 5},
+  {k: 'minOpp', h: "Min Historical Opp score", min: 0, max: 100, step: 5},
 ];
 function apply(sortScen) {
   const A = window.SO2;
@@ -49,7 +49,7 @@ window.SO2_controls = function (el) {
     <h3>Screen</h3><p>Empty = off. Rows missing a screened field are excluded while that screen is on.</p>
     ${SCREEN.map(scrRow).join('')}
     <div class="ctl"><label><input type="checkbox" id="hideMissing" ${S.hideMissing ? 'checked' : ''}> Hide rows missing P/E, PEG or regression</label></div>
-    <h3>Regime tiers</h3><p>Sam's regime thresholds: 30 / 50 / 70 / 85 (display only; his tier labels come from his code).</p>
+    <h3>Regime tiers</h3><p>Historical regime thresholds: 30 / 50 / 70 / 85 (display only; his tier labels come from his code).</p>
     <p><button data-reset>Reset scenario + screen</button></p>`;
   el.oninput = e => {
     const t = e.target;

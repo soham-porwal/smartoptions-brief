@@ -1,0 +1,7 @@
+# Free public sources only; no browser runtime required for the daily pipeline.
+numpy>=2.0,<3
+pandas>=2.2,<4
+requests>=2.32,<3
+yfinance>=0.2.65,<2
+PyYAML>=6,<7
+lxml>=5,<7

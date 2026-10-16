@@ -150,15 +150,15 @@ const WORKFLOWS = [
       {h: 'Signals', m: nSig, panel: 'signals', tab: 'markets'},
     ], th: []},
   {id: 'csp', h: 'CSP candidate hunt',
-    state: {S: {minIV: 30, minEarnAway: 14, minOpp: 50}, V: {tab: 'markets', preset: 'all', sort: {k: 'iv', dir: -1}, sector: null, q: '', overlay: 'vix', range: '6M'}, cols: 'seller'},
+    state: {S: {minIV: 30, minEarnAway: 14, minOpp: null}, V: {tab: 'markets', preset: 'all', sort: {k: 'iv', dir: -1}, sector: null, q: '', overlay: 'vix', range: '6M'}, cols: 'seller'},
     steps: [
       {h: 'Regime', m: regimeTxt, panel: 'tape', tab: 'markets'},
       {h: 'Pass screen', m: nPass, panel: 'screener', tab: 'markets'},
-      {h: 'Sam risk / flags', m: () => 'detail', panel: 'detail', tab: 'markets'},
+      {h: 'Historical risk / flags', m: () => 'detail', panel: 'detail', tab: 'markets'},
       {h: 'Macro sensitivity', m: () => '|t| bars', panel: 'detail', tab: 'markets'},
       {h: 'Chart vs VIX 6M', m: () => A().V.sel.id, panel: 'chart', tab: 'markets'},
     ],
-    th: [['minIV', 'ATM IV ≥ 30%'], ['minEarnAway', 'earnings ≥ 14 days away'], ['minOpp', "Sam Opp ≥ 50"]]},
+    th: [['minIV', 'ATM IV ≥ 30%'], ['minEarnAway', 'earnings ≥ 14 days away'], ['minOpp', 'Historical score filter (optional)']]},
   {id: 'earnings', h: 'Earnings week risk',
     state: {S: {earnN: 7}, V: {tab: 'markets', preset: 'all', sort: {k: 'ern', dir: 1}, sector: null, q: '', overlay: '', range: '3M'}, cols: ['t', 'ern', 'd1', 'iv', 'px', 'pct', 'vr', 'opp', 'risk']},
     steps: [

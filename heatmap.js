@@ -266,8 +266,28 @@ function mount(el, opts) {
   async function pollQuotes() {
     if (!st.alive || st.period !== '1D' || (typeof document !== 'undefined' && document.hidden)) return;
     const q = await getQuotes(); if (!st.alive) return;
-    if (q.generated_at && q.generated_at !== st.qmeta.generated_at) { st.quotes = q.quotes || {}; st.qmeta = q; recolor(); }
+    if (q.generated_at && q.generated_at !== st.qmeta.generated_at) { st.qmeta = q; if (takeNewer(q.quotes || {})) recolor(); }
   }
+  // newest observation per name wins, so the shared file never overwrites a newer fast-path price
+  function takeNewer(incoming) {
+    let n = 0;
+    for (const [t, q] of Object.entries(incoming || {})) {
+      if (!q || !isNum(q.price)) continue;
+      const cur = st.quotes[t], tn = Date.parse(q.asof_utc || q.ts || ''), tc = cur ? Date.parse(cur.asof_utc || cur.ts || '') : NaN;
+      if (cur && isFinite(tc) && (!isFinite(tn) || tc >= tn) && cur.price === q.price) continue;
+      if (cur && isFinite(tc) && isFinite(tn) && tc > tn) continue;
+      // the Live engine labels freshness separately; a priced, timestamped observation is usable for colour
+      st.quotes[t] = Object.assign({}, q, {status: 'ok', change_status: isNum(q.chg_pct) ? 'ok' : q.change_status, ts: q.ts || q.asof_utc});
+      n++;
+    }
+    return n;
+  }
+  const L = root.SmartOptionsLive;
+  const unsub = L && L.subscribe ? L.subscribe(ev => {
+    if (!st.alive || !st.rows.length || !ev.changed || !ev.changed.length) return;
+    const xs = {}; ev.changed.forEach(t => { if (byT.has(t)) { const q = L.get(t); if (q) xs[t] = q; } });
+    if (takeNewer(xs) && st.period === '1D') recolor();
+  }) : null;
   function armLive() { clearInterval(st.timer); st.timer = st.period === '1D' ? setInterval(pollQuotes, 60000) : null; }
 
   el.addEventListener('click', e => {
@@ -307,7 +327,7 @@ function mount(el, opts) {
     ready, setPeriod, refresh: pollQuotes, alive: () => st.alive,
     setOptions: o => { if (o.onSelect) opts.onSelect = o.onSelect; },
     highlight: t => { st.q = String(t || ''); input.value = st.q; applyHighlight(); },
-    destroy: () => { st.alive = false; clearInterval(st.timer); if (ro) ro.disconnect(); el.innerHTML = ''; el.classList.remove('so-hm'); el.__soHm = null; },
+    destroy: () => { st.alive = false; clearInterval(st.timer); if (unsub) unsub(); if (ro) ro.disconnect(); el.innerHTML = ''; el.classList.remove('so-hm'); el.__soHm = null; },
   };
   el.__soHm = api;
   return api;

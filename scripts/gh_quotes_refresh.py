@@ -57,9 +57,23 @@ def market_state(now, observed=None):
     """
     local = now.astimezone(ET)
     m = local.hour * 60 + local.minute
+    # A provider outage must not turn yesterday's trade into a closed market.
+    if local.weekday() < 5 and 570 <= m < 960:
+        return "regular"
     if local.weekday() >= 5 or (observed and observed.astimezone(ET).date() < local.date()):
         return "closed"
     return "pre" if 240 <= m < 570 else "regular" if 570 <= m < 960 else "post" if 960 <= m < 1200 else "closed"
+
+
+def last_weekday_close(now):
+    """Conservative cash-session clock; holidays may remain visibly stale."""
+    local = now.astimezone(ET)
+    close = local.replace(hour=16, minute=0, second=0, microsecond=0)
+    if local < close:
+        close -= timedelta(days=1)
+    while close.weekday() >= 5:
+        close -= timedelta(days=1)
+    return close.astimezone(timezone.utc)
 
 
 def secret(name, directory=DEFAULT_SECRETS):
@@ -385,7 +399,10 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
             state = market_state(finished_at, observed)
             age = max(0, (finished_at - observed).total_seconds() / 60)
             delay = current.get("delay_minutes")
-            label = "closed" if state == "closed" else "stale" if current.get("retained") or delay is None else "live" if delay == 0 and age <= 1 else "delayed" if delay > 0 and age <= delay + 15 else "stale"
+            label = "stale" if current.get("retained") or delay is None or age > 96 * 60 else "closed" if state == "closed" else "live" if delay == 0 and age <= 1 else "delayed" if delay > 0 and age <= delay + 15 else "stale"
+            if label == "closed" and observed < last_weekday_close(finished_at) - timedelta(minutes=20):
+                label = "stale"
+                current["reason"] = "Observation predates the latest weekday close; source date retained"
             current.update(market_state=state, freshness=label)
             if label == "stale":
                 current["status"] = "stale"
@@ -409,6 +426,9 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
               "median_age_minutes": median_age, "oldest_age_minutes": oldest_age, "provider_mix": dict(served),
               "estimated_sweep_minutes": sweep_minutes, "cadence_basis": "450s minimum interval or universe dispatch time at 1.22s/start; excludes slow responses",
               "sources": [{"id": "finnhub", "status": "rejected" if fh_note == "key rejected by provider" else "missing" if not keys.get("FINNHUB_API_KEY") else "configured", "note": fh_note}]}
+    spy_observed = stamp(quotes.get("SPY", {}).get("asof_utc"))
+    if market_state(finished_at, spy_observed) == "closed" and spy_observed:
+        health["line"] = "Market closed; last observed session " + spy_observed.astimezone(ET).date().isoformat() + "; " + health["line"]
     if fh_note in ("key rejected by provider", "key missing"):
         health["line"] += "; Finnhub: " + fh_note
     return {"generated_at": utc(finished_at), "session": market_state(finished_at, stamp(quotes.get("SPY", {}).get("ts"))),
@@ -449,6 +469,37 @@ def optional_json(path):
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
+def mirror_quotes(url, previous, get=None):
+    """One canonical producer prevents two sites exhausting one free feed key."""
+    import hashlib
+    import requests
+    allowed = "https://soham-porwal.github.io/smartoptions-brief/data/quotes.json"
+    if url != allowed:
+        raise ValueError("Unapproved canonical quotes URL")
+    response = (get or requests.get)(url, timeout=(5, 25), allow_redirects=False)
+    if response.status_code != 200 or len(response.content) > 8 * 1024 * 1024:
+        raise ValueError("Canonical quotes unavailable")
+    data = response.json()
+    quotes = data.get("quotes") if isinstance(data, dict) else None
+    if not isinstance(quotes, dict) or not quotes:
+        raise ValueError("Canonical quotes missing")
+    old_valid = sum(finite(q.get("price"), True) is not None for q in previous.get("quotes", {}).values())
+    new_valid = 0
+    for symbol, quote in quotes.items():
+        if not re.fullmatch(r"[A-Z0-9.^=/-]{1,20}", symbol) or not isinstance(quote, dict):
+            raise ValueError("Invalid canonical quote")
+        if quote.get("price") is not None:
+            if finite(quote["price"], True) is None or not stamp(quote.get("asof_utc")):
+                raise ValueError("Invalid canonical price/timestamp")
+            new_valid += 1
+    if new_valid < old_valid:
+        raise ValueError("Canonical quote coverage regressed")
+    if stamp(data.get("generated_at")) and stamp(previous.get("generated_at")) and stamp(data["generated_at"]) < stamp(previous["generated_at"]):
+        raise ValueError("Canonical snapshot older than current client")
+    data["mirror"] = {"url": url, "mirrored_at": utc(), "source_sha256": hashlib.sha256(response.content).hexdigest(), "provider_calls": 0}
+    return data
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--core", type=Path, default=Path("data/core.json"))
@@ -456,6 +507,7 @@ def main(argv=None):
     parser.add_argument("--status", type=Path, default=Path("logs/quotes-status.json"))
     parser.add_argument("--watchlist", default=os.environ.get("QUOTE_WATCHLIST", ""))
     parser.add_argument("--check-key", action="store_true", help="Check Finnhub authentication without revealing credentials")
+    parser.add_argument("--mirror-url", help="Client site mirrors the approved canonical feed without provider calls")
     args = parser.parse_args(argv)
     try:
         if args.check_key:
@@ -466,8 +518,16 @@ def main(argv=None):
             result, error = finnhub_one("SPY", key, datetime.now(timezone.utc))
             print("Finnhub: valid" if result else "Finnhub: invalid (key rejected by provider)" if error == "key rejected by provider" else "Finnhub: unverified (provider unavailable)")
             return 0 if result else 2 if error == "key rejected by provider" else 1
-        core = optional_json(args.core)
         previous = optional_json(args.out)
+        if args.mirror_url:
+            result = mirror_quotes(args.mirror_url, previous)
+            status = {"status": "OK", "at": utc(), "mode": "canonical_mirror", "provider_calls": 0,
+                      "received": len(result["quotes"]), "source_sha256": result["mirror"]["source_sha256"]}
+            atomic_json(args.status, status)
+            atomic_json(args.out, result)
+            print(json.dumps(status))
+            return 0
+        core = optional_json(args.core)
         brief = optional_json(args.core.parent / "brief.json")
         config = optional_json(args.core.parent / "config.json")
         shortlist = [r["t"] for r in brief.get("shortlist", []) if r.get("t")]

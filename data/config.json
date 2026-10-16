@@ -1,5 +1,6 @@
 {
-  "chat_proxy_url": null,
+  "chat_proxy_url": "https://smartoptions-brief-chat.smartoptions-brief.workers.dev/chat",
+  "quotes_proxy_url": "https://smartoptions-brief-chat.smartoptions-brief.workers.dev/quotes",
   "chat_proxy_model": "nvidia/nemotron-3-super-120b-a12b:free",
   "quotes": {
     "providers": ["Finnhub US quote", "Alpaca IEX (single exchange)", "Yahoo Finance via yfinance"],

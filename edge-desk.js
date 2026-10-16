@@ -1,6 +1,6 @@
-/* SmartOptions Edge Desk — Lean, Interactive, Pure-Math & Live Cross-Linked Experience
- * Inspired by the simplicity of the Premium Pocket reference artifact, 100% wired to
- * Sam's live SmartOptions V2 data (core.json, px/*.json, 252d/60d OLS, My Book, Strategies).
+/* Options and risk research — Lean, Interactive, Pure-Math & Live Cross-Linked Experience
+ * Inspired by the simplicity of the Options income reference artifact, 100% wired to
+ * Historical live SmartOptions V2 data (core.json, px/*.json, 252d/60d OLS, My Book, Strategies).
  */
 (function (root) {
   'use strict';
@@ -229,17 +229,7 @@
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
     const byTicker = new Map((d.rows || []).map(r => [r.t, r]));
-    const defHold = DEFAULT_BOOK_SYMBOLS.filter(x => byTicker.has(x.t)).map(x => {
-      const r = byTicker.get(x.t);
-      return {
-        t: x.t,
-        shares: x.shares,
-        basis: r && finite(r.px) ? +(r.px * 0.94).toFixed(2) : 100,
-        price: r && finite(r.px) ? r.px : 0,
-        iv: r && finite(r.iv) ? r.iv : (r && finite(r.rv20) ? r.rv20 : 30),
-        earn: (r && r.er) || ''
-      };
-    });
+    const defHold = [];
     const base = {
       pillar: 'pocket',       // 'pocket' | 'alpha' | 'stress' | 'diff'
       mode: 'call',           // 'call' | 'put' | 'both'
@@ -279,16 +269,16 @@
 
   /* Sync Edge Desk holdings into SmartOptionsImport My Book so Overview / Strategies / Flow stay 100% connected */
   function syncToMyBook() {
-    if (!root.SmartOptionsImport || !ST || !Array.isArray(ST.hold)) return;
+    if (!root.SmartOptionsImport || !ST || !Array.isArray(ST.hold) || !ST.hold.length) return;
     try {
       const cur = root.SmartOptionsImport.getData() || {};
-      const book = {};
+      const book = {...(cur.book || {})};
       ST.hold.forEach(h => {
         if (h.t && h.shares > 0) {
           book[h.t] = {qty: h.shares, cost: finite(h.basis) ? h.basis : h.price};
         }
       });
-      localStorage.setItem('so_local_imports_v1', JSON.stringify({
+      localStorage.setItem('so_import_v1', JSON.stringify({
         book,
         metrics: cur.metrics || null,
         series: cur.series || [],
@@ -313,7 +303,7 @@
         t: sym,
         shares: finite(pos.qty) && pos.qty > 0 ? pos.qty : 100,
         basis: finite(pos.cost) && pos.cost > 0 ? pos.cost : r.px,
-        price: existing && existing.customPx ? existing.price : r.px,
+        price: existing && existing.customPx ? existing.price : (root.SmartOptionsLive && root.SmartOptionsLive.get(sym) || {}).price || r.px,
         iv: existing && existing.customIv ? existing.iv : (finite(r.iv) ? r.iv : (finite(r.rv20) ? r.rv20 : 30)),
         earn: (r && r.er) || ''
       });
@@ -514,7 +504,7 @@
     </div>`;
   }
 
-  /* ---------- Pillar 1: Premium Pocket & Option Income Finder ---------- */
+  /* ---------- Pillar 1: Options income & Option Income Finder ---------- */
   function renderPocketPillar(d) {
     const fr = fridaysFrom(d.asof_session);
     if (ST.fExp >= fr.length) ST.fExp = 1;
@@ -536,17 +526,17 @@
       return `<button class="ed-fri-b" data-fexp="${i}" aria-pressed="${i === ST.fExp}">
         <span class="ed-fri-d">${esc(shortDate(f))}</span>
         <span class="ed-fri-n">${td} trading day${td === 1 ? '' : 's'}</span>
-        <span class="ed-fri-y ed-num">${fmtMoney(vf.credit)}</span>
-        <span class="ed-fri-n">${ST.lead === 'odds' ? fmtPct(s.ann) + '/yr' : (s.ok ? oneIn(s.cap) : 'max ' + fmtPct(s.ann))}</span>
+        <span class="ed-fri-y ed-num">Est. ${fmtMoney(vf.credit)}</span>
+        <span class="ed-fri-n">Est. ${ST.lead === 'odds' ? fmtPct(s.ann) + '/yr' : (s.ok ? oneIn(s.cap) : 'max ' + fmtPct(s.ann))}</span>
       </button>`;
     }).join('');
 
     const what = ST.mode === 'both' ? 'strangles' : (em() === 'put' ? 'puts' : 'calls');
     const goalNote = ST.lead === 'odds'
-      ? `At <b>${oneIn(cap)}</b> odds or safer, ${what} for Fri ${esc(shortDate(exp))} earn <b>${fmtPct(sol.ann)}</b> annualized (${fmtMoney(V.credit)} total credit).`
+      ? `At <b>Est. ${oneIn(cap)}</b> odds or safer, ${what} for Fri ${esc(shortDate(exp))} earn <b>Est. ${fmtPct(sol.ann)}</b> annualized (${fmtMoney(V.credit)} total credit).`
       : sol.ok
-        ? `To earn <b>${fmtPct(ST.goal, 0)}</b> a year on Fri ${esc(shortDate(exp))}, ${what} need assignment odds of up to <b>${oneIn(cap)}</b> — the safest level that gets there.`
-        : `Fri ${esc(shortDate(exp))} reaches at most <b>${fmtPct(sol.ann)}</b> annualized at 1 in 3 odds. Lower the goal or pick a later Friday.`;
+        ? `To earn <b>${fmtPct(ST.goal, 0)}</b> a year on Fri ${esc(shortDate(exp))}, ${what} model closing odds of up to <b>Est. ${oneIn(cap)}</b>. This is a model constraint, not a safety guarantee.`
+        : `Fri ${esc(shortDate(exp))} reaches at most <b>Est. ${fmtPct(sol.ann)}</b> annualized at 1 in 3 odds. Different inputs change the modeled outcome.`;
 
     let bodyHtml = '';
     if (openT && ST.hold.some(h => h.t === openT)) {
@@ -570,12 +560,12 @@
         <h3 class="ed-vc-title">${esc(openT)} · ${fmtMoney2(h.price)} · Vol ${h.iv.toFixed(1)}% (${esc(sel ? sel.ivSrc : 'model')})</h3>
         <p class="ed-vc-dek">${r ? `Sector: ${esc(r.sec)} · 20d Idiosyncratic Alpha: ${fmtSignedPct(r.res20d)} · Fwd P/E: ${finite(r.pef) ? r.pef.toFixed(1) + 'x' : '—'} (${finite(r.pef_sec_rel) ? r.pef_sec_rel.toFixed(2) + 'x sector' : '—'})` : ''}</p>
         <div class="ed-lad">
-          <div class="ed-lad-h"><span>Strike</span><span>OTM Distance</span><span>Credit / Annualized</span><span>Assignment Odds</span></div>
+          <div class="ed-lad-h"><span>Strike</span><span>OTM Distance</span><span>Est. credit / est. annualized</span><span>Est. closing odds</span></div>
           ${lad.map(c => `<button class="ed-lad-r${c.k === selK ? ' on' : ''}" data-pick-k="${c.k}">
-            <span class="ed-num"><b>$${kfmt(c.k)}</b>${cur && c.k === cur.sugK ? '<em>suggested</em>' : ''}</span>
+            <span class="ed-num"><b>$${kfmt(c.k)}</b>${cur && c.k === cur.sugK ? '<em>model selection</em>' : ''}</span>
             <span class="ed-num">${em() === 'put' ? '−' : '+'}${fmtPct(c.otm)}</span>
-            <span class="ed-num"><b>${fmtMoney(c.px * 100 * nn)}</b><small>${fmtPct(c.ann)}/yr (${fmtMoney2(c.px)}/sh)</small></span>
-            <span><span class="ed-pill ${c.p < 0.10 ? 'good' : c.p < 0.20 ? 'warn' : 'bad'}">${oneIn(c.p)}</span></span>
+            <span class="ed-num"><b>Est. ${fmtMoney(c.px * 100 * nn)}</b><small>Est. ${fmtPct(c.ann)}/yr (${fmtMoney2(c.px)}/sh)</small></span>
+            <span><span class="ed-pill ${c.p < 0.10 ? 'good' : c.p < 0.20 ? 'warn' : 'bad'}">Est. ${oneIn(c.p)}</span></span>
           </button>`).join('')}
         </div>
         ${chartsForTicker(d, openT, exp, legs)}
@@ -589,7 +579,7 @@
       bodyHtml = `<div class="ed-vc">
         <div class="ed-vc-kick">${ST.mode === 'both' ? 'Short Strangles' : em() === 'put' ? 'Cash-Secured Puts' : 'Covered Calls'} · Fri ${esc(shortDate(exp))}</div>
         <h3 class="ed-vc-title">${hit} of ${V.rows.length} ${what} hit your ${fmtPct(ST.goal, 0)} goal</h3>
-        <p class="ed-vc-dek">Best strike on each holding at ${oneIn(cap)} odds or safer, ranked by annualized yield. Tap any stock to inspect its strike ladder, probability density, payoff curve, or launch Analyst / Strategies.</p>
+        <p class="ed-vc-dek">Model estimate at the selected strike on each holding at ${oneIn(cap)} odds or safer, ranked by annualized yield. Tap any stock to inspect its strike ladder, probability density, payoff curve, or launch Analyst / Strategies.</p>
         <div class="ed-vc-key">
           <span><i class="ed-sw ok"></i>Meets ${fmtPct(ST.goal, 0)} goal</span>
           <span><i class="ed-sw lo"></i>Below goal</span>
@@ -613,9 +603,9 @@
                 <span class="ed-vc-bar">
                   <span class="ed-vc-fill ${r.ann >= ST.goal - 1e-9 ? 'ok' : 'lo'}" style="width:${wd(r.ann).toFixed(1)}%"></span>
                   <span class="ed-vc-goal" style="left:${gx.toFixed(1)}%"></span>
-                  <b class="ed-vc-v ed-num" style="left:calc(${wd(r.ann).toFixed(1)}% + 6px)">${fmtPct(r.ann)}</b>
+                  <b class="ed-vc-v ed-num" style="left:calc(${wd(r.ann).toFixed(1)}% + 6px)">Est. ${fmtPct(r.ann)}</b>
                 </span>
-                <span class="ed-vc-s ed-num"><span>${esc(sub)}</span><span class="ed-pill ${oc}">${oneIn(pVal)}</span></span>
+                <span class="ed-vc-s ed-num"><span>${esc(sub)}</span><span class="ed-pill ${oc}">Est. ${oneIn(pVal)}</span></span>
               </span>
               <span>›</span>
             </button>`;
@@ -657,7 +647,7 @@
         <div class="ed-step"><span class="ed-stepn">1</span><b>Pick the Friday Expiration</b><span class="ed-step-r">trading days · est. credit · odds</span></div>
         <div class="ed-fri">${friHtml}</div>
 
-        <div class="ed-step"><span class="ed-stepn">2</span><b>Set Your Income Goal or Assignment Risk</b><span class="ed-step-r">move either slider — the other solves automatically</span></div>
+        <div class="ed-step"><span class="ed-stepn">2</span><b>Set Your Income Goal or Estimated closing risk</b><span class="ed-step-r">move either slider — the other solves automatically</span></div>
         <div class="ed-dual">
           <div class="ed-dl ${ST.lead === 'goal' ? 'lead' : ''}">
             <label for="edGoal">Annualized Income Goal</label>
@@ -680,10 +670,10 @@
 
         <div class="ed-capsum">
           <div class="ed-cs"><span>Est. Total Credit</span><b class="ed-num">${fmtMoney(V.credit)}</b></div>
-          <div class="ed-cs"><span>Weekly Yield</span><b class="ed-num">${fmtPct(V.wk / V.PV, 2)}</b></div>
-          <div class="ed-cs"><span>Annualized Yield</span><b class="ed-num">${fmtPct(V.ann, 1)}</b></div>
+          <div class="ed-cs"><span>Est. weekly yield</span><b class="ed-num">${fmtPct(V.wk / V.PV, 2)}</b></div>
+          <div class="ed-cs"><span>Est. annualized yield</span><b class="ed-num">${fmtPct(V.ann, 1)}</b></div>
           <div class="ed-cs"><span>Book Value</span><b class="ed-num">${fmtMoney(V.PV)}</b></div>
-          <p class="ed-cs-note">Deterministic Black-Scholes pricing (5% slippage haircut, r=4.0%). Uses live Yahoo ATM IV where fetched, with automatic fallback to 20-session annualized realized vol (rv20) across all 365 S&P stocks.</p>
+          <p class="ed-cs-note">Estimates only, not executable quotes or trade recommendations. Black-Scholes lognormal European closing model (5% slippage haircut, r=4.0%); closing odds do not measure early assignment. Underlying observations may be delayed. Uses dated Yahoo ATM IV where fetched, with automatic fallback to 20-session annualized realized vol (rv20) across all covered stocks.</p>
         </div>
 
         <div class="ed-step"><span class="ed-stepn">3</span><b>${openT ? 'Inspect Strike Ladder & Payoff' : 'Pick a Stock to Inspect Strikes'}</b><span class="ed-step-r">Fri ${esc(shortDate(exp))} · ${tradingDaysBetween(d.asof_session, exp)} trading days</span></div>
@@ -701,7 +691,7 @@
             <h3 style="margin:2px 0 0;font-family:var(--ed-f-display);font-size:20px">Symbols, Shares & Cost Basis (${ST.hold.length} holdings · ${fmtMoney(pv())})</h3>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="ed-btn ghost" id="edResetBook">Reset 10-Stock Sample Book</button>
+            <button class="ed-btn ghost" id="edResetBook">Reset desk controls (preserves My Book)</button>
             <button class="ed-btn" id="edOpenOverviewBook">View in Overview Table ↗</button>
           </div>
         </div>
@@ -719,7 +709,7 @@
       </div>`;
   }
 
-  /* ---------- Pillar 2: Edge & Alpha Finder (365 S&P Universe) ---------- */
+  /* ---------- Pillar 2: Company comparisons (365 S&P Universe) ---------- */
   function renderAlphaPillar(d) {
     const shock = api.S ? api.S().shock : {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0};
     const ranked = rankAlphaCandidates(d.rows, ST.alphaPreset, shock, ST.alphaHorizon, ST.useTactical60);
@@ -730,13 +720,13 @@
       ['tailwind_cheap', 'Macro Tailwind + Cheap (<1.0x Sector P/E)'],
       ['pos_alpha', 'Top Idiosyncratic Alpha (+2%+ Residual)'],
       ['cheap_vol', 'Cheap Volatility (IV/RV ≤ 1.05x)'],
-      ['rich_vol', 'Rich Option Premium (IV/RV ≥ 1.20x)'],
+      ['rich_vol', 'Rich Option Estimated premium (IV/RV ≥ 1.20x)'],
       ['beta_shift', 'Largest 60d vs 252d Beta Regime Shift']
     ];
 
     return `
       <div class="ed-card">
-        <div class="ed-step"><span class="ed-stepn">1</span><b>Select a Deterministic Edge Formula</b><span class="ed-step-r">365 S&P 500 stocks · 5-factor OLS</span></div>
+        <div class="ed-step"><span class="ed-stepn">1</span><b>Select a Deterministic Edge Formula</b><span class="ed-step-r">covered S&P 500 stocks · 5-factor OLS</span></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${presets.map(([id, label]) => `<button class="ed-btn ${ST.alphaPreset === id ? 'solid' : 'ghost'}" data-alpha-preset="${id}">${esc(label)}</button>`).join('')}
         </div>
@@ -792,7 +782,7 @@
       </div>`;
   }
 
-  /* ---------- Pillar 3: Portfolio Macro Stress & Hedge Sizer ---------- */
+  /* ---------- Pillar 3: Portfolio scenarios & Hedge Sizer ---------- */
   function renderStressPillar(d) {
     const sObj = api.S ? api.S() : {shock: {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0}};
     const shock = sObj.shock || {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0};
@@ -900,8 +890,8 @@
     return `
       <div class="ed-card">
         <div class="ed-vc-kick">Transparent Architecture & Formula Audit</div>
-        <h3 style="margin:0;font-family:var(--ed-f-display);font-size:24px">Every Difference Between Original SmartOptions V2 and SmartOptions Edge</h3>
-        <p class="ed-mode-note" style="margin:0">100% of core rankings, option pricing, volatility proxies, factor regressions, and portfolio stress tests run on deterministic Python & JavaScript math — zero AI guesswork.</p>
+        <h3 style="margin:0;font-family:var(--ed-f-display);font-size:24px">Methods and limits</h3>
+        <p class="ed-mode-note" style="margin:0">100% of core rankings, option pricing, volatility proxies, factor regressions, and portfolio stress tests run on deterministic Python & JavaScript math — formulas with source and model limits.</p>
         <div style="overflow-x:auto">
           <table class="ed-cmp-table">
             <thead>
@@ -916,7 +906,7 @@
               <tr>
                 <td><b>1. Primary UX & Weekly Option Finder</b></td>
                 <td>Dense 6-tab workstation; required navigating multiple drawers to size covered calls or puts.</td>
-                <td><b>Edge Desk (<code>#pg-edge</code>)</b> with 1-click Friday chips, coupled Income Goal ↔ Assignment Odds sliders, visual goal bars, and inline strike ladder.</td>
+                <td><b>Edge Desk (<code>#pg-edge</code>)</b> with 1-click Friday chips, coupled Income Goal ↔ Est. closing odds sliders, visual goal bars, and inline strike ladder.</td>
                 <td class="ed-num">Black-Scholes N(d₂) assignment odds, binary goal solver (<code>solveCapFor</code>), lognormal density + payoff SVG.</td>
               </tr>
               <tr>
@@ -939,7 +929,7 @@
               </tr>
               <tr>
                 <td><b>5. Stale Snapshot Quarantine & Drift</b></td>
-                <td>Sam’s 2026-07-25 snapshot voted silently inside today’s live directional Flow & Confidence scores.</td>
+                <td>Historical 2026-07-25 snapshot voted silently inside today’s live directional Flow & Confidence scores.</td>
                 <td><b>Quarantined by default when &gt;30d old</b> (<code>includeStaleSamVote: false</code>), replaced with live 20d Alpha vote + explicit <b>Price & Fwd P/E Drift since 07-25</b>.</td>
                 <td class="ed-num">Px Drift = (Px_today / Px_07-25 − 1) × 100; ΔPE_fwd = PE_fwd − FPE_07-25.</td>
               </tr>
@@ -983,29 +973,29 @@
         <div class="ed-banner">
           <div class="ed-banner-hd">
             <div class="ed-title-wrap">
-              <h1 class="ed-title">SmartOptions Edge Desk</h1>
-              <span class="ed-kick">100% Deterministic Math · Live S&P 365 + My Book</span>
+              <h1 class="ed-title">Options and risk research</h1>
+              <span class="ed-kick">Calculated research · Covered universe + My Book</span>
             </div>
-            <span class="ed-stamp">Session ${esc(d.asof_session)} · ${d.rows.length} S&P symbols · Zero AI guesswork in calculations</span>
+            <span class="ed-stamp">Session ${esc(d.asof_session)} · ${d.rows.length} covered symbols · Source dates and model limits apply</span>
           </div>
-          <p class="ed-sub">Lean interactive desk modeled after <b>Premium Pocket</b> and connected live to Sam’s systems (<b>Overview</b>, <b>Analyst Chart</b>, <b>28-Strategy Engine</b>, <b>Patterns</b>, and <b>5-Factor OLS</b>). AI is reserved strictly for optional natural-language Q&A in the bottom-right Ask dock.</p>
+          <p class="ed-sub">Explore modeled option income, company comparisons and portfolio scenarios using the dated inputs in (<b>Overview</b>, <b>Analyst Chart</b>, <b>28-Strategy Engine</b>, <b>Patterns</b>, and <b>5-Factor OLS</b>). AI is reserved strictly for optional natural-language Q&A in the bottom-right Ask dock.</p>
         </div>
 
         <div class="ed-pillars" role="tablist" aria-label="Edge Desk Modes">
           <button class="ed-pillar-btn" data-pillar="pocket" aria-pressed="${ST.pillar === 'pocket'}">
-            <b>1. Premium Pocket</b>
+            <b>1. Options income</b>
             <span>Weekly calls, puts & strangles on your book</span>
           </button>
           <button class="ed-pillar-btn" data-pillar="alpha" aria-pressed="${ST.pillar === 'alpha'}">
-            <b>2. Edge & Alpha Finder</b>
-            <span>20d OLS residuals, valuation & vol arb (365 stocks)</span>
+            <b>2. Company comparisons</b>
+            <span>20d OLS residuals, valuation & vol arb (covered stocks)</span>
           </button>
           <button class="ed-pillar-btn" data-pillar="stress" aria-pressed="${ST.pillar === 'stress'}">
-            <b>3. Portfolio Macro Stress</b>
+            <b>3. Portfolio scenarios</b>
             <span>Factor shocks, weighted betas & option hedge sizer</span>
           </button>
           <button class="ed-pillar-btn" data-pillar="diff" aria-pressed="${ST.pillar === 'diff'}">
-            <b>4. Edge vs. V2 Audit</b>
+            <b>4. Methods and limits</b>
             <span>All 7 deterministic upgrades & formulas side-by-side</span>
           </button>
         </div>
@@ -1020,7 +1010,7 @@
     const tab = $('#ed-tab');
     if (tab) tab.classList.toggle('on', on);
     if (on) {
-      syncToMyBook();
+      pullFromMyBook(api.D());
       document.body.classList.remove('so-overview', 'so-flow', 'so-patterns', 'so-cycles');
       ['#pg-overview', '#pg-flow', '#pg-markets', '#pg-macro', '#pg-patterns', '#pg-cycles'].forEach(sel => {
         const el = $(sel);
@@ -1042,11 +1032,15 @@
     tab.id = 'ed-tab';
     tab.textContent = '★ Edge Desk';
     tab.dataset.tab = 'edge';
-    tab.title = 'Lean interactive Premium Pocket + Alpha Finder + Portfolio Macro Stress Desk';
+    tab.title = 'Lean interactive Options income + Alpha Finder + Portfolio scenarios Desk';
     $('#tabs').appendChild(tab);
 
+    if (root.SmartOptionsLive) root.SmartOptionsLive.subscribe(() => {
+      for (const h of ST.hold) { const q = root.SmartOptionsLive.get(h.t); if (!h.customPx && q && finite(q.price)) h.price = q.price; }
+      if (!page.hidden) render();
+    });
     const brand = $('#hdr .brand');
-    if (brand) brand.innerHTML = 'SmartOptions <span style="color:var(--ed-brass);font-weight:700">EDGE</span>';
+    if (brand) brand.innerHTML = 'SmartOptions <span style="color:var(--ed-brass);font-weight:700">Brief</span>';
 
     page = document.createElement('main');
     page.id = 'pg-edge';
@@ -1155,8 +1149,8 @@
         return;
       }
       if (e.target.closest('#edResetBook')) {
-        localStorage.removeItem(KEY);
-        ST = loadState(api.D());
+        const retainedHold = ST.hold;
+        ST = {...loadState(api.D()), pillar: 'pocket', mode: 'call', hold: retainedHold};
         saveState();
         syncToMyBook();
         render();

@@ -3,7 +3,7 @@
    "model confidence: agreement and data quality, NOT probability of profit".
    Score 0-100 = fixed documented weights over five components (constants, not tuned):
    agreement 0.30, statistical strength 0.15, data completeness/freshness 0.20, regime fit 0.20, event risk 0.15.
-   Sam's own scores (SmartOptions snapshot 2026-07-25) are shown BESIDE this, never merged into it. */
+   Historical own scores (SmartOptions snapshot 2026-07-25) are shown BESIDE this, never merged into it. */
 (function (root) {
 'use strict';
 const isNum = x => typeof x === 'number' && isFinite(x);
@@ -13,7 +13,7 @@ const NAMES = {agreement: 'Signal agreement', stats: 'Statistical strength', dat
 const r1 = v => isNum(v) ? Math.round(v * 10) / 10 : null;
 const clamp = v => Math.max(0, Math.min(100, v));
 const SAM_Q = {GREAT: 1, GOOD: 1, OK: 0, WEAK: -1, AVOID: -1};
-// Sam's regime tiers (his vocabulary): how well each suits a long (bullish) or short (bearish) lean; neutral leans score the middle
+// Historical regime tiers (his vocabulary): how well each suits a long (bullish) or short (bearish) lean; neutral leans score the middle
 const REGIME_FIT = {OPTIMAL: 100, FAVORABLE: 85, NORMAL: 60, DEFENSIVE: 30, AVOID: 10};
 
 /* inputs: {ticker, row (core row), tech (SmartOptionsTech.analyze result or null), patterns (SmartOptionsPatterns scan result or null),
@@ -27,7 +27,7 @@ function compute(inp) {
   if (inp.flow && (inp.flow.word === 'STRONG' || inp.flow.word === 'WEAK')) votes.push({name: 'Flow name verdict', value: inp.flow.word + ' (vote sum ' + inp.flow.sum + ' of ' + inp.flow.n + ')', dir: inp.flow.word === 'STRONG' ? 1 : -1, rule: 'Flow step 3 documented rule (app/flow.js)', asof: inp.asof});
   if (isNum(row.up)) votes.push({name: 'Fundamental: analyst mean target upside', value: r1(row.up) + '%', dir: row.up > 0 ? 1 : row.up < 0 ? -1 : 0, rule: 'positive upside = bullish vote (Yahoo analyst mean target vs price; not a consensus forecast we verified)', asof: inp.asof});
   const samStaleQuarantine = Boolean(row.sam_drift || (row.sam && row.sam.asof && inp.asof && Math.abs(Date.parse(inp.asof) - Date.parse(row.sam.asof)) > 30 * 864e5)) && !inp.includeStaleSamVote;
-  if (row.sam && SAM_Q[row.sam.q] != null && SAM_Q[row.sam.q] !== 0 && !samStaleQuarantine) votes.push({name: "Fundamental: Sam's quality tier", value: row.sam.q + ' (' + (row.sam.label || 'SmartOptions snapshot 2026-07-25') + ')', dir: SAM_Q[row.sam.q], rule: 'GREAT/GOOD = bullish vote, WEAK/AVOID = bearish; his tier, read-only', asof: row.sam.asof || null});
+  if (row.sam && SAM_Q[row.sam.q] != null && SAM_Q[row.sam.q] !== 0 && !samStaleQuarantine) votes.push({name: "Fundamental: Historical quality tier", value: row.sam.q + ' (' + (row.sam.label || 'SmartOptions snapshot 2026-07-25') + ')', dir: SAM_Q[row.sam.q], rule: 'GREAT/GOOD = bullish vote, WEAK/AVOID = bearish; his tier, read-only', asof: row.sam.asof || null});
   if (isNum(row.res20d) && Math.abs(row.res20d) >= 3.0) votes.push({name: 'Macro-adjusted 20d idiosyncratic residual', value: (row.res20d > 0 ? '+' : '') + r1(row.res20d) + '%', dir: row.res20d > 0 ? 1 : -1, rule: '20d cumulative return minus 5-factor OLS explained move (>= +3% bullish, <= -3% bearish)', asof: inp.asof});
   const bull = votes.filter(v => v.dir > 0).length, bear = votes.filter(v => v.dir < 0).length, tot = bull + bear;
   const dir = bull > bear ? 'bullish' : bear > bull ? 'bearish' : 'neutral';
@@ -53,7 +53,7 @@ function compute(inp) {
   let regS = isNum(base) ? (dir === 'bearish' ? 110 - base : dir === 'neutral' ? 100 - Math.abs(base - 55) : base) : 0;
   const cyc = inp.cycle && inp.cycle.phase;
   if (cyc === 'contracting' && dir === 'bullish') regS -= 15; if (cyc === 'expanding' && dir === 'bearish') regS -= 15;
-  comp.regime = {score: clamp(regS), reasons: [{name: "Market regime (Sam's tiers)", value: reg ? reg.tier + ' (' + reg.score + ')' : 'missing', rule: 'OPTIMAL 100, FAVORABLE 85, NORMAL 60, DEFENSIVE 30, AVOID 10 for a bullish lean; mirrored for bearish', asof: inp.asof},
+  comp.regime = {score: clamp(regS), reasons: [{name: "Market regime (Historical tiers)", value: reg ? reg.tier + ' (' + reg.score + ')' : 'missing', rule: 'OPTIMAL 100, FAVORABLE 85, NORMAL 60, DEFENSIVE 30, AVOID 10 for a bullish lean; mirrored for bearish', asof: inp.asof},
     {name: 'Macro cycle read', value: cyc || 'missing', rule: '-15 when the lean fights the cycle (bullish in contracting, bearish in expanding)', asof: inp.asof}],
     rule: 'does the lean suit the current market regime and macro cycle', summary: `${dir} lean in a ${reg ? reg.tier : 'unknown'} regime, cycle ${cyc || 'unknown'}`};
   // (e) event risk inside a 30-day horizon
@@ -101,7 +101,7 @@ function boxHtml(r, open) {
   return `<div class="cf-top"><b class="cf-n">${r.score}</b><span class="cf-d cf-${r.direction}">${esc(r.direction)} lean</span><span class="cf-bar">${seg}</span><button data-cf="why">${open ? 'Hide why' : 'Why?'}</button></div>
     <div class="cf-lab">${esc(r.label)}</div>
     ${open ? `<div class="cf-why"><div class="cf-h">${esc(r.headline)}</div>${r.components.map(c => `<div class="cf-c"><b>${esc(c.label)}</b> ${c.score}/100 &middot; weight ${c.weight} <span class="cf-rule">${esc(c.rule)}</span><ul>${c.reasons.map(x => `<li>${esc(x.name)}: ${esc(x.value)}${x.asof ? ' <small>as of ' + esc(x.asof) + '</small>' : ''}<br><small>${esc(x.rule)}</small></li>`).join('')}</ul></div>`).join('')}
-    ${r.sam ? `<div class="cf-sam">Sam's own scores, shown beside (not merged into live vote when >30d old): Opportunity ${esc(r.sam.opportunity)}, Quality ${esc(r.sam.quality)}, Trend ${esc(r.sam.trend)}, Risk ${esc(r.sam.risk)}, Flags ${esc(r.sam.flags)}${r.sam.drift_px != null ? ` &middot; <b>Drift since 07-25: ${r.sam.drift_px > 0 ? '+' : ''}${r.sam.drift_px}% px${r.sam.drift_pef != null ? ', ' + (r.sam.drift_pef > 0 ? '+' : '') + r.sam.drift_pef + 'x fP/E' : ''}</b>` : ''} &middot; ${esc(r.sam.label)}</div>` : '<div class="cf-sam">Not in Sam\'s snapshot universe.</div>'}</div>` : ''}`;
+    ${r.sam ? `<div class="cf-sam">Historical own scores, shown beside (not merged into live vote when >30d old): Opportunity ${esc(r.sam.opportunity)}, Quality ${esc(r.sam.quality)}, Trend ${esc(r.sam.trend)}, Risk ${esc(r.sam.risk)}, Flags ${esc(r.sam.flags)}${r.sam.drift_px != null ? ` &middot; <b>Drift since 07-25: ${r.sam.drift_px > 0 ? '+' : ''}${r.sam.drift_px}% px${r.sam.drift_pef != null ? ', ' + (r.sam.drift_pef > 0 ? '+' : '') + r.sam.drift_pef + 'x fP/E' : ''}</b>` : ''} &middot; ${esc(r.sam.label)}</div>` : '<div class="cf-sam">Not in Historical\'s snapshot universe.</div>'}</div>` : ''}`;
 }
 async function renderBox(el, t, open) { try { const r = await score(t); if (el.dataset.cft !== t) return; el.innerHTML = boxHtml(r, open); } catch (e) { el.innerHTML = `<div class="cf-lab">Confidence unavailable: ${esc(e.message || e)}</div>`; } }
 function hookDetail() { // Analyst detail pane: one-click "why" under the ticker header (observer; no edit to app.js)

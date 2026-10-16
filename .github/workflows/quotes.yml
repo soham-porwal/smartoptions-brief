@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   refresh:
-    if: github.repository == 'soham-porwal/smartoptions-brief' || github.repository == 'samsej/sp500-screener-dashboard'
+    if: github.repository == 'soham-porwal/smartoptions-brief'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:

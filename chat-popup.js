@@ -11,6 +11,7 @@
 })(typeof window !== 'undefined' ? window : globalThis, function (root) {
   const LS_KEY = 'smartoptions.chat.apiKey';          // same key slot the chat module reads
   const LS_PROV = 'so-brief-chat-provider';
+  const LS_MODEL = 'smartoptions.chat.model';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
 
@@ -81,8 +82,22 @@
   const doc = root.document;
   const ST = {cfg: null, provider: 'local', conv: null, busy: false, open: false, opener: null, controller:null};
   function store() { try { return root.localStorage; } catch (e) { return null; } }
-  function getKey() { const s = store(); return (s && s.getItem(LS_KEY)) || ''; }
-  function proxyUrl() { return ST.cfg && typeof ST.cfg.chat_proxy_url === 'string' && /^https:\/\//.test(ST.cfg.chat_proxy_url) ? ST.cfg.chat_proxy_url : ''; }
+  function getKey() { try { const s = store(); return (s && s.getItem(LS_KEY)) || ''; } catch(e) { reportStorage(); return ''; } }
+  function reportStorage(){root.SmartOptionsBriefChat?.record('WARN','storage','Browser could not save chat settings.');const n=doc?.querySelector('.cp-provnote');if(n)n.textContent='Browser storage is unavailable. Chat settings were not saved.';}
+  function saveSetting(key,value){try{const s=store();if(!s)throw new Error('Storage unavailable');if(value===null)s.removeItem(key);else s.setItem(key,value);return true;}catch(e){reportStorage();return false;}}
+  function viewportGeometry(view,width,height){
+    const v=view||{},w=width||root.innerWidth||1024,mobile=w<=560||(w<=1024&&!!root.matchMedia?.('(pointer:coarse)').matches),h=Math.max(120,Math.floor(v.height||height||root.innerHeight||700)),top=Math.max(0,Math.floor(v.offsetTop||0));
+    return {mobile,top:top+8,height:Math.max(100,h-16),keyboard:h<(height||root.innerHeight||h)-100};
+  }
+  function syncViewport(){const p=doc.getElementById('cp-panel');if(!p)return;const g=viewportGeometry(root.visualViewport,root.innerWidth,root.innerHeight);p.style.setProperty('--cp-vtop',g.top+'px');p.style.setProperty('--cp-vheight',g.height+'px');p.classList.toggle('cp-keyboard',g.keyboard);}
+  function scrollLog(){const log=doc.querySelector('#cp-panel .cp-body');if(log)log.scrollTop=log.scrollHeight;}
+  function proxyUrl() {
+    // The relay serves the published sites. Local development keeps deterministic
+    // answers without making doomed cross-origin requests or spending shared quota.
+    const origins = ['https://soham-porwal.github.io', 'https://samsej.github.io'];
+    if (!origins.includes(root.location && root.location.origin)) return '';
+    return ST.cfg && typeof ST.cfg.chat_proxy_url === 'string' && /^https:\/\//.test(ST.cfg.chat_proxy_url) ? ST.cfg.chat_proxy_url : '';
+  }
   function C() { return root.SmartOptionsChat; }
 
   function build() {
@@ -94,27 +109,32 @@
     p.className = 'cp'; p.id = 'cp-panel'; p.hidden = true;
     p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Chat about this data');
     p.innerHTML = `<div class="cp-hd"><h2>Ask about this data</h2><button type="button" class="cp-x" aria-label="Close chat">&times;</button></div>
-      <div class="cp-prov" role="radiogroup" aria-label="Answer with">
+      <div class="cp-body"><div class="cp-prov" role="radiogroup" aria-label="Answer with">
         <button type="button" role="radio" data-prov="shared">Shared assistant</button>
         <button type="button" role="radio" data-prov="key">Use my own key</button>
         <button type="button" role="radio" data-prov="local">Quick answers</button>
       </div>
       <div class="cp-provnote"></div>
       <form class="cp-key" hidden onsubmit="return false"><label>Anthropic API key<input type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..."></label>
+        <label>Model for your own key<select class="cp-model" aria-label="Your paid model"><option value="">Choose a model (your provider pricing)</option>${(C()?.MODELS||[]).map(m=>`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('')}</select></label>
         <div class="cp-row"><button type="button" class="cp-save">Save key</button><button type="button" class="cp-forget">Forget key</button></div>
         <p class="cp-small">Kept only in this browser and sent only to api.anthropic.com. Avoid on a shared computer.</p></form>
       <div class="cp-log" aria-live="polite"></div>
-      <div class="cp-chips" aria-label="Quick questions">${['pulse','risks','shortlist','breadth','sectors','freshness'].map(id => `<button type="button" data-intent="${id}">${esc(root.SmartOptionsIntents.chipText(id))}</button>`).join('')}</div>
+      <div class="cp-dash-tools"><button type="button" class="cp-dash-example">Create my dashboard</button></div>
+      <div class="cp-chips" aria-label="Quick questions">${['pulse','risks','shortlist','breadth','sectors','freshness'].map(id => `<button type="button" data-intent="${id}">${esc(root.SmartOptionsIntents.chipText(id))}</button>`).join('')}</div></div>
       <form class="cp-in"><textarea rows="1" aria-label="Your question" placeholder="Ask about prices, macro or a company"></textarea><button type="submit" class="cp-send" aria-label="Send">Send</button></form>
       <button type="button" class="cp-cancel" hidden>Cancel</button><p class="cp-disc">Research tool, not advice. Answers cite the data on this site.</p>`;
     doc.body.append(btn, p);
+    root.visualViewport?.addEventListener('resize',syncViewport);root.visualViewport?.addEventListener('scroll',syncViewport);root.addEventListener('resize',syncViewport);syncViewport();
+    p.querySelector('.cp-dash-example').addEventListener('click',()=>{const ta=p.querySelector('.cp-in textarea');ta.value='Create dashboard named My research with AAPL price and operating margin';ta.focus();});
     btn.addEventListener('click', () => toggle());
     p.querySelector('.cp-x').addEventListener('click', () => toggle(false));
     p.querySelector('.cp-prov').addEventListener('click', e => { const b = e.target.closest('[data-prov]'); if (b && !b.disabled) setProvider(b.dataset.prov, true); });
     p.addEventListener('click', e => { const b=e.target.closest('[data-intent]');if(b)submit(b.textContent,{intent:b.dataset.intent,entities:JSON.parse(b.dataset.entities||'{}')}); });
     p.querySelector('.cp-cancel').addEventListener('click',()=>ST.controller?.abort());
-    p.querySelector('.cp-save').addEventListener('click', () => { const i = p.querySelector('.cp-key input'); const v = i.value.trim(); const s = store(); if (v && s) s.setItem(LS_KEY, v); i.value = ''; renderProv(); });
-    p.querySelector('.cp-forget').addEventListener('click', () => { const s = store(); if (s) s.removeItem(LS_KEY); renderProv(); });
+    p.querySelector('.cp-save').addEventListener('click', () => { const i = p.querySelector('.cp-key input'); const v = i.value.trim(); const ok=v&&saveSetting(LS_KEY,v); i.value = ''; if(ok)renderProv(); });
+    p.querySelector('.cp-forget').addEventListener('click', () => { if(saveSetting(LS_KEY,null))renderProv(); });
+    const model=p.querySelector('.cp-model');try{model.value=store()?.getItem(LS_MODEL)||'';}catch(e){reportStorage();}model.addEventListener('change',()=>{if(saveSetting(LS_MODEL,model.value))renderProv();});
     p.querySelector('.cp-in').addEventListener('submit', e => { e.preventDefault(); submit(); });
     const ta = p.querySelector('.cp-in textarea');
     ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } });
@@ -131,8 +151,9 @@
     const open = force == null ? p.hidden : force;
     ST.open = open; p.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.classList.toggle('on', open);
     b.setAttribute('aria-label', open ? 'Close chat' : 'Open chat');
-    if (open) { renderProv(); if (!p.querySelector('.cp-log').children.length) greet(); p.querySelector('.cp-in textarea').focus(); }
-    else { ST.controller?.abort(); b.focus(); }
+    doc.documentElement.classList.toggle('cp-open',open);
+    if (open) { syncViewport();renderProv(); if (!p.querySelector('.cp-log').children.length) greet(); p.querySelector('.cp-in textarea').focus({preventScroll:true}); }
+    else { ST.controller?.abort(); p.querySelector('.cp-in textarea').blur();b.focus({preventScroll:true}); }
   }
   function greet() {
     const log = doc.querySelector('#cp-panel .cp-log');
@@ -141,7 +162,7 @@
   function setProvider(v, user) {
     if (v === 'shared' && !proxyUrl()) v = getKey() ? 'key' : 'local';
     ST.provider = v;
-    if (user) { const s = store(); if (s) try { s.setItem(LS_PROV, v); } catch (e) { /* storage blocked */ } }
+    if (user&&!saveSetting(LS_PROV,v))return;
     renderProv();
   }
   function renderProv() {
@@ -157,17 +178,17 @@
     kf.querySelector('.cp-forget').hidden = !key;
     if (ST.provider === 'shared') { note.textContent = 'Questions go to the shared assistant for this site. No key is stored in your browser.'; inp.hidden = false; }
     else if (ST.provider === 'key') { note.textContent = key ? 'Using your saved key.' : 'Paste your Anthropic API key to ask free-form questions.'; inp.hidden = !key; }
-    else { note.textContent = 'Typed questions and chips use dashboard data. No model is needed.'; }
+    else { note.textContent = 'Dashboard answer first. Typed questions and chips use dashboard data. No model is needed.'; }
     inp.hidden = false;
     if(ST.provider==='shared')note.textContent='Dashboard answer first. Optional rephrasing sends selected public facts to free providers. Google may review them.';
-    if(ST.provider==='key')note.textContent='Dashboard answer first. Optional rephrasing uses your saved key and provider pricing.';
+    if(ST.provider==='key')note.textContent=p.querySelector('.cp-model').value?'Dashboard answer first. Your selected model uses your saved key and provider pricing.':'Select a model to opt in to your provider pricing. Dashboard answers work without a model.';
   }
   function turn(q) {
     const log = doc.querySelector('#cp-panel .cp-log');
     const h = log.querySelector('.cp-hello'); if (h) h.remove();
     const t = doc.createElement('div'); t.className = 'cp-turn';
     t.innerHTML = `<div class="cp-q">${esc(q)}</div><div class="cp-a"><span class="cp-dim">Working</span></div>`;
-    log.appendChild(t); log.scrollTop = log.scrollHeight;
+    log.appendChild(t); scrollLog();
     return t.querySelector('.cp-a');
   }
   function watch() { try { return new Set(root.SmartOptionsWatchlist ? root.SmartOptionsWatchlist.get() : []); } catch (e) { return new Set(); } }
@@ -189,11 +210,11 @@
     ta.value=''; ta.style.height=''; const a=turn(q), controller=new AbortController();
     ST.controller=controller;ST.busy=true;p.classList.add('busy');p.querySelector('.cp-cancel').hidden=false;
     const timeout=setTimeout(()=>controller.abort(),20000);
-    const cfg=()=>({url:ST.provider==='shared'?proxyUrl():'',apiKey:ST.provider==='key'?getKey():'',universe:new Set(root.SmartOptionsUniverse.rows.map(r=>r[0]))});
+    const cfg=()=>({url:ST.provider==='shared'?proxyUrl():'',apiKey:ST.provider==='key'&&p.querySelector('.cp-model').value?getKey():'',model:p.querySelector('.cp-model').value,universe:new Set(root.SmartOptionsUniverse.rows.map(r=>r[0]))});
     try {
-      const {result:r}=await root.SmartOptionsBriefChat.answer(q,direct,controller.signal);
+      const {result:r}=await root.SmartOptionsBriefChat.answer(q,direct,controller.signal,{...cfg(),signal:controller.signal});
       a.innerHTML=packHTML(r);
-      if(r.facts.length&&!r.action&&!r.na){
+      if(r.facts.length&&!r.action&&!r.na&&!r.noPolish){
         const simple=doc.createElement('button');simple.type='button';simple.className='cp-simple';simple.textContent='Say it more simply';a.appendChild(simple);
         const polish=async(signal)=>{
           simple.disabled=true;
@@ -211,7 +232,7 @@
         if(cfg().url||cfg().apiKey)try{await polish(controller.signal);}catch(e){const n=doc.createElement('p');n.className='cp-foot';n.textContent=e.name==='AbortError'?'Rephrasing cancelled. Dashboard answer retained.':e.message+' Dashboard answer retained.';a.appendChild(n);root.SmartOptionsBriefChat.record('WARN','rewrite',e.name==='AbortError'?'Cancelled':e.message);}
       }
     }catch(e){a.innerHTML=`<p class="cp-na">${esc(e.name==='AbortError'?'Cancelled. No answer was applied.':e.message)}</p>`;root.SmartOptionsBriefChat.record('FAIL','question',e.name==='AbortError'?'Cancelled':e.message);}
-    finally{clearTimeout(timeout);ST.controller=null;ST.busy=false;p.classList.remove('busy');p.querySelector('.cp-cancel').hidden=true;const log=p.querySelector('.cp-log');log.scrollTop=log.scrollHeight;}
+    finally{clearTimeout(timeout);ST.controller=null;ST.busy=false;p.classList.remove('busy');p.querySelector('.cp-cancel').hidden=true;scrollLog();}
   }
   function installContextChips(){
     const sections={'h-pulse':'pulse','h-risks':'risks','h-pos':'breadth','h-short':'shortlist','h-obs':'macro'};
@@ -221,7 +242,7 @@
     let pending=false;new MutationObserver(()=>{if(pending)return;pending=true;queueMicrotask(()=>{pending=false;scan();});}).observe(doc.body,{childList:true,subtree:true});scan();
   }
   async function loadModules(){
-    for(const [file,key]of [['universe','SmartOptionsUniverse'],['intents','SmartOptionsIntents'],['facts','SmartOptionsFacts'],['verify','SmartOptionsVerify'],['polish','SmartOptionsPolish'],['actions','SmartOptionsActions'],['runtime','SmartOptionsBriefChat']]){
+    for(const [file,key]of [['universe','SmartOptionsUniverse'],['intents','SmartOptionsIntents'],['facts','SmartOptionsFacts'],['verify','SmartOptionsVerify'],['polish','SmartOptionsPolish'],['actions','SmartOptionsActions'],['dashboard','SmartOptionsDashboardSpec'],['relationships','SmartOptionsRelationships'],['runtime','SmartOptionsBriefChat']]){
       if(root[key])continue;await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js';s.onload=resolve;s.onerror=()=>reject(new Error('Chat module failed to load: '+file));doc.head.appendChild(s);});
     }
   }
@@ -240,6 +261,6 @@
     };
     if (doc.body) go(); else doc.addEventListener('DOMContentLoaded', go);
   }
-  return {PRESETS, answerPreset, answerHTML, _start, open: () => toggle(true), close: () => toggle(false)};
+  return {PRESETS, answerPreset, answerHTML, viewportGeometry, _start, open: () => toggle(true), close: () => toggle(false)};
 });
 

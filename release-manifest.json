@@ -1,0 +1,290 @@
+{
+  "release_id": "brief-client-20261016-r1",
+  "built_at": "2026-10-16T13:06:14.585520+00:00",
+  "source_base": "1a84926d9720418eb846e96c5a04b09b772b8cc7",
+  "ui_assets": {
+    "about.js": {
+      "sha256": "f0863c5978cf602330b77b1aa2c5dfc930635e5ca796b5970d689b58ac8c0fbe",
+      "bytes": 3331
+    },
+    "app.css": {
+      "sha256": "dbcb270833be3f3a5ba78280a983376834783501aa2df7bf52682e645ad7f025",
+      "bytes": 11660
+    },
+    "app.js": {
+      "sha256": "11145524c4499e90f33de0b088432e6fc14e0ee795e2726e14c10fd965b8dab6",
+      "bytes": 56559
+    },
+    "brief.css": {
+      "sha256": "9b584c236325c82c260edbf8805dc319ad90f221d1d7ea9ea1d753a279cae826",
+      "bytes": 32216
+    },
+    "brief.js": {
+      "sha256": "558da26a557ee95ac2eea180d0899be936c2de896256abbb4ab3b8f0b35443ae",
+      "bytes": 78793
+    },
+    "chat-popup.css": {
+      "sha256": "454958d5ba3f6bb328b7f4466b0873eafbcc5d07c53ce8bec642f18ea5807542",
+      "bytes": 8442
+    },
+    "chat-popup.js": {
+      "sha256": "809da5fa3417347b7dd231f6263276edae45c880713ea41b7933c5659fc0df81",
+      "bytes": 24297
+    },
+    "company.css": {
+      "sha256": "0f9b5a7a398af0289db72de65c6db7eba1c192e7a15bd6a5b408d1cd72bac4ba",
+      "bytes": 21642
+    },
+    "company.js": {
+      "sha256": "c12400bdcb357a39989e87e24d1ded90fbc9a37b4cf45716ff4166ae1c40de0a",
+      "bytes": 53778
+    },
+    "confidence.css": {
+      "sha256": "0ec148ff8c246141856e421864c065ff361e9fdc49c185eb082f705b2c5928b6",
+      "bytes": 1312
+    },
+    "confidence.js": {
+      "sha256": "2e85a666bd322904ab5f49190602e6143a00ca09cdae06c33581aa91380d1b42",
+      "bytes": 16489
+    },
+    "controls.js": {
+      "sha256": "7aa30bd7a514e97839ef5ff66c59c4fd4b8e618c0762bea7b5f67ee8ca651377",
+      "bytes": 4632
+    },
+    "custom.js": {
+      "sha256": "3d4e78912b1d4400c5c4ad173df199a07bc8ffd3c010c7518894856f3880ae90",
+      "bytes": 33480
+    },
+    "cycles.css": {
+      "sha256": "0abcf0b000b93f2672527bda035520733f2586e8ee190f1551dd7acb6d83f645",
+      "bytes": 2350
+    },
+    "cycles.js": {
+      "sha256": "44495bf6807bcb3ad0df11c3fc0ae910e2a9a3b1f085f451fe886a7a55fd6ee2",
+      "bytes": 20436
+    },
+    "edge-desk.css": {
+      "sha256": "dacbb5d3a22ab0d803c25c7851c2c490329ff510842deb19d914d6a80032325f",
+      "bytes": 17560
+    },
+    "edge-desk.js": {
+      "sha256": "4b69a34c996396117ad426f1701d0bf4a5b15653eb27840b0e1e56ded22b7eaf",
+      "bytes": 69296
+    },
+    "explore.css": {
+      "sha256": "ab9ec430db2172aa3046bc23870c69704755bd0547f70ad5b0eaa2c309f87aa0",
+      "bytes": 1244
+    },
+    "explore.js": {
+      "sha256": "c21532f101ef29a0c5ca2232ee900b52375d78ff2c7709cf30cfed5644f8ec51",
+      "bytes": 12029
+    },
+    "flow.css": {
+      "sha256": "1666fd9c883ceced49e90bfb3e5cb37c7e1ec79e9a2117f2749c4be17fe5a888",
+      "bytes": 8250
+    },
+    "flow.js": {
+      "sha256": "ca3cec868f29e93ab271d4141797c2335fa47ef21e0c2182855bebadc215c392",
+      "bytes": 55209
+    },
+    "fvchart.css": {
+      "sha256": "8d9745e64b7c50eee152b416b5be5c99922d8e730da1dccbe23b68da40f9e2a3",
+      "bytes": 8593
+    },
+    "fvchart.js": {
+      "sha256": "22086000d3104631c8fc42b488b585a6125597c5b7756e16417124243d8e2347",
+      "bytes": 46345
+    },
+    "heatmap.css": {
+      "sha256": "133080f05b23e178a32199ac5c3eff416d32fb79c3f70f621e7c14bd4efdb756",
+      "bytes": 6716
+    },
+    "heatmap.js": {
+      "sha256": "a7b1a8685e8ba8721f7438a7a86c2109ad02c9b6d7f347cf3b3352a2bf78ce58",
+      "bytes": 23760
+    },
+    "impact.css": {
+      "sha256": "5037786233789fd0f1b85554b51404d8e8731e5a80ad9e927453f231d4b5c0cc",
+      "bytes": 4164
+    },
+    "impact.js": {
+      "sha256": "76af145f02d714bcd8408db84525936166cf5ca363b70aa07b58abfed39f25bc",
+      "bytes": 39442
+    },
+    "import.css": {
+      "sha256": "e3ba9d88ddf63c4fa5fe34311d99e85a9b1baaed7e1087939ffcbdb5e84b271e",
+      "bytes": 2465
+    },
+    "import.js": {
+      "sha256": "406b7d2537a30a1a95c2f67825882cff35eb37154d3f71f2c606d87a467959a1",
+      "bytes": 22554
+    },
+    "index.html": {
+      "sha256": "a4475b1211f28f9cd358bc69fcad8e203ffa4109c13fa9ea0d7a4079e71e0479",
+      "bytes": 5958
+    },
+    "intelligence.css": {
+      "sha256": "6f2106053e74a257b73c008e25641c05874abd6b828b6f6e4301602a587cb60b",
+      "bytes": 5386
+    },
+    "intelligence.js": {
+      "sha256": "6e92f8d49e0897242eb7f35945ada30243e3e207ff1bbea1c8efc54f688d2314",
+      "bytes": 13357
+    },
+    "live.css": {
+      "sha256": "670845c75f13076c59af2e912b526b073b5accb74d06a4fa84672ace6f170168",
+      "bytes": 4633
+    },
+    "live.js": {
+      "sha256": "0dc7208129b0659f5a13d1d6dd957bf57243d4fda65eaa6ac43551f9cef50b51",
+      "bytes": 17919
+    },
+    "macro.js": {
+      "sha256": "b783d3f9ede37f8369c87edb2b2a5a7c5722e4fa707672325eaccfd79e4e8b36",
+      "bytes": 6631
+    },
+    "money-flow.css": {
+      "sha256": "ddef742bb34f0216e5ecfbdcb9b3116ddbdc99abe8cfe13072fd7ad503c5e737",
+      "bytes": 1806
+    },
+    "money-flow.js": {
+      "sha256": "9755c31b497d7921150247cb2c9360b28d927f21a08464f8477a9035eaadd098",
+      "bytes": 6540
+    },
+    "my-dashboard.css": {
+      "sha256": "87ce4a452bbc65ea434464a13a371aa899d2d4a2ca13275dca6042d6bb422a4f",
+      "bytes": 4984
+    },
+    "my-dashboard.js": {
+      "sha256": "d2af5f5a4bb326bb9949382b474d86bd8fe4b8a1245450f28e9c9e12852b1c8c",
+      "bytes": 19642
+    },
+    "overview.css": {
+      "sha256": "e8973d6a406aaa3e4bb42388ab807532868cf5b70c98bf8897ed45a8b12af219",
+      "bytes": 10904
+    },
+    "overview.js": {
+      "sha256": "845f09b287d8aff461c0506ae48381efa7da79d0119f45574a299f75ee100f2e",
+      "bytes": 28466
+    },
+    "patterns.css": {
+      "sha256": "ba297eac557a28f872c17a372ea017d231cbeebff8564f2e34d0387e0b67c031",
+      "bytes": 3330
+    },
+    "patterns.js": {
+      "sha256": "5ab40680a4ffca2e6ed71eb43e1307d8b11bbe4314169a1e7952339ad689b6ce",
+      "bytes": 43413
+    },
+    "shocks.css": {
+      "sha256": "b93d615fe4491dfd84962fe6432d0c636b063cc2b47721f81ba4bab6d2b338d9",
+      "bytes": 9789
+    },
+    "shocks.js": {
+      "sha256": "70407a48e4f7e0f1e9deed80f95b3c98e723f1def561b4b146f8539fec0ea838",
+      "bytes": 24192
+    },
+    "strategies.css": {
+      "sha256": "c6f89a290327020f3f49a26aac22e52ac87b1c2c011240eb151adcd2920fce2c",
+      "bytes": 4672
+    },
+    "strategies.js": {
+      "sha256": "37775cc924f03a8ff3a27b520dbc76ae0df9aae57bffcd7e4555810dc1f05f7a",
+      "bytes": 62088
+    },
+    "technicals.css": {
+      "sha256": "79d5bbb93e93da6c3899686c470888c954ff156f854f3a38890a51a85273f890",
+      "bytes": 3428
+    },
+    "technicals.js": {
+      "sha256": "f3d997c11c636bb0d5957cfc770365d8d28afbeb11b910d88f834fb66b2eedc5",
+      "bytes": 46109
+    },
+    "ui.css": {
+      "sha256": "621759ac9bb90ddc441aa824866554057abc012da82aaf62cf67b54ca5cf91c8",
+      "bytes": 8328
+    },
+    "chat/actions.js": {
+      "sha256": "87d8636403bcf25fc80d4c1a20e1d329246b06d26e5ffccd0fe6f0062bd3c9fc",
+      "bytes": 5479
+    },
+    "chat/chat.css": {
+      "sha256": "b4066b277e2c2a514139ea4c219f708a53bc61846606a12cbd743846bb30376c",
+      "bytes": 5752
+    },
+    "chat/chat.js": {
+      "sha256": "a6649cced16d964c40da9a54f225647d07f9bbd58e358b9767698ff93785369a",
+      "bytes": 73133
+    },
+    "chat/dashboard.js": {
+      "sha256": "e3567e2990cc29328a0dd7e0ebce0c5925abe1afe206e08247c13661fc7905f9",
+      "bytes": 20170
+    },
+    "chat/facts.js": {
+      "sha256": "3c9709dd1e1d4e898d696ab8dd0d16a86d0015959421d95848062e3af93f5366",
+      "bytes": 44074
+    },
+    "chat/intents.js": {
+      "sha256": "3c06b6010cbec0b6540f4f5d2262af80f3969904423f43da91f5b98949707486",
+      "bytes": 30938
+    },
+    "chat/polish.js": {
+      "sha256": "c4dea5f6650bda0d54c0eedffd0d94f223908465d21b75d783f5103b6974e882",
+      "bytes": 3005
+    },
+    "chat/relationships.js": {
+      "sha256": "b8211c6a7915f7ceb68415ff664ad6afa94feadb181b26c08f167daf2bd1c05a",
+      "bytes": 2440
+    },
+    "chat/runtime.js": {
+      "sha256": "c5fb9584a9c4855fa2919dde98e91adf8472f4b9171a36e63135fc2f2c96fc71",
+      "bytes": 3961
+    },
+    "chat/universe.js": {
+      "sha256": "12589cfed1ce8386d850246dca0a3ee3521977c26594b6fe6a5a50643a93f823",
+      "bytes": 21698
+    },
+    "chat/verify.js": {
+      "sha256": "4b12899060aec04d1a0dae4799b2f945184ed8acf2004ac4739f74ea8f42974b",
+      "bytes": 6143
+    },
+    "legacy/index.html": {
+      "sha256": "31617366525ae51a4564b1a6c868dc3c22064891970d90e27244fda4ed9e983e",
+      "bytes": 854711
+    },
+    "vendor/lightweight-charts.standalone.production.js": {
+      "sha256": "6fae1046ce09c1b0e118c52c7059cfa0025df725fa993bfb00cbd37750e4d124",
+      "bytes": 163558
+    }
+  },
+  "data_at_publication": {
+    "data/core.json": {
+      "sha256": "4cec4a0b0e443a774baa6e8212e5922914285cee4e32f12f23d873260b61a51e",
+      "bytes": 1705010
+    },
+    "data/quotes.json": {
+      "sha256": "41287bafd6a9d4f9f78568e7282796cb3b6e509cc7226cc0c035c444336663b2",
+      "bytes": 466804
+    },
+    "data/brief.json": {
+      "sha256": "de571cfd8ae4ec69a82ea5d496ae3c65ec5f87ca80a46188622b81369fb369d0",
+      "bytes": 96935
+    },
+    "data/intelligence.json": {
+      "sha256": "bcfc771fd14f5ba2d515b1b32e20380616bf03a50f0505617e48aaa1ff9fa2ae",
+      "bytes": 4795144
+    },
+    "data/shocks.json": {
+      "sha256": "8301354fbc600edd49c7ba04f3e9648605d5cc3b34bd6d6b1d495932698ce139",
+      "bytes": 2720609
+    },
+    "data/money-flow.json": {
+      "sha256": "eae835bbc52a79e2a49cca7c6a4afad6c0ebe36d9c0ace34d886d306a64784c9",
+      "bytes": 32717
+    },
+    "data/brief/company/CTVA.json": {
+      "sha256": "2d94107c78b90534582b3ff07b4c92be40afa2fcc7a58800a315f8584b63f74f",
+      "bytes": 11881
+    }
+  },
+  "note": "Dataset hashes describe publication, not subsequent scheduled refreshes; observations retain individual dates."
+}
