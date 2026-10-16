@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261016-r1",
-  "built_at": "2026-10-16T13:06:14.585520+00:00",
-  "source_base": "1a84926d9720418eb846e96c5a04b09b772b8cc7",
+  "release_id": "brief-client-20261016-r2",
+  "built_at": "2026-10-16T15:35:41.975100+00:00",
+  "source_base": "515e03e5b8f3e8841649daef0713e1d58794537c",
   "ui_assets": {
     "about.js": {
       "sha256": "367867c42efae1fd57d519675f4f4f6521bb69d52d5e2625bd6e32ee053e7be5",
@@ -16,8 +16,8 @@
       "bytes": 55844
     },
     "brief.css": {
-      "sha256": "7c3f5ea06841c5f224791ba6a4963df7d927624accd94ae10df0c46f0d52caa3",
-      "bytes": 31816
+      "sha256": "58ce68098f4eb3ccb578ffa7ab85488880fc3e476a9f09a4badb8a2d7dc75a60",
+      "bytes": 32488
     },
     "brief.js": {
       "sha256": "5e83548c54788a8f3ae1da347468f37e63e406088351d7fb0ebe7ade241dede4",
@@ -28,8 +28,8 @@
       "bytes": 8355
     },
     "chat-popup.js": {
-      "sha256": "dc0769978b6bb196cec5f3d4306dc0d0e1ce98b4d37ec94f7a975ad92cbf747f",
-      "bytes": 24031
+      "sha256": "29b56f5891ec0dfa6d9d2e8bd6202f93aa7cdbae0112cae2a9c68d9a29e3a696",
+      "bytes": 24009
     },
     "company.css": {
       "sha256": "c609d67c2473e2862b329188883536858d68d1fd4bfaf33bfb9b3a3077aea447",
@@ -52,8 +52,8 @@
       "bytes": 4551
     },
     "custom.js": {
-      "sha256": "b0fd0e775e1d555d12222d447ea54d517442eb58749387bc3c727aa8b3ff5171",
-      "bytes": 33023
+      "sha256": "8ad5cc89d420ddcd67b3a2c4e51ed3e6b6759c296b6335ca79a757cdc1482836",
+      "bytes": 33053
     },
     "cycles.css": {
       "sha256": "c57ac9b1e84300fa570c29f88543422b7f1da07b156e8c8f7ad71afbba742804",
@@ -258,16 +258,12 @@
   },
   "data_at_publication": {
     "data/core.json": {
-      "sha256": "4cec4a0b0e443a774baa6e8212e5922914285cee4e32f12f23d873260b61a51e",
-      "bytes": 1705010
-    },
-    "data/quotes.json": {
-      "sha256": "41287bafd6a9d4f9f78568e7282796cb3b6e509cc7226cc0c035c444336663b2",
-      "bytes": 466804
+      "sha256": "55084cd9c707d7e619308ed9c5b1b9d20beb955425bf4053a33854728db39be3",
+      "bytes": 1705110
     },
     "data/brief.json": {
-      "sha256": "de571cfd8ae4ec69a82ea5d496ae3c65ec5f87ca80a46188622b81369fb369d0",
-      "bytes": 96935
+      "sha256": "839608ce7ad732fbafbccef717dbce07939fd8e2e54a78f4ce72fb5de214e108",
+      "bytes": 96931
     },
     "data/intelligence.json": {
       "sha256": "bcfc771fd14f5ba2d515b1b32e20380616bf03a50f0505617e48aaa1ff9fa2ae",
@@ -286,6 +282,6 @@
       "bytes": 11881
     }
   },
-  "note": "Dataset hashes describe publication, not subsequent scheduled refreshes; observations retain individual dates.",
+  "note": "Dataset hashes describe publication, not subsequent scheduled refreshes; observations retain individual dates. data/quotes.json is owned by each site's scheduled quote refresh and is compared by per-symbol observation, not file hash.",
   "publication_encoding": "UTF-8, LF; exact Git/Pages asset bytes"
 }

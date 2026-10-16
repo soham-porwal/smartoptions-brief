@@ -122,7 +122,7 @@
       <div class="cp-log" aria-live="polite"></div>
       <div class="cp-dash-tools"><button type="button" class="cp-dash-example">Create my dashboard</button></div>
       <div class="cp-chips" aria-label="Quick questions">${['pulse','risks','shortlist','breadth','sectors','freshness'].map(id => `<button type="button" data-intent="${id}">${esc(root.SmartOptionsIntents.chipText(id))}</button>`).join('')}</div></div>
-      <form class="cp-in"><textarea rows="1" aria-label="Your question" placeholder="Ask about prices, macro or a company"></textarea><button type="submit" class="cp-send" aria-label="Send">Send</button></form>
+      <form class="cp-in"><textarea rows="1" aria-label="Your question" placeholder="Ask a question"></textarea><button type="submit" class="cp-send" aria-label="Send">Send</button></form>
       <button type="button" class="cp-cancel" hidden>Cancel</button><p class="cp-disc">Research tool, not advice. Answers cite the data on this site.</p>`;
     doc.body.append(btn, p);
     root.visualViewport?.addEventListener('resize',syncViewport);root.visualViewport?.addEventListener('scroll',syncViewport);root.addEventListener('resize',syncViewport);syncViewport();

@@ -13,9 +13,9 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } ca
 // group: cols = Markets page columns (reorderable), center = under the chart, side = Macro tab side column, mgrp = Macro tab groups
 const PANELS = [
   {id: 'tape', h: 'Market tape', g: 'top', el: '#tape'},
-  {id: 'screener', h: 'Screener table', g: 'cols', el: '#left', w: 'minmax(560px,1.5fr)'},
-  {id: 'chart', h: 'Chart pane', g: 'cols', el: '#center', w: 'minmax(380px,1.1fr)'},
-  {id: 'detail', h: 'Ticker detail', g: 'cols', el: '#right', w: 'minmax(280px,320px)'},
+  {id: 'screener', h: 'Screener table', g: 'cols', el: '#left', w: 'minmax(min(560px,40vw),1.5fr)'},
+  {id: 'chart', h: 'Chart pane', g: 'cols', el: '#center', w: 'minmax(min(380px,30vw),1.1fr)'},
+  {id: 'detail', h: 'Ticker detail', g: 'cols', el: '#right', w: 'minmax(min(280px,24vw),320px)'},
   {id: 'calendar', h: 'Event strip (under chart)', g: 'center', el: '#evstrip'},
   {id: 'signals', h: 'Signals', g: 'center', el: '#center .sigs'},
   {id: 'macro_grid', h: 'Macro: indicator grid', g: 'mtab', el: '#pg-macro .mgrid-wrap'},
