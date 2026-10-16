@@ -7,7 +7,7 @@ on:
     - cron: '*/8 13-21 * * 1-5'
     # Outside regular hours the job only checks the clock after its close sweep.
     - cron: '17 0-12,22-23 * * 1-5'
-    - cron: '17 * * 0,6'
+    - cron: '17 * * * 0,6'
 
 permissions:
   contents: write
