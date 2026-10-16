@@ -58,6 +58,32 @@ jobs:
           else
             python scripts/gh_quotes_refresh.py --core data/core.json --out data/quotes.json > logs/refresh.txt 2>&1
           fi
+      - name: Label observations older than the advertised cadence
+        shell: python
+        run: |
+          import datetime as dt, json, pathlib
+          from zoneinfo import ZoneInfo
+          path = pathlib.Path('data/quotes.json')
+          data = json.loads(path.read_text())
+          local = dt.datetime.now(dt.timezone.utc).astimezone(ZoneInfo('America/New_York'))
+          close = local.replace(hour=16, minute=0, second=0, microsecond=0)
+          regular = local.weekday() < 5 and 570 <= local.hour*60+local.minute < 960
+          if local < close:
+              close -= dt.timedelta(days=1)
+          while close.weekday() >= 5:
+              close -= dt.timedelta(days=1)
+          cutoff = (local if regular else close) - dt.timedelta(minutes=20)
+          for quote in data.get('quotes', {}).values():
+              if quote.get('price') is None:
+                  continue
+              observed = dt.datetime.fromisoformat(str(quote.get('asof_utc')).replace('Z', '+00:00'))
+              if observed < cutoff or observed > local + dt.timedelta(minutes=1):
+                  quote.update(freshness='stale', status='stale', reason='Observation is outside the advertised session cadence; original source timestamp retained')
+          stale = sum(q.get('freshness') == 'stale' for q in data.get('quotes', {}).values())
+          health = data.setdefault('health', {})
+          health['stale_count'] = stale
+          health['line'] = health.get('line', '').split('; labeled stale:')[0] + '; labeled stale: ' + str(stale)
+          path.write_text(json.dumps(data, separators=(',', ':'), allow_nan=False) + '\n')
       - name: Commit only changed quotes
         shell: bash
         run: |
