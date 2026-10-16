@@ -127,9 +127,9 @@ def record(symbol, price, prior, observed, now, provider, delay, source_url, *, 
     result = {"price": price, "chg_pct": pct, "change": change, "change_pct": pct,
               "volume": finite(volume), "volume_unit": "shares" if unit == "USD/share" else "provider contracts",
               "volume_period": volume_period, "volume_reason": None if volume is not None else "Provider did not return volume",
-              "provider": provider, "delay_minutes": delay, "asof_utc": utc(observed), "ts": utc(observed),
+              "provider": provider, "delay_minutes": delay, "asof_utc": utc(observed), "ts": observed.astimezone(ET).isoformat(),
               "market_state": state, "freshness": freshness, "status": "stale" if freshness == "stale" else "ok",
-              "source_url": source_url, "series": symbol, "unit": unit, "period": utc(observed), "retrieved_at": utc(now),
+              "source_url": source_url, "series": symbol, "unit": unit, "period": observed.astimezone(ET).isoformat(), "retrieved_at": utc(now),
               "prior_close": prior, "prior_close_date": prior_date,
               "change_status": "ok" if prior else "missing",
               "method": "100 * (last trade or unadjusted bar Close / provider previous daily Close - 1)"}
@@ -283,7 +283,9 @@ def yahoo_bars(symbols, budget=110):
 
 
 def yahoo_quotes(symbols, now, fetcher=yahoo_bars):
+    started = time.monotonic()
     data = fetcher(symbols)
+    now = now + timedelta(seconds=time.monotonic() - started)
     found = {}
     for t in symbols:
         bars = [(stamp(b[0]), b[1], b[2] if len(b) > 2 else None) for b in data["intraday"].get(t, [])]
@@ -334,6 +336,7 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
             quotes.update(yahoo(needed, now + timedelta(seconds=time.monotonic() - started)))
         except Exception:
             errors["Yahoo"] = "Request failed; previous values retained where available"
+    finished_at = now + timedelta(seconds=time.monotonic() - started)
     for t in symbols:
         if t not in quotes:
             prev = old.get(t, {})
@@ -359,12 +362,20 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
         current.setdefault("change", None)
         current.setdefault("change_pct", current.get("chg_pct"))
         current.setdefault("volume", None)
+        if current.get("price") is not None and observed:
+            state = market_state(finished_at, observed)
+            age = max(0, (finished_at - observed).total_seconds() / 60)
+            delay = current.get("delay_minutes")
+            label = "closed" if state == "closed" else "stale" if current.get("retained") or delay is None else "live" if delay == 0 and age <= 1 else "delayed" if delay > 0 and age <= delay + 15 else "stale"
+            current.update(market_state=state, freshness=label)
+            if label == "stale":
+                current["status"] = "stale"
         if t in errors:
             quotes[t]["provider_warning"] = errors[t]
     served = Counter(q.get("provider") or "missing" for q in quotes.values())
     fresh_count = sum(q.get("price") is not None and not q.get("retained") for q in quotes.values())
     success = sum(q.get("price") is not None for q in quotes.values())
-    return {"generated_at": utc(now), "session": market_state(now, stamp(quotes.get("SPY", {}).get("ts"))),
+    return {"generated_at": utc(finished_at), "session": market_state(finished_at, stamp(quotes.get("SPY", {}).get("ts"))),
             "source": "Per-quote provider chain: Finnhub, Alpaca IEX, delayed Yahoo",
             "quotes": quotes, "session_method": "ET weekday clock; prior-date prices close holidays/data absences; no early-close calendar",
             "refresh": {"status": "OK" if fresh_count == len(symbols) and not errors else "WARN" if fresh_count else "FAIL",
@@ -419,8 +430,8 @@ def main(argv=None):
         if not status["received"]:
             # Even a retained-only snapshot does not replace the previous file.
             raise RuntimeError("No new prices returned; previous quotes.json preserved")
-        atomic_json(args.out, result)
         atomic_json(args.status, status)
+        atomic_json(args.out, result)
         print(json.dumps(status))
         return 0
     except Exception as exc:

@@ -318,7 +318,20 @@
     const rows = [];
     rows.push({label: 'Prices (quotes.json)', asof: ST.quotes ? ST.quotes.generated_at : '', age: pf.ageH, status: pf.status,
       note: (ST.quotes ? ST.quotes.source + '. Checked every minute while this page is open.' : 'Quotes file did not load.')});
-    (h.sources || []).filter(s => !(ST.quotes && s.id === 'quotes')).forEach(s => rows.push({label: s.label || s.id, asof: s.asof, age: s.age_hours, status: s.status, note: s.note}));
+    // group per-category macro series and build receipts so the table stays short; worst status and oldest age win
+    const groups = {};
+    (h.sources || []).filter(s => !(ST.quotes && s.id === 'quotes')).forEach(s => {
+      const g = /^macro_/.test(s.id) ? 'macro_obs' : /receipt/i.test(s.label || '') ? 'build' : s.id;
+      (groups[g] = groups[g] || []).push(s);
+    });
+    const NAME = {macro_obs: n => 'Macro observations (' + n + ' groups)', build: n => 'Site build (' + n + ' steps)'};
+    Object.keys(groups).forEach(g => {
+      const xs = groups[g];
+      if (xs.length === 1 && !NAME[g]) { const s = xs[0]; rows.push({label: s.label || s.id, asof: s.asof, age: s.age_hours, status: s.status, note: s.note}); return; }
+      const worst = xs.reduce((a, s) => ((RANK[String(s.status).toLowerCase()] ?? 3) > (RANK[String(a.status).toLowerCase()] ?? 3) ? s : a), xs[0]);
+      const oldest = xs.reduce((a, s) => (isNum(s.age_hours) && (!isNum(a.age_hours) || s.age_hours > a.age_hours) ? s : a), xs[0]);
+      rows.push({label: NAME[g] ? NAME[g](xs.length) : (xs[0].label || g), asof: oldest.asof, age: oldest.age_hours, status: worst.status, note: worst.note || xs[0].note});
+    });
     const scr = h.screener || {asof: SCREENER_ASOF_FALLBACK, status: 'stale'};
     pop.innerHTML = `<div class="bv-pop-hd"><h2>Data freshness</h2><button type="button" class="bv-x" aria-label="Close">&times;</button></div>
       ${ST.briefSrc && ST.briefSrc.indexOf('test/') === 0 ? '<p class="bv-sample">This page is showing sample data for layout checks, not today\'s figures.</p>' : ''}
@@ -341,7 +354,7 @@
   function placePop() {
     const pop = doc.getElementById('bv-pop'), pill = doc.getElementById('bv-pill');
     const r = pill.getBoundingClientRect();
-    const w = Math.min(640, root.innerWidth - 24);
+    const w = Math.min(720, root.innerWidth - 24);
     pop.style.width = w + 'px';
     pop.style.top = (r.bottom + 10 + root.scrollY) + 'px';
     pop.style.left = Math.max(12, Math.min(root.innerWidth - w - 12, r.right - w)) + 'px';
@@ -497,7 +510,9 @@
   function whenWords(iso) {
     const t = Date.parse(iso || '');
     if (!isFinite(t)) return {d: 'Date not set', h: ''};
-    const o = {timeZone: 'America/New_York'};
+    // a bare date is a calendar day, not midnight UTC: format it in UTC so it does not slip to the day before in New York
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(iso));
+    const o = {timeZone: dateOnly ? 'UTC' : 'America/New_York'};
     try {
       const d = new Date(t).toLocaleDateString('en-US', Object.assign({weekday: 'short', month: 'short', day: 'numeric'}, o));
       const hasTime = /T\d{2}:\d{2}/.test(iso) && !/T00:00(:00)?/.test(iso);
@@ -557,6 +572,7 @@
   function mountHeatmap() {
     const el = doc.getElementById('bv-heatmap'); if (!el) return;
     const H = root.SmartOptionsHeatmap;
+    if (!H && doc.readyState !== 'complete') root.addEventListener('load', mountHeatmap, {once: true});   // heatmap.js loads after this file
     if (H && typeof H.mount === 'function') {
       try { H.mount(el, {period: ST.period, brief: ST.brief}); return; } catch (e) { console.error('[brief] heatmap mount failed', e); }
     }

@@ -58,3 +58,7 @@
 @media (prefers-reduced-motion: reduce) {
   .cp, .cp-turn, .cp-fab { animation: none !important; transition: none !important; }
 }
+@media (max-width: 560px) {
+  .cp-chips { flex-wrap: nowrap; scroll-snap-type: x proximity; }
+  .cp-chips button { flex: none; white-space: nowrap; }
+}

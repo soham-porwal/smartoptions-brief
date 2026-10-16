@@ -56,7 +56,7 @@
       xs.slice(0, 5).forEach(r => {
         const t = Date.parse(r.when_et || '');
         let when = '';
-        try { when = isFinite(t) ? new Date(t).toLocaleDateString('en-US', {timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric'}) + ': ' : ''; } catch (e) { when = ''; }
+        try { when = isFinite(t) ? new Date(t).toLocaleDateString('en-US', {timeZone: /^\d{4}-\d{2}-\d{2}$/.test(r.when_et) ? 'UTC' : 'America/New_York', weekday: 'short', month: 'short', day: 'numeric'}) + ': ' : ''; } catch (e) { when = ''; }
         add(when + r.title + (r.why ? '. ' + r.why : ''), r.metrics);
       });
       if (!lines.length) return {lines, sources, empty: 'No scheduled releases or earnings are recorded in this brief.'};

@@ -259,3 +259,5 @@ body.bv-research .bv-hdr { position: relative; }
 }
 .bv-mark { gap: 6px; }
 .b-name-ft .b-flip { min-height: 36px; }
+.bv-ht td:nth-child(2), .bv-ht td:nth-child(3) { white-space: nowrap; }
+.bv-ht td:last-child { min-width: 220px; color: var(--b-ink-2); }
