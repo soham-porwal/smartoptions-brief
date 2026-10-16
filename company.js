@@ -119,6 +119,7 @@ function trendWord(s) {
 }
 function currentDocument(doc,s,asof) {
   if(!doc||!s)return doc;
+  if(!isNum(s.price)||s.price<=0)return Object.assign({},doc,{cards:Object.assign({},doc.cards,{valuation:{status:'unavailable',line:'Current valuation unavailable: no usable current price.',metrics:[]}})});
   const old=doc.cards&&doc.cards.valuation,med=old&&(old.metrics||[]).find(m=>m.label==='Sector trailing P/E median');
   if(!med||!isNum(med.value)||med.value<=0||!isNum(s.pe))return doc;
   const ratio=s.pe/med.value,status=ratio<=0.8?'strong':ratio>=1.5?'weak':'ok';

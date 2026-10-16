@@ -799,7 +799,7 @@
   function nowLines() {
     const L = live(); if (!L) return [];
     const spy = L.get('SPY'), rsp = L.get('RSP'), avg = spyAverages(), out = [];
-    if (spy && isNum(spy.price) && isNum(avg.sma50) && isNum(avg.sma200)) {
+    if (spy && spy.current_usable!==false && isNum(spy.price) && isNum(avg.sma50) && isNum(avg.sma200)) {
       const a50 = 100 * (spy.price / avg.sma50 - 1), a200 = 100 * (spy.price / avg.sma200 - 1);
       const where = a50 >= 0 && a200 >= 0 ? 'above both' : a50 < 0 && a200 < 0 ? 'below both' : a50 < 0 ? 'below its 50-session but above its 200-session' : 'above its 50-session but below its 200-session';
       out.push({tone: a50 >= 0 && a200 >= 0 ? 'good' : a50 < 0 && a200 < 0 ? 'bad' : 'neutral',
@@ -807,7 +807,7 @@
         why: 'Price above its averages means the trend is still up; below means buyers have stepped back.'});
     }
     const sc = spy && (isNum(spy.chg_pct) ? spy.chg_pct : spy.change_pct), rc = rsp && (isNum(rsp.chg_pct) ? rsp.chg_pct : rsp.change_pct);
-    if (isNum(sc) && isNum(rc)) {
+    if (spy?.current_usable!==false&&rsp?.current_usable!==false&&isNum(sc) && isNum(rc)) {
       const gap = rc - sc;
       out.push({tone: Math.abs(gap) < 0.1 ? 'neutral' : gap > 0 ? 'good' : 'bad',
         text: Math.abs(gap) < 0.1 ? `Equal weight and the S&P 500 are moving together today (${L.fmtPct(rc)} vs ${L.fmtPct(sc)}).` :

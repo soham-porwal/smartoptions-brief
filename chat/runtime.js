@@ -12,6 +12,7 @@
     if(!Array.isArray(raw.rows)||!raw.rows.length)throw new Error('The core file contains no company rows.');
     const L=root.SmartOptionsLive; const canonical=L&&L.snapshot?L.snapshot():quotes;
     const core=Object.fromEntries(raw.rows.map(r=>[r.t,L&&L.currentRow?L.currentRow(r):r]));
+    if(L&&canonical?.quotes)canonical.quotes=Object.fromEntries(Object.entries(canonical.quotes).map(([t,q])=>[t,L.get?.(t)||q]));
     const currentBrief=L&&L.currentBrief?L.currentBrief(brief,canonical):brief;
     const rows=(root.SmartOptionsUniverse?.rows||[]).filter(r=>core[r[0]]);
     for(const r of raw.rows)if(!rows.some(x=>x[0]===r.t))rows.push([r.t,r.n,r.sec]);

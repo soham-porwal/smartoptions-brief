@@ -105,7 +105,7 @@ def universe(core):
 
 
 def priority_plan(rows, previous, shortlist=(), watchlist=(), now=None):
-    """One due quote per symbol, watchlist -> shortlist -> top 100 -> remainder."""
+    """Oldest successful check first; watchlist/shortlist/cap order breaks ties."""
     now = now or datetime.now(timezone.utc)
     top = sorted(rows, key=lambda t: finite(rows[t].get("mcap")) or 0, reverse=True)[:100]
     first = list(dict.fromkeys([*watchlist, *shortlist, *top, "SPY", "RSP"]))
@@ -118,14 +118,17 @@ def priority_plan(rows, previous, shortlist=(), watchlist=(), now=None):
         # wait an extra full cycle merely because it was sampled last.
         return not last or (now - last).total_seconds() + index * FINNHUB_SPACING >= QUOTE_INTERVAL_SECONDS
     selected = []
-    for t in first + remaining:
+    ordered=first+remaining
+    rank={t:i for i,t in enumerate(ordered)}
+    ordered.sort(key=lambda t:(previous.get(t,{}).get("checked_at") or previous.get(t,{}).get("retrieved_at") or "",rank[t]))
+    for t in ordered:
         if due(t, len(selected)):
             selected.append(t)
     return selected, 0
 
 
 class TokenBucket:
-    """Capacity one: no startup burst; at most 50 starts/minute with headroom."""
+    """Capacity one: no startup burst; paced dispatch inside the shared Worker limits."""
     def __init__(self, spacing=FINNHUB_SPACING):
         self.spacing, self.next_start = spacing, 0.0
         self.lock = threading.Lock()

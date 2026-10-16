@@ -106,7 +106,7 @@
   function currentRow(row, quote) {
     if (!row) return row;
     const q = quote === undefined ? get(row.t) : quote;
-    if(q?.current_usable===false)return Object.assign({},row,{px:null,d1:null,pe:null,pef:null,peg:null,mcap:null,up:null,pef_sec_rel:null,quote_asof:q.asof_utc||q.ts});
+    if(q&&(q.current_usable===false||['missing','stale','blocked'].includes(feedSummary({[row.t]:q},[row.t],Date.now(),ST.worker.errors).items[0].state)))return Object.assign({},row,{px:null,d1:null,pe:null,pef:null,peg:null,mcap:null,up:null,pef_sec_rel:null,quote_asof:q.asof_utc||q.ts});
     if (!q || !isNum(q.price) || q.price <= 0) return row;
     const d = derive(row, q), k = isNum(row.px) && row.px > 0 ? q.price / row.px : null;
     return Object.assign({}, row, {px:d.price, d1:d.chg_pct, pe:d.pe, pef:d.pef,
@@ -121,7 +121,15 @@
     const ms = brief.macro && brief.macro.price_trend && brief.macro.price_trend.metrics || [];
     const avg = label => (ms.find(m => m.label === label) || {}).value;
     const a50=avg('SPY 50-session average'), a200=avg('SPY 200-session average');
-    if (!q || !isNum(q.price) || q.price<=0 || !isNum(a50) || !isNum(a200)) return brief;
+    const state=feedSummary({SPY:q},['SPY'],nowMs==null?Date.now():nowMs,ST.worker.errors).items[0].state;
+    if(!q||!isNum(q.price)||q.price<=0||['missing','stale','blocked'].includes(state)){
+      const b=JSON.parse(JSON.stringify(brief));b.macro ||= {};b.pulse ||= {};
+      const line='Current SPY price assessment unavailable: '+state+'. Historical averages and reported inputs retain their dates.';
+      b.macro.price_trend={status:'unavailable',line,metrics:ms.filter(m=>!/SPY close|previous-session change/.test(m.label||''))};b.pulse.headline=line;b.pulse.status='unavailable';
+      for(const k of ['supports','challenges','changed'])b.pulse[k]=(b.pulse[k]||[]).filter(x=>!(x.metrics||[]).some(m=>/SPY (close|latest price|50-session|200-session)/.test(m.label||'')));
+      return b;
+    }
+    if(!isNum(a50)||!isNum(a200))return brief;
     const b=JSON.parse(JSON.stringify(brief)), v50=100*(q.price/a50-1), v200=100*(q.price/a200-1);
     const status=v50>=0&&v200>=0?'supportive':v50<0&&v200<0?'adverse':'mixed';
     const where=status==='supportive'?'above both averages':status==='adverse'?'below both averages':v50<0?'below its 50-session but above its 200-session average':'above its 50-session but below its 200-session average';

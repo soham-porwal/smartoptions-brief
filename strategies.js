@@ -341,7 +341,7 @@ function termRatio(D) { const v = D && D.rel && D.rel.vol_breadth && D.rel.vol_b
 function findIn(groups, id) { for (const g of Object.values(groups || {})) if (Array.isArray(g)) { const x = g.find(o => o && o.id === id); if (x) return x; } return null; }
 async function ctxFromData(t) {
   const D = coreData() || {}, r = (D.rows || []).find(x => x.t === t) || {}, ctx = {ticker: t, price: r.px, iv: r.iv, rv20_core: r.rv20, iv_sec_med: r.iv_sec_med, days_to_earnings: r.ern, sector: r.sec, prov: {}};
-  const quote=root.SmartOptionsLive?.get(t);if(quote&&isNum(quote.price)){ctx.price=quote.price;}
+  const quote=root.SmartOptionsLive?.get(t);if(root.SmartOptionsLive)ctx.price=quote&&quote.current_usable!==false&&isNum(quote.price)?quote.price:null;
   ctx.prov.price = quote ? `${quote.asof_utc||quote.ts} ${quote.provider||'canonical quote'} (${root.SmartOptionsLive.classify?.(quote,Date.now()).label||quote.freshness||'observation'})` : `${r.pxd || 'n/a'} close/last (core.json)`; ctx.prov.iv = isNum(r.iv) ? `${r.ivs || 'option chain'}; expiry ${r.ivx || '?'} strike ${r.ivk || '?'}` : 'no IV stored for this ticker (20d RV proxy available)';
   const bill = findIn(D.macro, 'us3m'); if (bill && isNum(bill.v)) { ctx.r = bill.v / 100; ctx.prov.r = `3M T-bill ${bill.v}% (${bill.provider || 'US Treasury'}, ${bill.period || ''})`; } else { ctx.r = 0; ctx.prov.r = 'no T-bill rate stored: r = 0'; }
   const reg = D.rel && D.rel.regime; if (reg && isNum(reg.score)) { ctx.regime = reg.score; ctx.prov.regime = `${reg.score} ${reg.tier || ''} (dashboard regime)`; }

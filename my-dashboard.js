@@ -25,9 +25,10 @@
     const out={value:null,asof:'unknown',period:'unknown',source:'Unavailable',url:'',basis:'No measured input is available.'};
     if(['price','change_1d_pct'].includes(id)){
       const key=id==='price'?'price':'chg_pct';
-      if(q?.status==='ok'&&num(q[key]))return {...out,value:q[key],asof:q.asof_utc||q.ts||'unknown',period:id==='price'?(q.freshness||'snapshot'):'versus previous close '+(q.prior_close_date||''),source:q.provider||'Quote snapshot',url:q.source_url||'',basis:id==='price'?'Provider quote; observation timestamp retained.':'(quote / previous session close − 1) × 100; provider change.'};
-      return {...out,value:num(c?.[id==='price'?'px':'d1'])?c[id==='price'?'px':'d1']:null,asof:c?.pxd||'unknown',period:'Last exported close',source:'Yahoo Finance via core.json',basis:id==='price'?'Unadjusted daily close; dated snapshot.':'Close-to-close percentage return in the exported snapshot.'};
+      if(q&&q.current_usable!==false&&num(q[key])&&c?.px!=null)return {...out,value:q[key],asof:q.asof_utc||q.ts||'unknown',period:id==='price'?(q.freshness||'snapshot'):'versus previous close '+(q.prior_close_date||''),source:q.provider||'Quote snapshot',url:q.source_url||'',basis:id==='price'?'Provider quote; observation timestamp retained.':'(quote / previous session close − 1) × 100; provider change.'};
+      return {...out,value:null,asof:c?.pxd||'unknown',period:'Last exported close',source:'Yahoo Finance via core.json',basis:id==='price'?'Unadjusted daily close; dated snapshot.':'Close-to-close percentage return in the exported snapshot.'};
     }
+    if(['forward_pe','market_cap'].includes(id)&&(!q||c?.px==null))return {...out,basis:'Current price unavailable; dated fundamentals are retained.'};
     if(['forward_pe','market_cap'].includes(id))return {...out,value:num(c?.[id==='forward_pe'?'pef':'mcap'])?c[id==='forward_pe'?'pef':'mcap']:null,asof:c?.quote_asof||c?.rat||data.core?.exported_at||'unknown',period:data.core?.asof_session||'Export snapshot',source:'Yahoo Finance via core.json',basis:id==='forward_pe'?'Latest canonical price / fixed dated expected earnings per share.':'Snapshot shares implied by market cap / price, multiplied by latest canonical price.'};
     if(['revenue_growth_pct','operating_margin_pct','free_cash_flow'].includes(id)){
       const [card,label]={revenue_growth_pct:['growth','Revenue growth YoY'],operating_margin_pct:['profitability','Operating margin'],free_cash_flow:['cash','Free cash flow TTM']}[id],m=co?.cards?.[card]?.metrics?.find(m=>m.label===label);

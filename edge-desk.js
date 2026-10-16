@@ -185,7 +185,7 @@
     const out = [];
     holdings.forEach((h, ci) => {
       const row = byTicker.get(h.t);
-      const price = finite(h.price) && h.price > 0 ? h.price : (row && finite(row.px) ? row.px : 0);
+      const price = Object.prototype.hasOwnProperty.call(h,'price') ? (finite(h.price)&&h.price>0?h.price:0) : (row&&finite(row.px)?row.px:0);
       const rawIv = finite(h.iv) && h.iv > 0 ? h.iv : (row && finite(row.iv) ? row.iv : row && finite(row.rv20) ? row.rv20 : row && finite(row.iv_sec_med) ? row.iv_sec_med : 0);
       const ivSrc = finite(h.iv) && h.iv > 0 ? 'custom' : (row && finite(row.iv) ? 'Yahoo ATM IV' : row && finite(row.rv20) ? '20d Realized Vol proxy' : 'Sector median IV');
       if (!(price > 0 && rawIv > 0)) return;
@@ -303,7 +303,7 @@
         t: sym,
         shares: finite(pos.qty) && pos.qty >= 0 ? pos.qty : null,
         basis: finite(pos.cost) && pos.cost >= 0 ? pos.cost : null,
-        price: existing && existing.customPx ? existing.price : (root.SmartOptionsLive && root.SmartOptionsLive.get(sym) || {}).price || r.px,
+        price: existing && existing.customPx ? existing.price : (root.SmartOptionsLive?.get(sym)?.current_usable!==false?root.SmartOptionsLive?.get(sym)?.price:null) ?? null,
         iv: existing && existing.customIv ? existing.iv : (finite(r.iv) ? r.iv : (finite(r.rv20) ? r.rv20 : 30)),
         earn: (r && r.er) || ''
       });
@@ -622,7 +622,7 @@
         <div class="ed-hl-row">
           <input data-hidx="${idx}" data-hk="t" value="${esc(h.t)}" aria-label="Symbol">
           <input data-hidx="${idx}" data-hk="shares" value="${h.shares}" type="number" step="100" aria-label="Shares of ${esc(h.t)}">
-          <input data-hidx="${idx}" data-hk="basis" value="${finite(h.basis) ? h.basis : h.price}" type="number" step="0.01" aria-label="Cost basis of ${esc(h.t)}">
+          <input data-hidx="${idx}" data-hk="basis" value="${finite(h.basis) ? h.basis : ''}" placeholder="Unknown" type="number" step="0.01" aria-label="Cost basis of ${esc(h.t)}">
           <button class="ed-hl-x" data-hdel="${idx}" title="Remove ${esc(h.t)}">×</button>
         </div>
         <div class="ed-hl-meta">
@@ -1038,7 +1038,7 @@
     $('#tabs').appendChild(tab);
 
     if (root.SmartOptionsLive) root.SmartOptionsLive.subscribe(() => {
-      for (const h of ST.hold) { const q = root.SmartOptionsLive.get(h.t); if (!h.customPx && q && finite(q.price)) h.price = q.price; }
+      for (const h of ST.hold) { const q = root.SmartOptionsLive.get(h.t); if(!h.customPx){h.price=q&&q.current_usable!==false&&finite(q.price)?q.price:null;h.quoteAsOf=q&&(q.asof_utc||q.ts);} }
       if (!page.hidden) render();
     });
     const brand = $('#hdr .brand');
@@ -1131,7 +1131,7 @@
         const row = api.D().rows.find(r => r.t === sym);
         if (!row) return;
         const existing = ST.hold.find(h => h.t === sym);
-        const basis = basIn && parseFloat(basIn.value) > 0 ? parseFloat(basIn.value) : row.px;
+        const enteredBasis=basIn?parseFloat(basIn.value):NaN;const basis=finite(enteredBasis)&&enteredBasis>=0?enteredBasis:null;
         if (existing) {
           existing.shares = sh;
           existing.basis = basis;
@@ -1298,7 +1298,7 @@
           saveState();
           syncToMyBook();
         } else if (k === 'basis') {
-          h.basis = parseFloat(t.value) || h.price;
+          const entered=parseFloat(t.value);h.basis=finite(entered)&&entered>=0?entered:null;
           saveState();
           syncToMyBook();
         }

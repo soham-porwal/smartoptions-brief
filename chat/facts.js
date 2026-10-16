@@ -94,7 +94,8 @@
   }
   function quoteFact(P, t, ctx) {
     const q = ctx.quotes && ctx.quotes[t];
-    if (q && q.status === 'ok' && isNum(q.price)) {
+    if (q?.current_usable===false)return null;
+    if (q && q.status !== 'missing' && isNum(q.price)) {
       const fresh = q.freshness === 'live' ? 'live' : q.freshness === 'closed' ? 'market closed' : (q.delay_minutes ? 'delayed ' + q.delay_minutes + ' min' : (q.freshness || 'delayed'));
       const p = P.add({label: t + ' last price', value: q.price, unit: 'USD/share', period: q.ts || q.asof_utc, asof: q.asof_utc || q.ts, source: q.provider, source_url: q.source_url}, {ticker: t});
       const c = isNum(q.chg_pct) ? P.add({label: t + ' change vs previous close', value: q.chg_pct, unit: '%', period: 'vs close of ' + (q.prior_close_date || 'previous session'), asof: q.asof_utc || q.ts, source: q.provider, source_url: q.source_url}, {ticker: t}) : null;
