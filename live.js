@@ -80,15 +80,28 @@
     }
     return out;
   }
-  function yahooQuote(event, previous, receivedMs) {
+  function quoteSession(ms) {
+    const p = {};
+    new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ms)).forEach(x => {p[x.type]=x.value;});
+    return p.year+'-'+p.month+'-'+p.day;
+  }
+  function yahooQuote(event, previous, receivedMs, regularReference) {
     receivedMs=receivedMs==null?Date.now():receivedMs;
     if(!event||!SYMBOL.test(event.id||'')||!isNum(event.price)||event.price<=0||!Number.isSafeInteger(event.time)||event.time<=0||event.time>receivedMs)return null;
     if(previous&&obsMs(previous)>event.time)return null;
     const ts=new Date(event.time).toISOString(),received=new Date(receivedMs).toISOString();
     const price=Number(event.price.toFixed(6));
-    const prior=isNum(event.previous_close)&&event.previous_close>0?event.previous_close:isNum(event.change)&&price-event.change>0?price-event.change:previous?.prior_close_date===ts.slice(0,10)&&previous?.prior_close>0?previous.prior_close:null;
-    const chg=isNum(event.change_percent)?event.change_percent:prior?100*(price/prior-1):null;
-    return {price,chg_pct:chg,change_pct:chg,prior_close:prior,prior_close_date:prior?ts.slice(0,10):null,
+    const session=quoteSession(event.time),extended=event.market_hours===2||event.market_hours===3;
+    const providerPrior=isNum(event.previous_close)&&event.previous_close>0?event.previous_close:isNum(event.change)&&price-event.change>0?price-event.change:isNum(event.change_percent)&&event.change_percent>-100?price/(1+event.change_percent/100):null;
+    // Yahoo post-market change is relative to today's close. Keep that separately;
+    // daily analytics must retain the previous regular-session close used by Finnhub.
+    const reference=[previous,regularReference].find(q=>q&&obsMs(q)!=null&&quoteSession(obsMs(q))===session&&isNum(q.prior_close)&&q.prior_close>0&&(q.return_basis==='previous_regular_session_close'||(![2,3].includes(q.market_hours)&&q.source_transport!=='websocket')));
+    const prior=extended?(reference?.prior_close||null):providerPrior;
+    const chg=prior?100*(price/prior-1):!extended&&isNum(event.change_percent)?event.change_percent:null;
+    return {price,chg_pct:chg,change_pct:chg,prior_close:prior,prior_close_date:extended?reference?.prior_close_date||null:null,
+      return_basis:chg==null?null:'previous_regular_session_close',return_session:session,
+      session_change_pct:isNum(event.change_percent)?event.change_percent:providerPrior?100*(price/providerPrior-1):null,
+      session_reference_price:providerPrior,prior_close_note:extended?'Daily return retains a same-session regular quote reference; Yahoo extended-session change is stored separately.':'Yahoo regular-session change reference; previous-close session date is not supplied.',
       day_volume:Number.isSafeInteger(event.day_volume)&&event.day_volume>=0?event.day_volume:null,
       market_hours:Number.isSafeInteger(event.market_hours)?event.market_hours:null,asof_utc:ts,ts,checked_at:received,received_at:received,provider:'Yahoo Finance stream',source_url:'https://finance.yahoo.com/quote/'+encodeURIComponent(event.id),source_transport:'websocket',delay_minutes:0,status:'ok',exchange:event.exchange||null,currency:event.currency||'USD'};
   }
@@ -180,8 +193,9 @@
     const qs=quotes&&(quotes.quotes||quotes)||{},q=qs[t],spy=qs.SPY;
     if(!q||!isNum(q.price)||q.current_usable===false||['stale','missing','blocked'].includes(feedSummary(qs,[t],Date.now(),ST.worker.errors).items[0].state))return 'Current price comparison is unavailable.';
     const change=isNum(q.chg_pct)?q.chg_pct:q.change_pct,market=spy&&(isNum(spy.chg_pct)?spy.chg_pct:spy.change_pct);
+    const comparable=spy&&spy.current_usable!==false&&obsMs(spy)!=null&&obsMs(q)!=null&&quoteSession(obsMs(spy))===quoteSession(obsMs(q))&&!['stale','missing','blocked'].includes(feedSummary(qs,['SPY'],Date.now(),ST.worker.errors).items[0].state);
     let line=`${t} is $${fmtPx(q.price)}`;
-    if(isNum(change)){line+=`, ${fmtPct(change)} versus its previous close`;if(t!=='SPY'&&isNum(market)){const gap=change-market;line+=` and ${Math.abs(gap).toFixed(2)} percentage points ${gap>=0?'ahead of':'behind'} SPY`;}}
+    if(isNum(change)){line+=`, ${fmtPct(change)} versus its previous close`;if(t!=='SPY'&&isNum(market)&&comparable){const gap=change-market;line+=` and ${Math.abs(gap).toFixed(2)} percentage points ${gap>=0?'ahead of':'behind'} SPY`;}}
     return line+'.';
   }
   // Header truth: worst of the price feed and every dataset in refresh-status / brief health.
@@ -194,7 +208,8 @@
   function feedSummary(quotes, tickers, nowMs, errors) {
     const clock=marketClock(nowMs),names=tickers&&tickers.length?tickers:Object.keys(quotes||{}),counts={};
     const items=names.map(t=>{const q=quotes&&quotes[t],c=classify(q,nowMs,clock),checked=q&&(q.checked_at||q.retrieved_at),cm=Date.parse(checked||'');
-      const error=errors&&errors[t];let state=error?'blocked':c.word;
+      const healthyStream=q&&q.source_transport==='websocket'&&c.ageMin!=null&&(c.word==='closed'||c.ageMin<=15)&&isFinite(cm)&&nowMs-cm<=180000&&nowMs-cm>=-60000;
+      const error=healthyStream?null:errors&&errors[t];let state=error?'blocked':c.word;
       if(!error&&c.word==='stale'&&q&&q.delay_minutes===0&&c.ageMin<=15&&isFinite(cm)&&nowMs-cm<=180000&&nowMs-cm>=-60000)state='older';
       counts[state]=(counts[state]||0)+1;
       return {t,state,observation:q&&(q.asof_utc||q.ts)||null,checked_at:checked||null,age_minutes:c.ageMin??null,error:error||null};});
@@ -210,7 +225,7 @@
   /* ------------------------------------------------------------ engine state */
   const ST = {quotes: {}, file: null, subs: new Set(), owners: {}, cursor: 0, timers: [], started: false,
     worker: {url: '', enabled: false, reason: 'not configured', last: null, error: '', errors: {}},
-    stream:{socket:null,subscribed:new Set(),pending:{},flush:null,retry:null,attempt:0,enabled:false,received:0,error:'',last:null}, fileState: {last: null, error: ''}, status: null, polling: false, vis: new Map(), seen: new WeakSet(), io: null, visTimer: null};
+    regularRefs:{},stream:{socket:null,subscribed:new Set(),pending:{},flush:null,retry:null,attempt:0,enabled:false,received:0,error:'',last:null}, fileState: {last: null, error: ''}, status: null, polling: false, vis: new Map(), seen: new WeakSet(), io: null, visTimer: null};
   const doc = root.document;
   const now = () => Date.now();
 
@@ -264,7 +279,7 @@
     ws.onopen=()=>{if(st.socket!==ws)return;st.attempt=0;st.error='';syncStream();};
     ws.onmessage=ev=>{if(st.socket!==ws)return;try{
       const event=decodeYahooMessage(ev.data),canonical=streamTargets().find(t=>t.replace(/\./g,'-')===event.id);if(!canonical)return;
-      const quote=yahooQuote(event,st.pending[canonical]||ST.quotes[canonical],now());if(!quote)return;
+      const quote=yahooQuote(event,st.pending[canonical]||ST.quotes[canonical],now(),ST.regularRefs[canonical]);if(!quote)return;
       st.pending[canonical]=quote;st.received++;st.last=quote.received_at;
       if(!st.flush)st.flush=setTimeout(()=>{st.flush=null;const pending=st.pending;st.pending={};Object.keys(pending).forEach(t=>delete ST.worker.errors[t]);accept(pending,'stream');},250);
     }catch(e){st.error='Invalid stream event: '+e.message;}};
@@ -294,6 +309,7 @@
     if (doc) { paint(doc, changed); if (root.CustomEvent) root.dispatchEvent(new root.CustomEvent('so:quotes-update', {detail: ev.quotes})); }
   }
   function accept(incoming, source) {
+    if(source!=='stream')Object.entries(incoming||{}).forEach(([t,q])=>{if(q&&isNum(q.prior_close)&&q.prior_close>0&&obsMs(q)!=null&&![2,3].includes(q.market_hours)&&(!ST.regularRefs[t]||obsMs(q)>=obsMs(ST.regularRefs[t])))ST.regularRefs[t]=q;});
     const r = merge(ST.quotes, incoming, source);
     ST.quotes = r.quotes;
     if (r.changed.length || source === 'file-first') emit(r.changed, source);
@@ -360,9 +376,9 @@
     try { cfg = await getJSON('data/config.json'); } catch (e) { ST.worker.reason = 'Configuration unavailable: ' + (e.message || e); }
     configure(cfg, root.location ? root.location.origin : '');
     ST.stream.enabled=!!root.WebSocket&&ALLOWED_ORIGINS.includes(root.location?.origin);
-    syncStream();
     ST.timers.push(setInterval(()=>{const st=ST.stream;if(st.socket?.readyState===1&&st.subscribed.size)st.socket.send(JSON.stringify({subscribe:[...st.subscribed]}));},15000));
     await loadFile();
+    syncStream();
     pollWorker(null, true);   // one fast read on arrival, even after the close, so the latest print is shown
     ST.timers.push(setInterval(async () => {if(!doc||doc.visibilityState==='visible') await refresh();}, OPEN_POLL_MS));
     ST.timers.push(setInterval(() => paint(doc, null), 15000));   // freshness words age even when no price moves

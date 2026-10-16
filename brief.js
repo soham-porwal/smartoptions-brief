@@ -329,7 +329,7 @@
     const hdr = doc.createElement('header');
     hdr.className = 'bv-hdr'; hdr.id = 'bv-hdr';
     hdr.innerHTML = `<div class="bv-hdr-in">
-      <a class="bv-mark" href="#/brief" aria-label="SmartOptions Brief, home">SmartOptions<span>Brief</span></a>
+      <a class="bv-mark" id="back-to-main" href="index.html#/" aria-label="SmartOptions Brief, main dashboard">SmartOptions<span>Brief</span></a>
       <nav class="bv-nav" aria-label="Main">
         <a href="#/brief" data-nav="brief">Brief</a><a href="#/company" data-nav="company"><span class="nav-wide">Companies</span><span class="nav-small">Company</span></a><a href="#/flows" data-nav="flows"><span class="nav-wide">Capital &amp; news</span><span class="nav-small">Capital</span></a><a href="#/my-dash" data-nav="my-dash">My Dash</a><a href="#/macro" data-nav="macro" class="nav-secondary">Macro</a><a href="#/research/overview" data-nav="research" class="nav-secondary">Research</a><button type="button" class="bv-more" id="bv-more" aria-expanded="false" aria-controls="bv-more-menu">More</button>
       </nav>

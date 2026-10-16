@@ -211,6 +211,7 @@
     main.innerHTML = `
       ${legacy ? `<p class="note">That view is part of the expanded dashboard. <a href="backup.html${esc(legacy)}">Open it in the backup</a>.</p>` : ''}
       <section><h2>Market <span class="px">SPY ${liveSpan('SPY', 'price')} <span class="chg">${liveSpan('SPY', 'chg')}</span></span></h2>
+        <small class="dim">${slot('market-session', () => q('SPY')?.market_hours === 2 ? 'After hours' : q('SPY')?.market_hours === 0 ? 'Pre-market' : '')}</small>
         ${slot('pulse', pulseSlot)}</section>
       <section><h2>Breadth and leadership</h2>
         <p>${slot('breadth', breadthSlot)}</p>

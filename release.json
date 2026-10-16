@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261016-r10-main",
+  "release_id": "brief-client-20261016-r11-main",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-16T11:47:55.795362-07:00",
-  "source_commit": "1927e5a",
+  "built_at": "2026-10-16T22:19:59.725164+00:00",
+  "source_commit": "fef3cc440c469848c20aa82fc1b14df8d4abcb9b",
   "data_session": "2026-10-15",
   "tickers": 509,
   "current_constituents": 503,
@@ -11,24 +11,20 @@
   "default_view": "minimal main: Market brief, Companies, Macro (index.html); expanded dashboard preserved at backup.html",
   "chat": "not on main; retained in the expanded backup",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
-  "price_feed": "Main: Yahoo Finance keyless websocket stream (one socket, on-screen names first then S&P members, reconnect with backoff, paused when hidden) on the published origins; shared Worker (Finnhub, 58/min and 30/sec, 120 s cadence) and the published quote file as fallback. Each accepted quote keeps provider time; older observations never replace newer.",
+  "price_feed": "Yahoo Finance stream for up to 100 prioritized active names; one connection. Finnhub shared within-budget 120-second fallback, then the timestamped shared snapshot. Full-index breadth uses one adequately covered dated session, not an unqualified all-index tick claim.",
   "verification": {
     "javascript_chat_worker": {
-      "passed": 362,
+      "passed": 385,
       "failed": 0,
       "skipped": 0,
-      "receipt": "price-now-js-wake-2.txt",
-      "run_at": "2026-10-16T11:53:27.637576-07:00"
+      "receipt": "parent-session-js-final.txt"
     },
     "python": {
-      "status": "pending final rerun; previous full run interrupted during priority steering",
-      "receipt": "reliability-full-python-1.txt",
-      "targeted_quotes": {
-        "passed": 14,
-        "receipt": "price-now-python.txt"
-      }
+      "passed": 1008,
+      "failed": 0,
+      "receipt": "parent-final-python.txt"
     },
-    "scope": "Price milestone; full analytics acceptance pending",
+    "scope": "Minimal main, preserved backup, canonical quote and current interpretation regressions. Actual hosted acceptance is recorded separately by the parent.",
     "evidence_dir": "Data/Logs/brief-client-recovery-20261016"
   },
   "screener_scores": "dated 2026-07-25 snapshot; separate from refreshed prices and fundamentals",
@@ -43,5 +39,13 @@
   "backup": {
     "url": "backup.html",
     "identity": "expanded dashboard (r8 quiet source, superset of published r7-price); same data and device storage"
+  },
+  "quote_return_basis": "Daily changes use the previous regular-session close. Yahoo extended-session changes are retained separately; an unknown daily reference stays unavailable.",
+  "quote_snapshot_at_publication": {
+    "generated_at": "2026-10-16T22:04:30.227070Z",
+    "source_url": "https://soham-porwal.github.io/smartoptions-brief/data/quotes.json",
+    "source_payload_sha256": "ddc4af8a03d1ca41f96b9cf5f8e3ca7ad35171db0d69a1b11f76c81e4f163058",
+    "quotes_sha256": "6fe6c80231e4d5e289349ba4df60d8d02fad13a693551f40fc2d87d020e0a511",
+    "dynamic": true
   }
 }
