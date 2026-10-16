@@ -1,0 +1,12 @@
+{
+  "chat_proxy_url": null,
+  "chat_proxy_model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "quotes": {
+    "providers": ["Finnhub US quote", "Alpaca IEX (single exchange)", "Yahoo Finance via yfinance"],
+    "default_delay_minutes": 15,
+    "cadence_market_minutes": 5,
+    "cadence_other_minutes": 60,
+    "watchlist": [],
+    "note": "Per-quote provider, delay and timestamp determine freshness. Scheduled refresh awaits workflow approval."
+  }
+}

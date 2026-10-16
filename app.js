@@ -28,6 +28,8 @@ function save() { try { localStorage.setItem('so2-settings', JSON.stringify(S));
 
 /* ---------- formatting ---------- */
 function na(reason) { return `<span class="na" data-tip="${esc(reason || 'not available')}">—</span>`; }
+// plain-language date label for Sam's screener scores (shared with the Brief shell, brief.js screenerLabel)
+function samLabel(mode) { return window.SmartOptionsBrief ? window.SmartOptionsBrief.screenerLabel(mode) : "Sam's screener scores from Jul 25, 2026"; }
 function num(v, dp, reason) { return isNum(v) ? v.toLocaleString('en-US', {minimumFractionDigits: dp, maximumFractionDigits: dp}) : na(reason); }
 function pct(v, dp, reason, unit) {
   if (!isNum(v)) return na(reason);
@@ -98,7 +100,7 @@ function renderHeader() {
   const st = {};
   for (const k in D.macro) for (const o of D.macro[k]) st[o.status] = (st[o.status] || 0) + 1;
   const fr = `macro ${st.ok || 0} ok${st.stale ? ` · <span style="color:var(--warn)">${st.stale} stale</span>` : ''}${st.missing ? ` · ${st.missing} missing` : ''}${st.error ? ` · ${st.error} error` : ''}`;
-  $('#hstat').innerHTML = `Session ${esc(D.asof_session)} · updated ${etTime(ex)} ET · delayed · ${fr} · <span class="dim">Sam columns: snapshot 2026-07-25</span>`;
+  $('#hstat').innerHTML = `Session ${esc(D.asof_session)} · updated ${etTime(ex)} ET · delayed · ${fr} · <span class="dim">${esc(samLabel('short'))}</span>`;
   $('#hstat').dataset.tip = `exported ${ex}\nmacro ${g.macro}\nequities ${g.equities}\nrelations ${g.relations}\ncrosscheck ${g.crosscheck}`;
 }
 function renderTape() {
@@ -132,7 +134,7 @@ const COLS = [
   {k: 'pct', h: '52w', ph: 1, tip: 'Position in 52-week range (unadjusted high/low)'},
   {k: 'ern', h: 'Earn', ph: 1, tip: 'Days until next earnings (Yahoo; may be an estimate)'},
   {k: 'iv', h: 'ATM IV', ph: 1, tip: 'At-the-money implied vol, nearest weekly expiry (Yahoo chain, delayed)'},
-  {k: 'opp', h: 'Opp', ph: 1, tip: "Sam's Opportunity score · SmartOptions snapshot 2026-07-25 (read-only)"},
+  {k: 'opp', h: 'Opp', ph: 1, tip: "Opportunity: " + samLabel('tip')},
   {k: 'b10', h: 'β10Y', ph: 1, tip: '% stock move per +10bp 10Y yield (OLS, 252 sessions). Bright = |t| at or above your threshold'},
   {k: 'boil', h: 'βOil', ph: 1, tip: '% stock move per +1% WTI (OLS, 252 sessions)'},
   {k: 'scen', h: 'Scen', tip: 'Scenario impact %: sum(coef x your shock). Historical association, not a forecast'},
@@ -147,8 +149,8 @@ const COLS = [
   {k: 'bvix', h: 'βVIX', ph: 1, opt: 1, tip: '% stock move per +1pt VIX (OLS, 252 sessions)'},
   {k: 'bspy', h: 'βSPY', ph: 1, opt: 1, tip: '% stock move per +1% SPY (OLS, 252 sessions)'},
   {k: 'r2', h: 'R²', ph: 1, opt: 1, tip: 'R² of the 5-factor OLS (252 sessions)'},
-  {k: 'risk', h: 'Risk', ph: 1, opt: 1, tip: "Sam's Risk label · SmartOptions snapshot 2026-07-25 (read-only)"},
-  {k: 'qual', h: 'Qual', ph: 1, opt: 1, tip: "Sam's Quality label · SmartOptions snapshot 2026-07-25 (read-only)"},
+  {k: 'risk', h: 'Risk', ph: 1, opt: 1, tip: "Risk label: " + samLabel('tip')},
+  {k: 'qual', h: 'Qual', ph: 1, opt: 1, tip: "Quality label: " + samLabel('tip')},
   {k: 'res20d', h: '20d α', ph: 1, tip: '20-session idiosyncratic return (%) = actual 20d return minus 5-factor OLS macro-explained move'},
   {k: 'pefrel', h: 'vs Sec', ph: 1, tip: 'Forward P/E relative to GICS sector median (1.00x = sector median)'},
   {k: 'epsg', h: 'EPS g%', ph: 1, opt: 1, tip: 'Implied forward EPS growth % = (Trailing P/E / Forward P/E - 1) * 100'},
@@ -276,8 +278,8 @@ flags ${r.sam.flags || '-'}${r.sam.risk === 'AVOID' ? '\nAVOID -> his composite 
       return `<td class="ph ${Math.abs(t) >= S.minT ? 'sig' : 'nsig'}" data-tip="coef ${r.rel.c[f]} · t ${t} · R² ${r.rel.r2} · n ${r.rel.n}">${pct(r.rel.c[f], 2)}</td>`;
     }
     case 'r2': return `<td class="ph" data-tip="${esc(r.rel ? '5-factor OLS, n ' + r.rel.n : '')}">${r.rel ? num(r.rel.r2, 2) : na('no regression (insufficient history)')}</td>`;
-    case 'risk': return `<td class="ph sam" data-tip="Sam snapshot 2026-07-25 (read-only)">${r.sam && r.sam.risk ? esc(r.sam.risk) : na("not in Sam's 2026-07-25 snapshot")}</td>`;
-    case 'qual': return `<td class="ph sam" data-tip="Sam snapshot 2026-07-25 (read-only)">${r.sam && r.sam.q ? esc(r.sam.q) : na("not in Sam's 2026-07-25 snapshot")}</td>`;
+    case 'risk': return `<td class="ph sam" data-tip="${esc(samLabel('tip'))}">${r.sam && r.sam.risk ? esc(r.sam.risk) : na("not in Sam's 2026-07-25 snapshot")}</td>`;
+    case 'qual': return `<td class="ph sam" data-tip="${esc(samLabel('tip'))}">${r.sam && r.sam.q ? esc(r.sam.q) : na("not in Sam's 2026-07-25 snapshot")}</td>`;
     case 'res20d': return `<td class="ph" data-tip="${esc(r.att ? `20d actual ${r.att.actual_20d}% = factors ${r.att.explained_20d}% + idiosyncratic ${r.res20d}%` : '20d idiosyncratic residual')}">${pct(r.res20d, 1, 'no 20d attribution')}</td>`;
     case 'res5d': return `<td class="ph" data-tip="${esc(r.att ? `5d actual ${r.att.actual_5d}% = factors ${r.att.explained_5d}% + idiosyncratic ${r.res5d}%` : '5d idiosyncratic residual')}">${pct(r.res5d, 1, 'no 5d attribution')}</td>`;
     case 'pefrel': return `<td class="ph" data-tip="${esc(`Fwd P/E ${r.pef || 'n/a'} vs ${r.sec || 'sector'} median ${r.pef_sec_med || 'n/a'}x`)}">${isNum(r.pef_sec_rel) ? `<span class="${r.pef_sec_rel <= 0.9 ? 'up' : r.pef_sec_rel >= 1.2 ? 'dn' : ''}">${r.pef_sec_rel.toFixed(2)}x</span>` : na('forward P/E missing')}</td>`;
@@ -301,7 +303,7 @@ function renderTable() {
   $('#tbody').innerHTML = rows.map(r => `<tr data-t="${esc(r.t)}"${r.t === selT ? ' class="sel"' : ''}>${activeCols().map(c => cell(r, c)).join('')}</tr>`).join('');
   const sc = scenOn() ? ' · scenario on: ' + FACTORS.filter(f => S.shock[f]).map(f => `${FLABEL[f]} ${S.shock[f] > 0 ? '+' : ''}${S.shock[f]}${SHOCK_U[f]}`).join(', ') + ' (historical association, not a forecast)' : '';
   const sk = V.sort.k.startsWith('c:') ? ` · sorted by ${FLABEL[V.sort.k.slice(2)]} coef` : '';
-  $('#tmeta').innerHTML = `<span>${rows.length} of ${D.rows.length}${V.sector ? ' · ' + esc(V.sector) : ''}${sk}${sc}</span><span>Sam cols = snapshot 2026-07-25</span>`;
+  $('#tmeta').innerHTML = `<span>${rows.length} of ${D.rows.length}${V.sector ? ' · ' + esc(V.sector) : ''}${sk}${sc}</span><span>${esc(samLabel('short'))}</span>`;
 }
 
 /* ---------- chart ---------- */
@@ -551,7 +553,7 @@ function samBlock(r, d) {
     bar = `<svg width="100%" viewBox="0 0 ${W} 12" preserveAspectRatio="none" style="height:12px">${segs.join('')}</svg>
       <div class="sub" style="padding:3px 0">${c.parts.map((p, i) => `<span style="color:${cols[i]}">■</span> ${p.k} ${p.score.toFixed(0)}`).join(' · ')}<br>base ${c.base_score == null ? (c.parts.reduce((a, p) => a + p.w * p.score, 0) / 100).toFixed(2) : c.base_score.toFixed(2)} x Q ${c.qmult} x R ${c.rmult} = ${c.derived} (published ${c.published})</div>`;
   } else if (c) bar = `<div class="sub">components not shown: could not reproduce published score from EXPLAIN</div>`;
-  return `<div class="blk"><div class="sech" data-tip="${esc("Sam's own scores, read-only. SmartOptions snapshot " + (s.asof || '2026-07-25') + '. Component split uses his documented formula and is shown only when it reproduces his published number.')}">Sam's score <span class="dim">snapshot 2026-07-25</span></div>
+  return `<div class="blk"><div class="sech" data-tip="${esc("Sam's own scores, read-only. SmartOptions snapshot " + (s.asof || '2026-07-25') + '. Component split uses his documented formula and is shown only when it reproduces his published number.')}">Sam's score <span class="dim">${esc(samLabel('short'))}</span></div>
     <div style="padding:0 12px">
     <div class="grid" style="grid-template-columns:repeat(4,1fr);border:0">${stat('Opp', num(s.opp, 1))}${stat('Quality', esc(s.q || '—'))}${stat('Trend', num(s.trend, 0))}${stat('Risk', esc(s.risk || '—'))}</div>
     ${bar}<div class="sub">flags: ${esc(s.flags || '—')} · snapshot price ${num(s.px, 2)}${r.sam_drift && isNum(r.sam_drift.px_pct) ? ` · <b>drift since 07-25: ${pct(r.sam_drift.px_pct, 1)} px${isNum(r.sam_drift.pef_chg) ? ', ' + (r.sam_drift.pef_chg > 0 ? '+' : '') + r.sam_drift.pef_chg.toFixed(1) + 'x fP/E' : ''}</b>` : ''}${r.sam_drift && (isNum(r.sam_drift.roe) || isNum(r.sam_drift.de)) ? `<br>retained quality inputs (07-25): ROE ${num(r.sam_drift.roe, 1)}% · D/E ${num(r.sam_drift.de, 2)} · Rev g ${num(r.sam_drift.rev_g, 1)}% · EPS g ${num(r.sam_drift.eps_g, 1)}%` : ''}</div></div></div>`;
@@ -601,7 +603,8 @@ function step(dir) {
   select('t', n.dataset.t); n.scrollIntoView({block: 'nearest'});
 }
 function writeHash() {
-  const sh = FACTORS.filter(f => S.shock[f]).map(f => `${f}:${S.shock[f]}`).join(',');
+  if (window.SmartOptionsBrief && !window.SmartOptionsBrief.isResearch()) return;   // Brief routes own the hash outside Research
+  const sh =FACTORS.filter(f => S.shock[f]).map(f => `${f}:${S.shock[f]}`).join(',');
   const h = `${V.sel.kind}=${encodeURIComponent(V.sel.id)}&r=${V.range}${V.overlay ? '&ov=' + V.overlay : ''}${sh ? '&sc=' + sh : ''}${V.tab !== 'markets' ? '&tab=' + V.tab : ''}`;
   history.replaceState(null, '', '#' + h);
 }
@@ -624,6 +627,7 @@ function wire() {
   });
   document.addEventListener('keydown', e => {
     if (e.target.matches('input,select,textarea')) return;
+    if (window.SmartOptionsBrief && !window.SmartOptionsBrief.isResearch()) return;
     if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); step(1); }
     else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); step(-1); }
     else if (e.key === '/') { e.preventDefault(); e.stopImmediatePropagation(); $('#q').focus(); }   // '/' = search; chat opens from ASK

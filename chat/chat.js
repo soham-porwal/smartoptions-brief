@@ -39,11 +39,20 @@
     if (!MODELS.some(m => m.id === value.model)) return null;
     return {url: u.href, expires_at: value.expires_at, model: value.model};
   }
-  function activeDemo() { return validateDemoConfig(demoService && Object.assign({enabled: true}, demoService)); }
+  // Brief: shared assistant relay from data/config.json chat_proxy_url (https only, no key in the browser)
+  let proxyService = null;
+  function useProxy(p) {
+    let u = null;
+    try { u = p && p.url ? new URL(p.url) : null; } catch (e) { u = null; }
+    proxyService = u && u.protocol === 'https:' && !u.username && !u.password ? {url: u.href, model: p.model && MODELS.some(m => m.id === p.model) ? p.model : MODELS[0].id, proxy: true} : null;
+    return proxyService;
+  }
+  function activeDemo() { return proxyService || validateDemoConfig(demoService && Object.assign({enabled: true}, demoService)); }
   function isAllowedUrl(url, origin, demo) {
     let u;
     try { u = new URL(url, origin || 'http://same.origin.invalid/'); } catch (e) { return false; }
     if (u.origin === API_ORIGIN) return u.pathname === '/v1/messages';
+    if (proxyService && u.href === proxyService.url) return true;
     if (demo && validateDemoConfig(Object.assign({enabled: true}, demo)) && u.href === demo.url) return true;
     const own = origin ? new URL(origin).origin : 'http://same.origin.invalid';
     return u.origin === own;
@@ -925,7 +934,7 @@
   return {
     version: '1', API_URL, MODELS, MAX_TOOL_ROUNDS, TOOL_SCHEMAS, SUGGESTED,
     adapt, loadData, isAllowedUrl, validateDemoConfig, safeFetch, CiteRegistry, newConversation, runTool, systemPrompt,
-    citationCheck, figuresIn, ask, renderMarkdown, renderSources, renderWarning, mount,
+    citationCheck, figuresIn, ask, renderMarkdown, renderSources, renderWarning, mount, useProxy,
     tools: DATA_TOOLS, uiTools: Object.keys(UI_TOOLS),
   };
 });
