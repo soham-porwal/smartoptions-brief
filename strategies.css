@@ -1,0 +1,65 @@
+/* SmartOptions V2 - Strategy engine panel (lane R7). Uses the app theme variables from app.css. */
+.st { font-size: 12px; color: var(--fg); }
+.st .dim { color: var(--fg3); }
+.st h4 { margin: 10px 0 4px; font-size: 13px; }
+.st-head { margin: 4px 0 6px; }
+.st-warn { background: var(--bg3); border-left: 3px solid var(--warn); padding: 4px 8px; margin: 4px 0; color: var(--fg2); }
+.st-form { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 6px 0; }
+.st-form select, .st-form input { background: var(--bg3); color: var(--fg); border: 1px solid var(--line); border-radius: 3px; font: inherit; }
+.st-form input { width: 60px; }
+.st-btn { background: var(--bg3); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; cursor: pointer; font: inherit; }
+.st-btn:hover { border-color: var(--acc); }
+.st-ins { display: flex; flex-wrap: wrap; gap: 3px 10px; margin: 4px 0 6px; color: var(--fg2); }
+.st-in { cursor: help; }
+.st-rules { margin: 4px 0 4px 18px; padding: 0; color: var(--fg2); }
+.st-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px; }
+.st-card { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--bg2); }
+.st-sel { border-color: var(--acc); }
+.st-ch { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+.st-fam { color: var(--fg3); font-size: 11px; }
+.st-score { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--acc); }
+.st-plain { color: var(--fg2); margin: 3px 0; }
+.st-parts { display: flex; flex-wrap: wrap; gap: 3px; margin: 3px 0; }
+.st-pt { border: 1px solid var(--line); border-radius: 9px; padding: 0 6px; font-size: 11px; cursor: help; white-space: nowrap; }
+.st-pt.up { color: var(--up); border-color: currentColor; }
+.st-pt.dn { color: var(--dn); border-color: currentColor; }
+.st-flip { font-size: 11px; }
+.st-more summary, .st-why summary { cursor: pointer; color: var(--fg2); }
+.st-more div { margin: 2px 0; color: var(--fg2); }
+.st-why ul { margin: 4px 0 4px 18px; padding: 0; color: var(--fg2); }
+.st-cmp { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; }
+.st-cmpg { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.st-svg { width: 100%; height: auto; display: block; margin: 4px 0; }
+.st-em { fill: var(--acc); opacity: .10; }
+.st-zero { stroke: var(--fg3); stroke-width: 1; }
+.st-spot { stroke: var(--fg2); stroke-dasharray: 3 3; }
+.st-ax { fill: var(--fg3); font-size: 9px; }
+.st-cap { font-size: 11px; }
+.st-kv { border-collapse: collapse; width: 100%; }
+.st-kv td { text-align: left; border-bottom: 1px solid var(--line); padding: 2px 4px; vertical-align: top; }
+.st-kv td:first-child { color: var(--fg3); white-space: nowrap; }
+.st-na { color: var(--fg3); padding: 4px 0; }
+.st-hint { margin: 6px 0; }
+@media (max-width: 600px) { .st-list { grid-template-columns: 1fr; } }
+.r7-tabs { display: flex; gap: 2px; margin: 6px 0; border-bottom: 1px solid var(--line); }
+.r7-tabs button { background: transparent; color: var(--fg2); border: 0; border-bottom: 2px solid transparent; padding: 4px 10px; cursor: pointer; font: inherit; }
+.r7-tabs button.on { color: var(--fg); border-bottom-color: var(--acc); }
+.r7-box { padding-top: 2px; }
+.st-flow { margin: 4px 0; color: var(--fg2); }
+.r7-tabs .r7-exp { margin-left: auto; font-size: 11px; }
+.r7-box.r7-wide { position: fixed; inset: 56px 24px 24px 24px; z-index: 60; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; overflow: auto; box-shadow: 0 8px 40px rgba(0,0,0,.5); }
+.r7-box.r7-wide .tc-svg { max-width: 1000px; }
+@container (max-width: 560px) { .st-list, .st-cmpg { grid-template-columns: 1fr; } }
+.st-q { font-size: 11px; color: var(--fg2); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.st-svg { max-width: 720px; }
+.st-kv td { overflow-wrap: anywhere; }
+.st-kv { table-layout: fixed; }
+.st-kv td { white-space: normal; word-break: normal; }
+.st-kv td:first-child { width: 36%; white-space: normal; }
+.st-cmpg > div { min-width: 0; }
+.st-method, .st-rank-why { white-space: normal; overflow-wrap: anywhere; margin: 5px 0; color: var(--fg2); }
+.st-method summary, .st-rank-why summary { cursor: pointer; color: var(--fg); }
+.st-rank-why ul { padding-left: 18px; }
+#detail:has(> .r7-tabs) { overflow-y: auto; min-height: 0; }
+.r7-box.r7-wide { max-height: calc(100dvh - 80px); overscroll-behavior: contain; padding-bottom: 30px; }
+@media (max-width: 600px) { .r7-box.r7-wide { inset: 44px 4px 4px 4px; padding: 8px; } }

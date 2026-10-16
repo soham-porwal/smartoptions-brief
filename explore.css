@@ -1,0 +1,15 @@
+.ex-explore{flex:none;border-top:1px solid var(--line);font-size:11px;min-width:0;color:var(--fg2)}
+.ex-explore summary{padding:9px 10px;cursor:pointer;color:var(--fg);font-weight:600}
+.ex-body{padding:0 10px 10px;max-height:250px;overflow:auto}
+.ex-body p{margin:7px 0;line-height:1.45}
+.ex-point{color:var(--fg);padding-bottom:7px;font-variant-numeric:tabular-nums}
+.ex-form,.ex-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ex-form label{display:flex;gap:6px;align-items:center;flex:1;min-width:180px}
+.ex-form input{width:100%;min-width:0;max-width:230px}
+.ex-body button{padding:4px 6px;font-size:11px;white-space:nowrap}
+.ex-body button:focus-visible,.ex-explore summary:focus-visible{outline:2px solid #6ea8fe;outline-offset:2px}
+.ex-results{overflow-x:auto}.ex-results table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.ex-results th,.ex-results td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.ex-results th:first-child,.ex-results td:first-child{text-align:left}
+.ex-source{color:var(--fg2)}.ex-source a{color:#6ea8fe}.ex-error{color:var(--warn)}
+@media(max-width:820px){.ex-body{max-height:340px}.ex-form input{max-width:none}}

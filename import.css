@@ -1,0 +1,14 @@
+/* R5 import sheet + full-window drop zone. Local-only data; restrained styling to match the app. */
+#imp-sheet{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding-top:9vh}
+#imp-sheet[hidden],#imp-zone[hidden],#imp-toast[hidden]{display:none}
+.imp-card{width:min(560px,94vw);max-height:80vh;overflow:auto;background:var(--bg2);border:1px solid var(--line);color:var(--fg);font-size:12px;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+.imp-hd{display:flex;align-items:baseline;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}.imp-hd b{font-size:14px}.imp-hd span{color:var(--fg2);font-size:10px}.imp-hd button{margin-left:auto;border:0;font-size:16px;padding:0 4px}
+#imp-body{padding:12px}
+.imp-drop{display:flex;flex-direction:column;gap:4px;border:1px dashed var(--fg3);padding:16px;text-align:center;cursor:pointer}.imp-drop span{color:var(--fg2);font-size:11px}.imp-drop input{margin:8px auto 0;font-size:11px;color:var(--fg2)}
+#imp-text{width:100%;box-sizing:border-box;margin-top:10px;background:var(--bg);border:1px solid var(--line);color:var(--fg);font:12px ui-monospace,Consolas,monospace;padding:6px;resize:vertical}
+.imp-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}.imp-actions button{padding:6px 10px}.imp-primary{border-color:var(--up)!important;color:var(--up)}
+.imp-note{color:var(--fg2);font-size:10px;margin:10px 0 0}
+.imp-file{font-size:10px;color:var(--fg2);text-transform:uppercase;letter-spacing:.5px}.imp-summary{font-size:13px;margin:6px 0 4px}.imp-reason{color:var(--fg2);font-size:11px;margin:0}
+.imp-prev{border-collapse:collapse;margin-top:10px;font-variant-numeric:tabular-nums;font-size:11px;width:100%}.imp-prev th{text-align:left;color:var(--fg2);font-weight:500;border-bottom:1px solid var(--line);padding:3px 6px}.imp-prev td{padding:2px 6px;border-bottom:1px solid var(--grid)}
+#imp-zone{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;pointer-events:none}#imp-zone div{border:2px dashed var(--fg2);padding:40px 60px;color:var(--fg);font-size:15px;background:var(--bg2)}
+#imp-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:65;background:var(--bg2);border:1px solid var(--line);padding:7px 10px;font-size:12px;display:flex;gap:10px;align-items:center;color:var(--fg)}#imp-toast button{padding:3px 8px}

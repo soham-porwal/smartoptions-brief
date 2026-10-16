@@ -1,0 +1,18 @@
+/* R8 model confidence box + why drawer */
+.cf-box { border: 1px solid rgba(128,128,128,.35); border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-size: 12px; }
+.cf-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cf-n { font-size: 18px; }
+.cf-d { font-size: 11px; text-transform: uppercase; opacity: .85; }
+.cf-bullish { color: #2fbf71; } .cf-bearish { color: #ff6b4a; } .cf-neutral { opacity: .7; }
+.cf-bar { display: flex; flex: 1 1 120px; min-width: 100px; height: 8px; gap: 2px; }
+.cf-seg { width: var(--w); background: rgba(128,128,128,.25); border-radius: 2px; overflow: hidden; }
+.cf-seg i { display: block; height: 100%; width: var(--f); background: #6ea8fe; }
+.cf-top button { font: inherit; font-size: 11px; padding: 2px 8px; background: transparent; color: inherit; border: 1px solid rgba(128,128,128,.4); border-radius: 4px; cursor: pointer; }
+.cf-lab { font-size: 10px; opacity: .6; margin-top: 2px; }
+.cf-why { margin-top: 6px; }
+.cf-h { margin-bottom: 4px; }
+.cf-c { margin: 4px 0; }
+.cf-c ul { margin: 2px 0 0 16px; padding: 0; }
+.cf-c li { margin: 1px 0; overflow-wrap: anywhere; }
+.cf-c small, .cf-rule { font-size: 10px; opacity: .6; }
+.cf-sam { margin-top: 6px; padding-top: 4px; border-top: 1px dashed rgba(128,128,128,.35); font-size: 11px; }
