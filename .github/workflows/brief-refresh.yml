@@ -1,0 +1,133 @@
+name: Refresh full Brief snapshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    # After the completed US cash session, with DST handled by source bar checks.
+    - cron: '45 22 * * 1-5'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Share the existing quote workflow lock to prevent stale snapshot commits or
+# overlapping Pages deployments. Quotes resume after the coordinated refresh.
+concurrency:
+  group: quotes-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.repository == 'soham-porwal/smartoptions-brief' || github.repository == 'samsej/sp500-screener-dashboard'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      PYTHONPATH: _pipeline
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Validate installed refresh runtime
+        shell: python
+        run: |
+          import pathlib, sys
+          required = ['_pipeline/requirements-refresh.txt', '_pipeline/smartoptions/refresh.py', '_pipeline/config/brief.yaml']
+          missing = [name for name in required if not pathlib.Path(name).is_file()]
+          if missing:
+              print('FAIL: refresh runtime not installed: ' + ', '.join(missing))
+              print('Run scripts/install_refresh_pipeline.py from the source checkout; see docs/FRESHNESS.md.')
+              sys.exit(1)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: _pipeline/requirements-refresh.txt
+      - name: Install bounded free-source runtime
+        run: python -m pip install -r _pipeline/requirements-refresh.txt
+      - uses: actions/cache/restore@v4
+        id: statements
+        if: github.repository == 'soham-porwal/smartoptions-brief'
+        with:
+          path: |
+            _pipeline/data/cache/brief
+            _pipeline/data/cache/capital
+          key: brief-statements-${{ github.repository_id }}-${{ github.run_id }}
+          restore-keys: brief-statements-${{ github.repository_id }}-
+      - name: Refresh coordinated snapshot
+        id: build
+        continue-on-error: true
+        run: |
+          if [ "$GITHUB_REPOSITORY" = 'soham-porwal/smartoptions-brief' ]; then
+            python -m smartoptions.refresh --data-root data --work-root _pipeline/out/refresh --cache-root _pipeline/data/cache/brief
+          else
+            python -m smartoptions.refresh --data-root data --work-root _pipeline/out/refresh --mirror-url https://soham-porwal.github.io/smartoptions-brief/data/snapshot.zip
+          fi
+      - name: Commit validated snapshot or visible failure receipt
+        run: |
+          git add -- data
+          if git diff --cached --quiet -- data; then
+            echo 'No snapshot or status change.'
+          else
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Refresh validated Brief snapshot and source dates' -- data
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+      - uses: actions/configure-pages@v5
+      - name: Prepare public tracked files only
+        shell: python
+        run: |
+          import pathlib, shutil, subprocess
+          root = pathlib.Path.cwd()
+          site = root / '_site'
+          site.mkdir(exist_ok=True)
+          for raw in subprocess.check_output(['git', 'ls-files', '-z']).split(b'\0'):
+              if not raw:
+                  continue
+              path = pathlib.Path(raw.decode())
+              if path.parts[0] in {'_pipeline', '.github', 'tests', 'logs', 'out'}:
+                  continue
+              if not (root / path).is_file():
+                  continue
+              dest = site / path
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(root / path, dest)
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        id: deployment
+      - name: Publish refresh receipt in run summary
+        if: always()
+        shell: python
+        run: |
+          import os, pathlib
+          receipt = pathlib.Path('data/refresh-status.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+              stream.write('### Full Brief refresh\n\n')
+              stream.write(receipt.read_text() if receipt.exists() else 'FAIL: no status receipt; inspect run logs; last snapshot retained.')
+      - uses: actions/cache/save@v4
+        if: always() && github.repository == 'soham-porwal/smartoptions-brief' && steps.statements.outputs.cache-hit != 'true'
+        with:
+          path: |
+            _pipeline/data/cache/brief
+            _pipeline/data/cache/capital
+          key: brief-statements-${{ github.repository_id }}-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-brief-refresh-${{ github.run_id }}
+          path: |
+            _pipeline/logs/
+            _pipeline/out/refresh/*/logs/
+            _pipeline/out/refresh/refresh-status.json
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Fail visibly when the last good dataset was retained
+        if: steps.build.outcome == 'failure'
+        run: exit 1
