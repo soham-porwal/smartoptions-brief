@@ -309,6 +309,11 @@
     L.watch('index', ['SPY', 'RSP']);
     L.watch('shortlist', r.view === 'brief' ? (ST.brief && ST.brief.shortlist || []).map(x => x.t) : []);
     L.watch('watchlist', r.view === 'brief' || r.view === 'company' ? [...watchSet()].slice(0, 12) : []);
+    if (r.view !== 'research') { L.watch('research', []); L.watch('table', []); }   // Research owners stop polling when it closes
+    else if (root.SO2 && root.SO2.V && root.SO2.filtered) {
+      const sel = root.SO2.V.sel; L.watch('research', sel && sel.kind === 't' ? [sel.id] : []);
+      try { L.watch('table', root.SO2.filtered().slice(0, 12).map(x => x.t)); } catch (e) { console.warn('[brief] research rows not watched', e); }
+    }
   }
   function startLive() {
     const L = live();
@@ -397,15 +402,17 @@
     const lh = L ? L.health(nowMs) : null;
     if (lh) {
       const f = lh.feed, w = lh.worker;
-      rows.push({label: 'Prices on this screen', asof: f.words.replace(/^[^,]*, /, ''), status: f.word === 'live' ? 'live' : f.word,
+      rows.push({label: 'Prices on this screen (' + (lh.coverage ? lh.coverage.watched : 0) + ' names)', asof: f.words.replace(/^[^,]*, /, ''), status: f.word === 'live' ? 'live' : f.word,
         cadence: w.enabled ? 'Every 20 seconds in market hours' : 'Shared file, checked every minute',
         provider: (f.providers || []).join('; ') || 'Not available',
         note: (w.enabled ? 'Fast path: ' + w.reason + '.' : w.reason + '.') + (w.error ? ' ' + w.error : '') + (f.missing ? ' ' + f.missing + ' of ' + f.of + ' names have no price.' : '') +
           (Object.keys(w.errors || {}).length ? ' ' + Object.entries(w.errors).slice(0, 3).map(([t, e]) => t + ': ' + e).join('; ') + '.' : '')});
       const fh = lh.fileHealth;
-      if (fh || lh.file.error) rows.push({label: 'All S&P prices (shared file)', asof: L.snapshot().generated_at ? fmtAsof(L.snapshot().generated_at) : '',
-        status: lh.file.error ? 'stale' : L.feedSummary(L.snapshot().quotes, null, nowMs).word, cadence: 'About every 8 minutes in market hours',
-        provider: fh && fh.provider_mix ? Object.keys(fh.provider_mix).filter(k => k !== 'missing').join('; ') : 'Not available', note: lh.file.error || (fh && fh.line) || ''});
+      const cv = lh.coverage || {};
+      if (fh || lh.file.error) rows.push({label: 'Other prices (shared file, ' + (cv.others || 0) + ' names)', asof: cv.others_asof ? 'Most ' + cv.others_label : '',
+        status: lh.file.error ? 'stale' : cv.others_word || 'missing', cadence: 'Scheduled about every 8 minutes in market hours; GitHub can delay runs',
+        provider: fh && fh.provider_mix ? Object.keys(fh.provider_mix).filter(k => k !== 'missing').join('; ') : 'Not available',
+        note: lh.file.error || ['Each row keeps its own time; a name refreshes when it is on screen.', fh && fh.line, L.snapshot().generated_at ? 'File built ' + fmtAsof(L.snapshot().generated_at) + '.' : ''].filter(Boolean).join(' ')});
     } else rows.push({label: 'Prices', status: 'missing', note: ST.quoteErr || 'Price engine not available.'});
     const groups = {};
     (h.sources || []).filter(s => s.id !== 'quotes' && s.id !== 'sam').forEach(s => {
@@ -427,6 +434,11 @@
       : {label: 'Scheduled refresh', status: 'missing', cadence: 'Daily', provider: 'Refresh receipt', note: ST.receiptErr || 'Not available.'});
     return rows;
   }
+  // other prices (not polled) differ in freshness from the on-screen set
+  function priceScope(lh) {
+    const c = lh && lh.coverage, f = lh && lh.feed;
+    return c && f && f.word !== 'missing' && c.others && c.others_asof && c.others_word !== f.word ? c : null;
+  }
   function pillState(nowMs) {
     const rows = healthRows(nowMs);
     const word = rows.reduce((w, r) => ((RANK[r.status] ?? 3) > (RANK[w] ?? 3) ? r.status : w), 'fresh');
@@ -436,12 +448,15 @@
   function renderPill() {
     const el = doc.getElementById('bv-pill'); if (!el) return;
     const now = Date.now(), L = live();
-    const st = pillState(now), f = L ? L.health(now).feed : null;
-    const lead = f ? f.words : 'Prices not available';
+    const lh = L ? L.health(now) : null, st = pillState(now), f = lh ? lh.feed : null, sc = priceScope(lh);
+    // a live subset must not read as the whole universe: name the on-screen scope and date the rest
+    const lead = f ? (sc ? f.words.replace(', as of', ' on screen, as of') + ' · others ' + sc.others_label : f.words) : 'Prices not available';
     const worst = st.word, others = st.rows.slice(1).filter(r => (RANK[r.status] ?? 3) >= 2);
     el.querySelector('.bv-pill-t').textContent = lead + (others.length ? ' · ' + others.length + (others.length === 1 ? ' dataset needs attention' : ' datasets need attention') : '');
-    const when = lead.replace(/^[^,]*, as of /, '').replace(/ ET$/, '');
-    el.querySelector('.bv-pill-s').textContent = f ? (PILL_WORD[f.word] || f.word) + (f.word === 'missing' ? '' : ' ' + (when.includes(',') ? when.split(',')[0] : when)) : 'Prices n/a';
+    const when = f ? f.words.replace(/^[^,]*, as of /, '').replace(/ ET$/, '') : '';
+    const restWhen = sc ? sc.others_label.replace(/^as of /, '').replace(/ ET$/, '').split(',')[0] : '';
+    el.querySelector('.bv-pill-s').textContent = !f ? 'Prices n/a' : sc ? (PILL_WORD[f.word] || f.word) + ' here · rest ' + restWhen :
+      (PILL_WORD[f.word] || f.word) + (f.word === 'missing' ? '' : ' ' + (when.includes(',') ? when.split(',')[0] : when));
     el.dataset.st = ['live', 'fresh', 'closed'].includes(worst) ? 'good' : worst === 'delayed' ? 'mixed' : 'bad';
     el.dataset.fresh = f ? f.word : 'missing';
     el.title = 'Data health: ' + lead + '. Show details.';
@@ -507,6 +522,7 @@
       if (!r.legacy) { try { root.history.replaceState(null, '', legacyHash(r)); } catch (e) { /* file:// may refuse; Edge reads the tab below */ } }
       if (!fromLoad && r.tab) openEdgeTab(r.tab);
       doc.title = 'Research | SmartOptions Brief';
+      watchOnScreen();
       return;
     }
     const view = doc.getElementById('bv-view');

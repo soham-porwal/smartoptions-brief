@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261016-r2",
-  "built_at": "2026-10-16T15:35:41.975100+00:00",
-  "source_base": "515e03e5b8f3e8841649daef0713e1d58794537c",
+  "release_id": "brief-client-20261016-r3",
+  "built_at": "2026-10-16T17:09:39.195072+00:00",
+  "source_base": "df233230feace6c9f9af1a808208eedb005d83dd",
   "ui_assets": {
     "about.js": {
       "sha256": "367867c42efae1fd57d519675f4f4f6521bb69d52d5e2625bd6e32ee053e7be5",
@@ -12,16 +12,16 @@
       "bytes": 11449
     },
     "app.js": {
-      "sha256": "65ad18b1e0a05a0519517f5edd6f0bcbc33f591466d748ff5347c976d576af97",
-      "bytes": 55844
+      "sha256": "bcf5fee48964af29870cf0b6ea5d199ed278283e8e71fe1b98f79b87a7c4f220",
+      "bytes": 56280
     },
     "brief.css": {
       "sha256": "58ce68098f4eb3ccb578ffa7ab85488880fc3e476a9f09a4badb8a2d7dc75a60",
       "bytes": 32488
     },
     "brief.js": {
-      "sha256": "5e83548c54788a8f3ae1da347468f37e63e406088351d7fb0ebe7ade241dede4",
-      "bytes": 77810
+      "sha256": "048cc7e8279d5792736b050d2ec590e75118f675125f0da6a5c609d31c5fd9ae",
+      "bytes": 79268
     },
     "chat-popup.css": {
       "sha256": "4e1618d9c6933a29420fcabe93f731cd2372e03512b36346b1029fd9a1fc7911",
@@ -120,7 +120,7 @@
       "bytes": 22208
     },
     "index.html": {
-      "sha256": "74742d3d9b4c4c4efa326f9c374119cac51d3aa15036b9b087ae98445bed67be",
+      "sha256": "99d753156a9b22faa167b29f9fcf438852e2d040aca4557660b9789a3db598d1",
       "bytes": 5839
     },
     "intelligence.css": {
@@ -136,8 +136,8 @@
       "bytes": 4572
     },
     "live.js": {
-      "sha256": "136ec5493ba942e51f28bc86461df81214fa4e0437d6a6e2044a0e9dcfea1963",
-      "bytes": 17635
+      "sha256": "dd69b1a9677a1f4246757b06b5a07039e0697437f31087e8eed6c333ce141b88",
+      "bytes": 18475
     },
     "macro.js": {
       "sha256": "ef630bc6efc0d92d1e5a9e11b217e283f5344af3c03108bcd9ecfdbaf8b7418f",
@@ -254,6 +254,10 @@
     "vendor/lightweight-charts.standalone.production.js": {
       "sha256": "46fc69534ec098f095bbcd1d9a26d693d39a8b9eeff7343536765b3dd28c2bdf",
       "bytes": 163551
+    },
+    "release.json": {
+      "sha256": "b69e61ce1ce33153bcd108af5fbcb1bf7e54b3761ea88049c93e5ca4e614735e",
+      "bytes": 1891
     }
   },
   "data_at_publication": {

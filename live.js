@@ -271,14 +271,26 @@
     });
     paintHealth();
   }
+  // Prices not on screen are not polled: describe them by their median observation, never by the live subset.
+  function coverage(quotes, watched, nowMs) {
+    const set = new Set(watched || []);
+    const rest = Object.entries(quotes || {}).filter(([t, q]) => !set.has(t) && q && isNum(q.price) && q.price > 0 && obsMs(q) != null)
+      .map(([, q]) => q).sort((a, b) => obsMs(a) - obsMs(b));
+    const mid = rest.length ? rest[Math.floor(rest.length / 2)] : null;
+    const c = mid ? classify(mid, nowMs) : null;
+    return {watched: set.size, others: rest.length, others_asof: mid ? (mid.asof_utc || mid.ts) : null, others_word: c ? c.word : 'missing',
+      others_label: mid ? etLabel(mid.asof_utc || mid.ts, nowMs) : 'time not available'};
+  }
   function health(nowMs) {
     nowMs = nowMs == null ? now() : nowMs;
-    const feed = feedSummary(ST.quotes, onScreen().length ? onScreen() : null, nowMs);
-    return {feed, worker: Object.assign({}, ST.worker), file: Object.assign({}, ST.fileState), fileHealth: ST.file && ST.file.health || null};
+    const watched = onScreen();
+    const feed = feedSummary(ST.quotes, watched.length ? watched : null, nowMs);
+    return {feed, coverage: coverage(ST.quotes, watched, nowMs), worker: Object.assign({}, ST.worker), file: Object.assign({}, ST.fileState),
+      fileHealth: ST.file && ST.file.health || null};
   }
   function paintHealth() { if (root.CustomEvent && root.dispatchEvent) root.dispatchEvent(new root.CustomEvent('so:live-health', {detail: health()})); }
 
-  return {start, configure, watch, subscribe, get, snapshot, health, paint, accept, loadFile, pollWorker, onScreen,
+  return {start, configure, watch, subscribe, get, snapshot, health, coverage, paint, accept, loadFile, pollWorker, onScreen,
     marketClock, classify, etLabel, merge, batches, derive, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH,
     _state: ST};
 });

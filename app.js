@@ -303,7 +303,11 @@ function renderTable() {
   $('#tbody').innerHTML = rows.map(r => `<tr data-t="${esc(r.t)}"${r.t === selT ? ' class="sel"' : ''}>${activeCols().map(c => cell(r, c)).join('')}</tr>`).join('');
   const sc = scenOn() ? ' · scenario on: ' + FACTORS.filter(f => S.shock[f]).map(f => `${FLABEL[f]} ${S.shock[f] > 0 ? '+' : ''}${S.shock[f]}${SHOCK_U[f]}`).join(', ') + ' (historical association, not a forecast)' : '';
   const sk = V.sort.k.startsWith('c:') ? ` · sorted by ${FLABEL[V.sort.k.slice(2)]} coef` : '';
-  if (window.SmartOptionsLive) window.SmartOptionsLive.paint(document.getElementById('tbody'));
+  if (window.SmartOptionsLive) {
+    // budget: only the top rows of the current sort are polled; the rest keep their file quote and its own time
+    if (document.body.classList.contains('bv-research')) window.SmartOptionsLive.watch('table', rows.slice(0, 12).map(r => r.t));
+    window.SmartOptionsLive.paint(document.getElementById('tbody'));
+  }
   $('#tmeta').innerHTML = `<span>${rows.length} of ${D.rows.length}${V.sector ? ' · ' + esc(V.sector) : ''}${sk}${sc}</span><span>Historical scores are optional in Settings</span>`;
 }
 
@@ -595,6 +599,7 @@ function select(kind, id, noHash) {
   if (kind === 't') { const tr = document.querySelector(`#tbody tr[data-t="${CSS.escape(id)}"]`); if (tr) tr.classList.add('sel'); }
   renderTape();
   drawChart(); renderDetail();
+  if (window.SmartOptionsLive && kind === 't' && document.body.classList.contains('bv-research')) window.SmartOptionsLive.watch('research', [id]);   // an opened name refreshes first
   if (!noHash) writeHash();
 }
 function step(dir) {
