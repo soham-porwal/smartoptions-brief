@@ -454,8 +454,8 @@
     const worst = st.word, others = st.rows.slice(1).filter(r => (RANK[r.status] ?? 3) >= 2);
     el.querySelector('.bv-pill-t').textContent = lead + (others.length ? ' · ' + others.length + (others.length === 1 ? ' dataset needs attention' : ' datasets need attention') : '');
     const when = f ? f.words.replace(/^[^,]*, as of /, '').replace(/ ET$/, '') : '';
-    const restWhen = sc ? sc.others_label.replace(/^as of /, '').replace(/ ET$/, '').split(',')[0] : '';
-    el.querySelector('.bv-pill-s').textContent = !f ? 'Prices n/a' : sc ? (PILL_WORD[f.word] || f.word) + ' here · rest ' + restWhen :
+    const restWhen = sc ? sc.others_label.replace(/^as of /, '').replace(/ ET$/, '').split(',')[0].replace(/ [AP]M$/, '') : '';
+    el.querySelector('.bv-pill-s').textContent = !f ? 'Prices n/a' : sc ? (PILL_WORD[f.word] || f.word) + ' here' + String.fromCharCode(10) + 'rest ' + restWhen :
       (PILL_WORD[f.word] || f.word) + (f.word === 'missing' ? '' : ' ' + (when.includes(',') ? when.split(',')[0] : when));
     el.dataset.st = ['live', 'fresh', 'closed'].includes(worst) ? 'good' : worst === 'delayed' ? 'mixed' : 'bad';
     el.dataset.fresh = f ? f.word : 'missing';

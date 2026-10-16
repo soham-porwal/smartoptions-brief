@@ -261,7 +261,7 @@ body.bv-research .bv-hdr { position: relative; }
 .b-name-ft .b-flip { min-height: 36px; }
 .bv-ht td:nth-child(2), .bv-ht td:nth-child(3) { white-space: nowrap; }
 .bv-ht td:last-child { min-width: 220px; color: var(--b-ink-2); }
-.bv-pill-s { display: none; white-space: nowrap; }
+.bv-pill-s { display: none; white-space: pre-line; overflow: hidden; min-width: 0; line-height: 1.15; text-align: left; }   /* two short lines: on-screen word, dated rest */
 @media (max-width: 560px) {
   .bv-hdr-in { flex-wrap: wrap; }
   .bv-pill .bv-pill-t { display: none; }

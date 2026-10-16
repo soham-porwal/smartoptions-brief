@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261016-r4",
+  "release_id": "brief-client-20261016-r5",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-16T17:45:00+00:00",
-  "source_commit": "1089f45",
+  "built_at": "2026-10-16T18:00:00+00:00",
+  "source_commit": "c9d9b92",
   "data_session": "2026-10-15",
   "tickers": 509,
   "current_constituents": 503,
@@ -17,13 +17,13 @@
       "passed": 1005,
       "failed": 0,
       "receipt": "claude-final-python.txt",
-      "run_at": "2026-10-16, source 1089f45"
+      "run_at": "2026-10-16, source c9d9b92"
     },
     "javascript_chat_worker": {
       "passed": 345,
       "failed": 0,
       "receipt": "claude-final-js.txt",
-      "run_at": "2026-10-16, source 1089f45"
+      "run_at": "2026-10-16, source c9d9b92"
     },
     "evidence_dir": "Data/Logs/brief-client-recovery-20261016 (private)"
   },
