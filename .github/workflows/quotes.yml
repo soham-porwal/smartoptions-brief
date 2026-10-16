@@ -49,7 +49,7 @@ jobs:
           FULL_SWEEP: ${{ inputs.full_sweep }}
         run: |
           mkdir -p logs
-          if [ "$GITHUB_REPOSITORY" = 'samsej/sp500-screener-dashboard' ]; then
+          if [ "$GITHUB_REPOSITORY" != 'soham-porwal/smartoptions-brief' ]; then
             python scripts/gh_quotes_refresh.py --out data/quotes.json --mirror-url https://soham-porwal.github.io/smartoptions-brief/data/quotes.json > logs/refresh.txt 2>&1
           elif [ "$FULL_SWEEP" = 'true' ]; then
             cp data/quotes.json logs/previous-quotes.json
