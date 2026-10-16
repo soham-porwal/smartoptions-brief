@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261016-r3",
+  "release_id": "brief-client-20261016-r4",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-16T17:30:00+00:00",
-  "source_commit": "df23323",
+  "built_at": "2026-10-16T17:45:00+00:00",
+  "source_commit": "1089f45",
   "data_session": "2026-10-15",
   "tickers": 509,
   "current_constituents": 503,
@@ -11,18 +11,19 @@
   "default_view": "brief",
   "chat": "deterministic dashboard facts and confirmed actions; optional verified rephrasing",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
-  "price_feed": "On-screen names: Finnhub real-time quotes through the shared Worker, polled about every 20 seconds in market hours. Other names: shared quote file (Finnhub, Alpaca IEX, then delayed Yahoo per quote), scheduled about every 8 minutes in market hours; GitHub can delay scheduled runs. Every price shows its own observation time.",
+  "price_feed": "On-screen names: Finnhub real-time quotes through the shared Worker, polled about every 20 seconds in market hours. Other names: shared quote file (Finnhub, Alpaca IEX, then delayed Yahoo per quote), scheduled about every 8 minutes in market hours; GitHub can delay scheduled runs. The header names the on-screen scope and dates the other prices; every price shows its own observation time. The client site mirrors the preview quote file on its own schedule.",
   "verification": {
     "python": {
       "passed": 1005,
       "failed": 0,
       "receipt": "claude-final-python.txt",
-      "run_at": "2026-10-16 (source d043a60 + df23323 changes)"
+      "run_at": "2026-10-16, source 1089f45"
     },
     "javascript_chat_worker": {
       "passed": 345,
       "failed": 0,
-      "receipt": "claude-final-js.txt"
+      "receipt": "claude-final-js.txt",
+      "run_at": "2026-10-16, source 1089f45"
     },
     "evidence_dir": "Data/Logs/brief-client-recovery-20261016 (private)"
   },

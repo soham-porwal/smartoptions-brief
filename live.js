@@ -141,6 +141,7 @@
   }
   function watch(owner, tickers) {
     ST.owners[owner] = [...new Set((tickers || []).map(t => String(t).toUpperCase()))];
+    if (doc) paintHealth();   // the header's on-screen/other scope changes with the watched set
     if (ST.started) schedule(true);
   }
   function subscribe(fn) { ST.subs.add(fn); return () => ST.subs.delete(fn); }

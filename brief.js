@@ -434,10 +434,10 @@
       : {label: 'Scheduled refresh', status: 'missing', cadence: 'Daily', provider: 'Refresh receipt', note: ST.receiptErr || 'Not available.'});
     return rows;
   }
-  // other prices (not polled) differ in freshness from the on-screen set
+  // whenever unpolled prices exist, the pill states both scopes: on-screen quotes and the dated rest
   function priceScope(lh) {
     const c = lh && lh.coverage, f = lh && lh.feed;
-    return c && f && f.word !== 'missing' && c.others && c.others_asof && c.others_word !== f.word ? c : null;
+    return c && f && f.word !== 'missing' && c.others && c.others_asof ? c : null;
   }
   function pillState(nowMs) {
     const rows = healthRows(nowMs);
