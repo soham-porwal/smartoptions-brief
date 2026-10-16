@@ -49,7 +49,7 @@ window.SO2_controls = function (el) {
     <h3>Screen</h3><p>Empty = off. Rows missing a screened field are excluded while that screen is on.</p>
     ${SCREEN.map(scrRow).join('')}
     <div class="ctl"><label><input type="checkbox" id="hideMissing" ${S.hideMissing ? 'checked' : ''}> Hide rows missing P/E, PEG or regression</label></div>
-    <h3>Regime tiers</h3><p>Historical regime thresholds: 30 / 50 / 70 / 85 (display only; his tier labels come from his code).</p>
+    <h3>Regime tiers</h3><p>Historical regime thresholds: 30 / 50 / 70 / 85 (historical reference labels).</p>
     <p><button data-reset>Reset scenario + screen</button></p>`;
   el.oninput = e => {
     const t = e.target;

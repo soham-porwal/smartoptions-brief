@@ -289,7 +289,7 @@
   H.ticker_summary = (e, ctx) => {
     const t = e.tickers[0], c = company(t, ctx); if (!c) return notCovered('ticker_summary', t, ctx);
     const P = new Pack(), q = quoteFact(P, t, ctx);
-    if (q) P.line(who(t, ctx) + ' last traded at ' + P.facts.find(f => f.id === q.p).display + (q.c ? ', ' + P.facts.find(f => f.id === q.c).display + ' on the day' : '') + ' (' + q.fresh + ').', [q.p, q.c]);
+    if (q) P.line(who(t, ctx) + ' last traded at ' + P.facts.find(f => f.id === q.p).display + (q.c ? ', ' + P.facts.find(f => f.id === q.c).display + ' on the day' : '') + '.', [q.p, q.c]);
     const g = c.cards && c.cards.growth;
     P.line(c.summary || (g && g.line) || 'No summary line in the company file.', g ? P.addAll(g.metrics, 2, {ticker: t}) : []);
     const by = {strong: [], ok: [], weak: [], unavailable: []};
@@ -341,7 +341,6 @@
     if (!q) return NA('price', who(t, ctx), 'No price for ' + who(t, ctx) + ' is in the quote file or the core build.');
     const pf = P.facts.find(f => f.id === q.p), cf = q.c && P.facts.find(f => f.id === q.c);
     P.line(who(t, ctx) + ': ' + pf.display + (cf ? ', ' + cf.display + ' versus the previous close' : '') + '.', [q.p, q.c]);
-    P.line('Freshness: ' + q.fresh + (pf.period ? ', price time ' + pf.period : '') + '. Source: ' + pf.source + '.', [q.p]);
     return P.out({intent: 'price', title: t + ' price', followups: [['technical', {tickers: [t]}], ['open_ticker', {tickers: [t]}]]});
   };
   H.earnings_date = (e, ctx) => {

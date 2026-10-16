@@ -101,10 +101,11 @@ function renderHeader() {
   const st = {};
   for (const k in D.macro) for (const o of D.macro[k]) st[o.status] = (st[o.status] || 0) + 1;
   const fr = `macro ${st.ok || 0} ok${st.stale ? ` · <span style="color:var(--warn)">${st.stale} stale</span>` : ''}${st.missing ? ` · ${st.missing} missing` : ''}${st.error ? ` · ${st.error} error` : ''}`;
-  $('#hstat').innerHTML = `Session ${esc(D.asof_session)} · updated ${etTime(ex)} ET · delayed · ${fr} · <span class="dim">Historical scores are optional in Settings</span>`;
+  $('#hstat').innerHTML = 'Research dashboard';
   $('#hstat').dataset.tip = `exported ${ex}\nmacro ${g.macro}\nequities ${g.equities}\nrelations ${g.relations}\ncrosscheck ${g.crosscheck}`;
 }
 function renderTape() {
+  $('#tape').hidden=true; return;
   const ids = Array.isArray(S.tapeIds) ? S.tapeIds : null;
   const items = ids ? ids.map(id => D.tape.find(x => x.id === id)).filter(Boolean) : D.tape;
   $('#tape').innerHTML = items.map(x => {
@@ -118,7 +119,7 @@ function renderTape() {
     const tip = `${x.label}: ${x.src || ''}\nas of ${x.date || 'n/a'} · status ${x.status || 'n/a'}`;
     const sel = V.sel.kind === 's' && V.sel.id === tapeSeries(x.id) ? ' sel' : '';
     return `<div class="ti${stale ? ' stale' : ''}${sel}" data-s="${esc(x.id)}" data-tip="${esc(tip)}">
-      <div class="l"><span>${esc(x.label)}</span>${stale ? '<span class="stale-tag">stale</span>' : ''}</div>
+      <div class="l"><span>${esc(x.label)}</span></div>
       <div class="v">${val}</div><small class="tape-observed">Observed ${esc(x.date || 'date unavailable')} · ${esc(x.src || 'provider unavailable')}</small><div class="c">${chg}${extra}</div>${spark(x.spark, 94, 18)}</div>`;
   }).join('');
 }
@@ -258,7 +259,7 @@ function cell(r, c) {
     case 'ern': return `<td class="ph" data-tip="${esc((r.er || '') + ' ' + (r.ert || '') + '\n' + (r.ers || ''))}">${isNum(r.ern) ? r.ern + 'd' : na(stReason(r, 'earnings', 'earnings date'))}</td>`;
     case 'iv': return `<td class="ph" data-tip="${esc(r.ivs ? `${r.ivs}\nexpiry ${r.ivx}, strike ${r.ivk}${r.ivspan ? '\nexpiry spans earnings' : ''}` : '')}">${isNum(r.iv) ? r.iv.toFixed(1) : na('ATM IV only fetched for movers + nearest-earnings names (status: ' + ((r.st || {}).atm_iv || 'not fetched') + ')')}</td>`;
     case 'opp': return `<td class="ph sam" data-tip="${esc(r.sam ? `Historical snapshot 2026-07-25 · quality ${r.sam.q || '-'} · risk ${r.sam.risk || '-'}
-flags ${r.sam.flags || '-'}${r.sam.risk === 'AVOID' ? '\nAVOID -> his composite is 0 by rule' : ''}` : '')}">${r.sam ? num(r.sam.opp, 1, 'no score in snapshot') : na("not in Historical 2026-07-25 snapshot")}</td>`;
+flags ${r.sam.flags || '-'}${r.sam.risk === 'AVOID' ? '\nAVOID -> historical composite is 0 by rule' : ''}` : '')}">${r.sam ? num(r.sam.opp, 1, 'no score in snapshot') : na("not in Historical 2026-07-25 snapshot")}</td>`;
     case 'b10': case 'boil': {
       const f = c.k === 'b10' ? 'us10y_bps' : 'wti';
       if (!r.rel) return `<td class="ph">${na('no regression (insufficient history)')}</td>`;
@@ -557,7 +558,7 @@ function samBlock(r, d) {
     bar = `<svg width="100%" viewBox="0 0 ${W} 12" preserveAspectRatio="none" style="height:12px">${segs.join('')}</svg>
       <div class="sub" style="padding:3px 0">${c.parts.map((p, i) => `<span style="color:${cols[i]}">■</span> ${p.k} ${p.score.toFixed(0)}`).join(' · ')}<br>base ${c.base_score == null ? (c.parts.reduce((a, p) => a + p.w * p.score, 0) / 100).toFixed(2) : c.base_score.toFixed(2)} x Q ${c.qmult} x R ${c.rmult} = ${c.derived} (published ${c.published})</div>`;
   } else if (c) bar = `<div class="sub">components not shown: could not reproduce published score from EXPLAIN</div>`;
-  return `<div class="blk"><div class="sech" data-tip="${esc("Historical own scores, read-only. SmartOptions snapshot " + (s.asof || '2026-07-25') + '. Component split uses his documented formula and is shown only when it reproduces his published number.')}">Historical score <span class="dim">Historical scores are optional in Settings</span></div>
+  return `<div class="blk"><div class="sech" data-tip="${esc("Historical own scores, read-only. SmartOptions snapshot " + (s.asof || '2026-07-25') + '. Component split uses the documented formula and is shown only when it reproduces the historical composite.')}">Historical score <span class="dim">Historical scores are optional in Settings</span></div>
     <div style="padding:0 12px">
     <div class="grid" style="grid-template-columns:repeat(4,1fr);border:0">${stat('Opp', num(s.opp, 1))}${stat('Quality', esc(s.q || '—'))}${stat('Trend', num(s.trend, 0))}${stat('Risk', esc(s.risk || '—'))}</div>
     ${bar}<div class="sub">flags: ${esc(s.flags || '—')} · snapshot price ${num(s.px, 2)}${r.sam_drift && isNum(r.sam_drift.px_pct) ? ` · <b>drift since 07-25: ${pct(r.sam_drift.px_pct, 1)} px${isNum(r.sam_drift.pef_chg) ? ', ' + (r.sam_drift.pef_chg > 0 ? '+' : '') + r.sam_drift.pef_chg.toFixed(1) + 'x fP/E' : ''}</b>` : ''}${r.sam_drift && (isNum(r.sam_drift.roe) || isNum(r.sam_drift.de)) ? `<br>retained quality inputs (07-25): ROE ${num(r.sam_drift.roe, 1)}% · D/E ${num(r.sam_drift.de, 2)} · Rev g ${num(r.sam_drift.rev_g, 1)}% · EPS g ${num(r.sam_drift.eps_g, 1)}%` : ''}</div></div></div>`;
@@ -706,11 +707,11 @@ async function boot() {
     COLS, DEFAULT_COLS, activeCols, PRESETS, OVERLAYS, renderTape, drawChart, setRange, writeHash, toggleDrawer, rowOf, setS: x => { S = x; }, chartObj: () => chart};
   wire();
   renderAll();
-  if (window.SmartOptionsLive) { window.SmartOptionsLive.paint(document); window.SmartOptionsLive.subscribe(() => { if(document.body.classList.contains('bv-research')) renderTable(); window.SmartOptionsLive.paint(document); }); }
+  if (window.SmartOptionsLive) { window.SmartOptionsLive.paint(document); let tableTimer=null;window.SmartOptionsLive.subscribe(() => { if(document.body.classList.contains('bv-research')&&!tableTimer)tableTimer=setTimeout(()=>{tableTimer=null;renderTable();},1000); window.SmartOptionsLive.paint(document); }); }
   const op = new URLSearchParams(location.hash.slice(1)).get('open');
   showTab(V.tab);
   if (op === 'controls' || op === 'about') toggleDrawer(op);
-  setInterval(refresh, 5 * 60 * 1000);
+  setInterval(refresh, 120000);
   document.addEventListener('visibilitychange', refresh);
   if (window.SO2_init) try { window.SO2_init(); } catch (e) { console.error("custom init failed", e); }
   window.SO2_ready = true;

@@ -32,7 +32,7 @@
     valCheap: 'Fwd P/E vs sector: cheap below x', valRich: 'Fwd P/E vs sector: rich above x', upsideMin: 'Analyst upside >= % (positive vote)',
     strongVotes: 'Name STRONG/WEAK needs |votes| >=', ivRich: 'IV/RV rich at/above', ivCheap: 'IV/RV not rich at/below',
     catalystDays: 'Earnings catalyst within days', dteDefault: 'Default horizon, days',
-    quarantineStaleSam: 'Quarantine stale (>30d) snapshot vote (1=yes, 0=no)', alpha20dMin: '20d factor residual alpha +/- %',
+    quarantineStaleSam: 'Exclude historical (>30d) reference vote (1=yes, 0=no)', alpha20dMin: '20d factor residual alpha +/- %',
   };
 
   /* ---------- pure math ---------- */
@@ -176,8 +176,8 @@
       const fpeTag = fin(drf.pef_chg) ? `, fP/E ${drf.pef_chg > 0 ? '+' : ''}${drf.pef_chg.toFixed(1)}x` : '';
       const qSub = [fin(drf.roe) ? `ROE ${drf.roe}%` : null, fin(drf.de) ? `D/E ${drf.de}` : null].filter(Boolean).join(', ');
       d.push({k: 'sam', label: 'Snapshot', vote: isQuarantined ? null : rawVote,
-        chip: `snap ${s.q || '?'} T${fin(s.trend) ? s.trend.toFixed(0) : '?'}${driftTag}${isQuarantined ? ' [stale]' : ''}`,
-        detail: `${s.label || 'SmartOptions snapshot'}: quality ${s.q || 'n/a'}${qSub ? ' (' + qSub + ')' : ''}, TrendScore ${fin(s.trend) ? s.trend : 'n/a'}, opp ${fin(s.opp) ? s.opp : 'n/a'}${driftTag}${fpeTag}; GREAT/GOOD AND trend >= 60 = +1, WEAK/AVOID = -1.${isQuarantined ? ' Quarantined from live vote (>30d old; toggle in Rules).' : ' Read-only, not recomputed; dated, may be stale.'}`, src: s.label || 'SmartOptions snapshot'});
+        chip: `snap ${s.q || '?'} T${fin(s.trend) ? s.trend.toFixed(0) : '?'}${driftTag}`,
+        detail: `${'Historical reference (2026-07-25)'}: quality ${s.q || 'n/a'}${qSub ? ' (' + qSub + ')' : ''}, TrendScore ${fin(s.trend) ? s.trend : 'n/a'}, opp ${fin(s.opp) ? s.opp : 'n/a'}${driftTag}${fpeTag}; GREAT/GOOD AND trend >= 60 = +1, WEAK/AVOID = -1.${isQuarantined ? ' Excluded from the current vote after 30 days.' : ' Historical reference, not recomputed.'}`, src: 'Historical reference (2026-07-25)'});
     } else d.push({k: 'sam', label: 'Snapshot', vote: null, chip: 'snap n/a', detail: 'not in SmartOptions snapshot', src: 'SmartOptions snapshot'});
     if (fin(r.res20d)) {
       const aTh = (R && fin(R.alpha20dMin)) ? R.alpha20dMin : 3.0;

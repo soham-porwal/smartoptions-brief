@@ -35,7 +35,7 @@
     if (error) reasons.unshift(error);
     if(state.receipt && state.receipt.status!=='ok') reasons.unshift('Latest refresh '+state.receipt.status+' at '+(state.receipt.attempted_at||'time unavailable')+'. '+(state.receipt.previous_snapshot_preserved?'Previous snapshot preserved. ':'')+(Array.isArray(state.receipt.reasons)?state.receipt.reasons.join(' '):''));
     if(state.receiptError) reasons.push('Latest refresh receipt unavailable. '+state.receiptError);
-    return s.state === 'degraded' || reasons.length ? `<p class="in-status" role="status">${esc(state.data && error ? 'Showing the last good relationship snapshot. ' : '')}${esc(reasons.join(' ') || 'Some relationship inputs are unavailable.')}</p>` : '';
+    return s.state === 'degraded' || reasons.length ? `<details class="in-source-details"><summary>Data &amp; sources</summary><p>${esc(state.data && error ? 'Showing the last good relationship snapshot. ' : '')}${esc(reasons.join(' ') || 'Some relationship inputs are unavailable.')}</p></details>` : '';
   }
   function evidenceHTML(items) {
     const xs = list(items);

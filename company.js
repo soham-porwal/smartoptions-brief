@@ -265,7 +265,7 @@ function statTiles(s, row) {
   const t = [];
   t.push({k: 'pe', label: 'P/E', value: isNum(s.pe) ? s.pe.toFixed(1) : 'Not available', sub: isNum(s.pef) ? `Forward ${s.pef.toFixed(1)}${isNum(s.pef_sec_med) ? ' · sector ' + s.pef_sec_med.toFixed(1) : ''}` : 'Forward not available',
     how: 'Snapshot trailing P/E times live price over snapshot close. Earnings per share stay at the last reported four quarters.',
-    inputs: [['Snapshot trailing P/E', isNum(row.pe) ? row.pe.toFixed(2) : 'Not available', row.pxd], ['Snapshot close', usd(row.px), row.pxd], ['Live price', usd(s.price), ''], ['Forward P/E, live', isNum(s.pef) ? s.pef.toFixed(2) : 'Not available', ''], ['Sector median forward P/E', isNum(s.pef_sec_med) ? s.pef_sec_med.toFixed(2) : 'Not available', row.pxd]],
+    inputs: [['Snapshot trailing P/E', isNum(row.pe) ? row.pe.toFixed(2) : 'Not available', row.pxd], ['Snapshot close', usd(row.px), row.pxd], ['Current price', usd(s.price), ''], ['Forward P/E', isNum(s.pef) ? s.pef.toFixed(2) : 'Not available', ''], ['Sector median forward P/E', isNum(s.pef_sec_med) ? s.pef_sec_med.toFixed(2) : 'Not available', row.pxd]],
     src: 'Yahoo Finance via yfinance (ratios); quote feed (price)'});
   t.push({k: 'peg', label: 'PEG', value: isNum(s.peg) ? s.peg.toFixed(2) : 'Not available', sub: isNum(s.peg) ? (s.peg < 1 ? 'Below 1: growth outpaces P/E' : s.peg > 2 ? 'Above 2: P/E outpaces growth' : 'Between 1 and 2') : 'Provider ratio missing',
     how: 'Provider trailing PEG ratio rescaled to the live price. PEG is P/E divided by expected earnings growth.',
@@ -275,7 +275,7 @@ function statTiles(s, row) {
     inputs: [['52-week low', usd(row.lo), row.pxd], ['52-week high', usd(row.hi), row.pxd], ['Position', isNum(s.range_pct) ? Math.round(s.range_pct) + '% of range' : 'Not available', '']], src: 'Yahoo Finance daily bars'});
   t.push({k: 'sma', label: 'vs 50 / 200-day', value: isNum(s.vs50) ? `${sgnPct(s.vs50)} / ${sgnPct(s.vs200)}` : 'Not available', tone: trendWord(s) === 'uptrend' ? 'good' : trendWord(s) === 'downtrend' ? 'bad' : 'mixed',
     sub: isNum(s.sma50) ? `${usd(s.sma50)} / ${isNum(s.sma200) ? usd(s.sma200) : 'n/a'}` : 'Price history not loaded', how: 'Distance of the live price from the simple averages of the last 50 and 200 daily closes.',
-    inputs: [['50-day average', usd(s.sma50), ''], ['200-day average', usd(s.sma200), ''], ['Live price', usd(s.price), '']], src: 'Daily closes, Yahoo Finance via yfinance'});
+    inputs: [['50-day average', usd(s.sma50), ''], ['200-day average', usd(s.sma200), ''], ['Current price', usd(s.price), '']], src: 'Daily closes, Yahoo Finance via yfinance'});
   t.push({k: 'sr', label: 'Support / resistance', value: isNum(s.to_support) || isNum(s.to_resistance) ? `${isNum(s.to_support) ? sgnPct(s.to_support) : 'n/a'} / ${isNum(s.to_resistance) ? sgnPct(s.to_resistance) : 'n/a'}` : 'Not available',
     sub: isNum(s.support) || isNum(s.resistance) ? `${isNum(s.support) ? usd(s.support) : 'none'} / ${isNum(s.resistance) ? usd(s.resistance) : 'none'}` : 'No level with enough touches', how: 'Price levels touched by the most swing highs and lows in the last 120 sessions; distance from the live price.',
     inputs: [['Support', usd(s.support), ''], ['Resistance', usd(s.resistance), '']], src: 'Rule-based reading of daily bars (patterns.js)'});
@@ -283,7 +283,7 @@ function statTiles(s, row) {
     how: 'Third-party analyst opinion, not dashboard advice. Date is the dataset observation date, not a verified rating publication date. A Buy rating with a target below the current quote conflicts; inspect both.', inputs: [['Rating', row.rating || 'Not available', row.pxd], ['Mean target', usd(row.tgt), row.pxd], ['Analysts', isNum(row.nan) ? String(row.nan) : 'Not available', row.pxd]], src: 'Yahoo Finance analyst consensus'});
   const big = v => !isNum(v) ? 'Not available' : v >= 1e12 ? '$' + (v / 1e12).toFixed(2) + 'T' : v >= 1e9 ? '$' + (v / 1e9).toFixed(1) + 'B' : '$' + (v / 1e6).toFixed(0) + 'M';
   t.push({k: 'mcap', label: 'Market value', value: big(s.mcap), sub: isNum(s.since_close) ? `${sgnPct(s.since_close, 2)} since the ${row.pxd || 'snapshot'} close` : '', tone: '',
-    how: 'Snapshot market capitalisation rescaled by live price over snapshot close (share count unchanged).', inputs: [['Snapshot market cap', big(row.mcap), row.pxd], ['Snapshot close', usd(row.px), row.pxd], ['Live price', usd(s.price), '']], src: 'Yahoo Finance via yfinance'});
+    how: 'Snapshot market capitalisation rescaled by current price over snapshot close (share count unchanged).', inputs: [['Snapshot market cap', big(row.mcap), row.pxd], ['Snapshot close', usd(row.px), row.pxd], ['Current price', usd(s.price), '']], src: 'Yahoo Finance via yfinance'});
   t.push({k: 'er', label: 'Next earnings', value: s.er ? new Date(s.er + 'T12:00:00Z').toLocaleDateString('en-US', {month: 'short', day: 'numeric', timeZone: 'UTC'}) : 'Not available',
     sub: isNum(s.er_days) ? (s.er_days > 0 ? `In ${s.er_days} days` : s.er_days === 0 ? 'Today' : `${-s.er_days} days ago`) + (row.ert ? ' · ' + row.ert : '') : 'Date not announced', tone: isNum(s.er_days) && s.er_days >= 0 && s.er_days <= 14 ? 'mixed' : '',
     how: 'Next expected report date. Dates can be estimates until the company confirms.', inputs: [['Next earnings', row.er || 'Not available', ''], ['Last earnings', row.ler || 'Not available', '']], src: row.ers || 'Yahoo get_earnings_dates'});
@@ -435,8 +435,7 @@ function mount(el, ticker, opts) {
     if (px) {
       px.innerHTML = `<b class="co-price">${isNum(price) ? usd(price) : 'Not available'}</b>
         ${isNum(chg) ? `<span class="co-chg ${chg >= 0 ? 'up' : 'dn'}">${sgnPct(chg, 2)}</span>` : ''}
-        <span class="b-chip sm t-${ftone} co-fresh" title="${esc(fr.text)}">${ICON[ftone]}${esc(cap1(fr.label))}</span>
-        <span class="co-src">${q ? esc(fmtET(q.asof_utc || q.ts)) + ' · ' + esc(shortProvider(q.provider)) + (q.cached ? ' · cached' : '') + (q.checked_at||q.retrieved_at ? ' · source checked '+esc(q.checked_at||q.retrieved_at) : '') + (q.current_usable===false?' · Last reported '+usd(q.price)+'; current price unavailable':'') : row.pxd ? 'Close of ' + esc(row.pxd) + ' · Yahoo Finance' : 'No price observation'}</span>`;
+        <span class="co-src" title="${esc(fr.text)}">${q ? esc(shortProvider(q.provider)) : 'Price source unavailable'}</span>`;
       if (flash && isNum(prevPrice) && isNum(price) && prevPrice !== price && !reduced() && px.animate) px.querySelector('.co-price').animate([{backgroundColor: price > prevPrice ? 'var(--b-good-bg, #e3f1e8)' : 'var(--b-bad-bg, #f7e2df)'}, {backgroundColor: 'transparent'}], {duration: 600, easing: 'ease-out'});
     }
     let context=el.querySelector('.co-live-context');if(!context){context=root.document.createElement('p');context.className='co-live-context co-src';el.querySelector('.co-head')?.appendChild(context);}const engine=live();if(context&&engine?.currentContext)context.textContent=engine.currentContext(t,engine.snapshot(),st.intel?.companies?.[t]?.model_asof);
@@ -444,7 +443,7 @@ function mount(el, ticker, opts) {
     const current=currentDocument(st.doc,s,q&&(q.asof_utc||q.ts));
     const card=el.querySelector('#co-valuation'); if(card&&current&&current.cards&&current.cards.valuation){const open=card.classList.contains('co-open');const wrap=root.document.createElement('div');const entry=CARDS.find(x=>x[0]==='valuation');wrap.innerHTML=cardHtml('valuation',entry[1],entry[2],current.cards.valuation,4,st.doc.asof_session,t);card.replaceWith(wrap.firstElementChild);if(open)setCard(el.querySelector('#co-valuation'),true);}
     const V = verdict(current, s), vEl = el.querySelector('.co-verdict');
-    if (vEl) { vEl.className = 'co-verdict t-' + V.tone; vEl.innerHTML = `<p class="co-vl"><span class="co-kind">Observed</span>${esc(V.line)}</p><p class="co-vr">${esc(V.reason)}</p>`; }
+    if (vEl) { vEl.className = 'co-verdict t-' + V.tone; vEl.innerHTML = `<p class="co-vl">${esc(V.line)}</p><p class="co-vr">${esc(V.reason)}</p>`; }
     st.tiles = statTiles(s, row);
     const box = el.querySelector('.co-stats');
     if (box) box.innerHTML = st.tiles.map(tileHtml).join('');
@@ -549,8 +548,7 @@ function renderWatchlist(el, opts) {
       return watchLineHtml(row, watchRow(row, q, now), q);
     });
     const fr = freshOf(newest, st.quotes);
-    el.innerHTML = `<div class="wl-meta"><span class="b-chip sm t-${FRESH_TONE[fr.word] || 'none'}">${ICON[FRESH_TONE[fr.word] || 'none']}${esc(cap1(fr.label))}</span><span>${newest ? esc(fmtET(newest.asof_utc || newest.ts)) + ' · ' + esc(shortProvider(newest.provider)) : 'Snapshot closes'}. P/E and PEG rescale to the current price; earnings stay at the last report.</span></div>
-      <table class="wl-t"><thead><tr><th scope="col">Company</th><th scope="col">Price</th><th scope="col">P/E</th><th scope="col">PEG</th><th scope="col">52-week range</th><th scope="col">Next earnings</th><th scope="col">Analysts</th></tr></thead><tbody>${lines.join('')}</tbody></table>`;
+    el.innerHTML = `      <table class="wl-t"><thead><tr><th scope="col">Company</th><th scope="col">Price</th><th scope="col">P/E</th><th scope="col">PEG</th><th scope="col">52-week range</th><th scope="col">Next earnings</th><th scope="col">Analysts</th></tr></thead><tbody>${lines.join('')}</tbody></table>`;
   };
   const ready = Promise.all([coreData(), fetch('data/quotes.json', {cache: 'no-store'}).then(r => r.ok ? r.json() : null).catch(e => { console.warn('[watchlist] quotes.json unavailable', e); return null; })])
     .then(([core, quotes]) => {

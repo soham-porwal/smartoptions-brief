@@ -688,7 +688,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
           <div>
             <div class="ed-vc-kick">Your Stocks · Synced Live with My Book</div>
-            <h3 style="margin:2px 0 0;font-family:var(--ed-f-display);font-size:20px">Symbols, Shares & Cost Basis (${ST.hold.length} holdings · ${fmtMoney(pv())})</h3>
+            <h3 style="margin:2px 0 0;font-family:var(--ed-f-display);font-size:20px">Symbols, Shares & Cost Basis (${ST.hold.length} holdings · ${fmtMoney(ST.hold.every(h=>finite(h.price)&&finite(h.shares))?pv():null)})</h3>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="ed-btn ghost" id="edResetBook">Reset desk controls (preserves My Book)</button>
@@ -787,6 +787,7 @@
     const sObj = api.S ? api.S() : {shock: {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0}};
     const shock = sObj.shock || {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0};
     const byTicker = new Map((d.rows || []).map(r => [r.t, r]));
+    if(ST.hold.some(h=>!finite(h.shares)||!finite(h.price)))return `<p class="ed-mode-note">Current portfolio value, P&amp;L and stress unavailable: a holding has no measured quantity or usable current quote. Last observations remain separate.</p>`;
     const totalVal = pv() || 1;
 
     let totPnl = 0, totShockDollar = 0;

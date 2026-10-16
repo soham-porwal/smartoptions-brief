@@ -83,7 +83,7 @@
         analyst: {rating: r.rating, target_mean: r.tgt, upside_pct: r.up, n: r.nan},
         beta_provider: r.beta, market_cap: r.mcap,
         atm_iv: r.iv == null ? null : {iv_pct: r.iv, expiry: r.ivx, strike: r.ivk, spans_earnings: r.ivspan, source: r.ivs},
-        sam: r.sam || null,
+        sam: r.sam ? {...r.sam,label:"Historical reference (2026-07-25)"} : null,
         relations: r.rel ? {coef: r.rel.c, t: r.rel.t, r2: r.rel.r2, n: r.rel.n} : null,
         attribution: r.att || null,
         status: r.st || {},
@@ -195,7 +195,7 @@
       series: t.symbol, as_of: m.generated.equities || m.exported_at, url: yahooUrl(t.symbol)});
   }
   function citeSam(m, t, ctx) {
-    return ctx.cite({label: (t.sam && t.sam.label) || 'SmartOptions snapshot 2026-07-25', source: "Historical SmartOptions screener snapshot (read-only)",
+    return ctx.cite({label: 'Historical reference (2026-07-25)', source: "Historical SmartOptions screener snapshot (read-only)",
       series: t.symbol, as_of: t.sam && t.sam.asof, url: null});
   }
   function citeRel(m, sym, ctx) {

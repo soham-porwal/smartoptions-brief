@@ -390,7 +390,7 @@ async function mount(el, ticker) {
   if (!el) return; const t = String(ticker || '').toUpperCase();
   el.innerHTML = '<div class="st dim">loading strategy ideas...</div>';
   const base = await ctxFromData(t);
-  const L=root.SmartOptionsLive;if(el._stUnsub)el._stUnsub();L?.watch('strategy',[t]);el._stUnsub=L?.subscribe(ev=>{if(!el.isConnected){el._stUnsub?.();return;}if(ev.changed.includes(t)){const q=L.get(t);if(q&&isNum(q.price)){base.price=q.price;base.prov.price=`${q.asof_utc||q.ts} ${q.provider}`;el._stDraw();}}});
+  const L=root.SmartOptionsLive;if(el._stUnsub)el._stUnsub();L?.watch('strategy',[t]);el._stUnsub=L?.subscribe(ev=>{if(!el.isConnected){el._stUnsub?.();return;}if(ev.changed.includes(t)){const q=L.get(t);if(q){base.price=q.current_usable!==false&&isNum(q.price)?q.price:null;base.prov.price=`${q.asof_utc||q.ts} ${q.provider}`;el._stDraw();}}});
   const draw = () => render(el, base);
   if (!el._stBound) {
     el._stBound = true;

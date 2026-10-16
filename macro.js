@@ -22,7 +22,7 @@ function tile(o) {
   const tip = `${o.label}\n${o.provider} · ${o.series}\nperiod ${o.period} · retrieved ${o.retrieved_at || ''}\nstatus ${o.status}${o.note ? '\n' + o.note : ''}\nchart ${first} to ${last}`;
   return `<div class="mc${stale ? ' stale' : ''}" role="button" tabindex="0" aria-label="Explore ${A.esc(o.label)} chart and sources" data-s="${A.esc(o.id)}" data-tip="${A.esc(tip)}">
     <div class="l">${A.esc(o.label)}</div>
-    <div><span class="v">${vs}</span> <span class="dim">${A.esc(o.unit || '')}</span> ${A.pct(chg, 2, 'no prior', '')}${stale ? '<span class="stale-tag">stale</span>' : ''}</div>
+    <div><span class="v">${vs}</span> <span class="dim">${A.esc(o.unit || '')}</span> ${A.pct(chg, 2, 'no prior', '')}</div>
     <div class="sub">${A.esc(o.period || '')}</div>${chartSvg(h, 200, 34)}</div>`;
 }
 function renderGrid() {

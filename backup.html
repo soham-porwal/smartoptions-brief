@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<title>SmartOptions Brief - expanded dashboard (backup)</title>
+<link rel="icon" href="favicon.ico">
+<link rel="stylesheet" href="app.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="chat/chat.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="flow.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="overview.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="import.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="technicals.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="strategies.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="explore.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="ui.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="brief.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="intelligence.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="my-dashboard.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="money-flow.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="chat-popup.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="live.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="shocks.css?v=client-20261016r8-quiet">
+<link rel="stylesheet" href="heatmap.css?v=client-20261016r8-quiet"><link rel="stylesheet" href="fvchart.css?v=client-20261016r8-quiet"><link rel="stylesheet" href="company.css?v=client-20261016r8-quiet">
+</head>
+<body>
+<header id="hdr">
+  <div class="brand">SmartOptions <span class="dim">expanded</span> <a href="./" style="font-size:12px;font-weight:400;margin-left:8px">Main brief</a></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="markets" class="on">Markets</button>
+    <button data-tab="macro">Macro</button>
+  </nav>
+  <div class="hstat" id="hstat"></div>
+  <div class="hsel">
+    <select id="wfSel" title="Workflow: a built-in screen + step checklist"></select>
+    <select id="wsSel" title="Saved workspaces (Settings to save)"></select>
+  </div>
+  <div class="hbtns">
+    <button id="btnSettings" title="Settings: panels, columns, tape, display, workspaces">Settings</button>
+    <button id="btnControls" title="Controls: scenario + screen thresholds">Controls</button>
+    <button id="btnAbout" title="Methods, sources, limitations">About</button>
+  </div>
+</header>
+<div id="tape" class="tape" hidden></div>
+<div id="wfstrip" class="wfstrip" hidden></div>
+
+<main id="pg-markets" class="page">
+  <section id="left" class="pane">
+    <div class="ptools">
+      <input id="q" type="search" placeholder="Search ticker / name / sector" autocomplete="off" spellcheck="false">
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="tmeta" id="tmeta"></div>
+    <div class="twrap" id="twrap"><table id="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  </section>
+  <section id="center" class="pane">
+    <div class="ctools">
+      <div class="ctitle" id="ctitle"></div>
+      <div class="cbtns" id="ranges"></div>
+      <label class="ovl">vs <select id="overlay"></select></label>
+    </div>
+    <div class="clegend" id="clegend"></div>
+    <div id="chart"></div>
+    <div class="evstrip" id="evstrip"></div>
+    <div class="sigs">
+      <div class="sech">Signals <span class="dim">click to chart</span></div>
+      <div id="signals"></div>
+    </div>
+  </section>
+  <section id="right" class="pane"><div id="detail"></div></section>
+</main>
+
+<main id="pg-macro" class="page" hidden>
+  <section class="mgrid-wrap">
+    <div id="mgrid"></div>
+  </section>
+  <section class="mside">
+    <div id="mhm"><div class="sech">Sector x factor <span class="dim" id="hmnote"></span></div>
+    <div id="heatmap"></div></div>
+    <div id="mcal"><div class="sech">Calendar</div>
+    <div id="cal"></div></div>
+  </section>
+</main>
+
+<aside id="controls" class="drawer" hidden></aside>
+<aside id="about" class="drawer wide" hidden></aside>
+<aside id="settings" class="drawer" hidden></aside>
+<div id="tip" hidden></div>
+<script src="vendor/lightweight-charts.standalone.production.js?v=client-20261016r8-quiet"></script>
+<link rel="stylesheet" href="impact.css?v=client-20261016r8-quiet">
+<script src="impact.js?v=client-20261016r8-quiet"></script>
+<script src="live.js?v=client-20261016r8-quiet"></script>
+<script src="intelligence.js?v=client-20261016r8-quiet"></script>
+<script src="brief.js?v=client-20261016r8-quiet"></script>
+<script src="controls.js?v=client-20261016r8-quiet"></script>
+<script src="macro.js?v=client-20261016r8-quiet"></script>
+<script src="about.js?v=client-20261016r8-quiet"></script>
+<script src="chat/chat.js?v=client-20261016r8-quiet"></script>
+<script src="custom.js?v=client-20261016r8-quiet"></script>
+<script src="my-dashboard.js?v=client-20261016r8-quiet"></script>
+<script src="money-flow.js?v=client-20261016r8-quiet"></script>
+<script src="shocks.js?v=client-20261016r8-quiet"></script>
+<script src="app.js?v=client-20261016r8-quiet"></script>
+<script src="flow.js?v=client-20261016r8-quiet"></script>
+<script src="overview.js?v=client-20261016r8-quiet"></script>
+<script src="import.js?v=client-20261016r8-quiet"></script>
+<script src="technicals.js?v=client-20261016r8-quiet"></script>
+<script src="strategies.js?v=client-20261016r8-quiet"></script>
+<link rel="stylesheet" href="patterns.css?v=client-20261016r8-quiet"><link rel="stylesheet" href="cycles.css?v=client-20261016r8-quiet"><link rel="stylesheet" href="confidence.css?v=client-20261016r8-quiet">
+<script src="patterns.js?v=client-20261016r8-quiet"></script>
+<script src="cycles.js?v=client-20261016r8-quiet"></script>
+<script src="confidence.js?v=client-20261016r8-quiet"></script>
+<script src="explore.js?v=client-20261016r8-quiet"></script>
+<link rel="stylesheet" href="edge-desk.css?v=client-20261016r8-quiet">
+<script src="edge-desk.js?v=client-20261016r8-quiet"></script>
+<script src="chat-popup.js?v=client-20261016r8-quiet"></script>
+<script src="heatmap.js?v=client-20261016r8-quiet"></script><script src="fvchart.js?v=client-20261016r8-quiet"></script><script src="company.js?v=client-20261016r8-quiet"></script>
+</body>
+</html>

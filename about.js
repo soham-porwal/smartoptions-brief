@@ -31,10 +31,10 @@ window.SO2_about = function (el) {
   for (const g in D.macro) for (const o of D.macro[g]) st[o.status] = (st[o.status] || 0) + 1;
   el.innerHTML = `<button class="x" data-close>Close</button>
     <h3>What this is</h3>
-    <p>Daily macro + market fundamentals for S&amp;P 500 movers (A) and Historical SmartOptions universe (B). Session ${e(D.asof_session)}; exported ${e(D.exported_at)}. Prices delayed (Yahoo Finance via yfinance). Relationships are measured associations over ${e(D.rel.window)}, not causes; scenario numbers are historical associations, not forecasts. Education only, not advice; no orders.</p>
-    <h3>Data health</h3>
+    <p>Market fundamentals, macro context and company research. Session ${e(D.asof_session)}; exported ${e(D.exported_at)}. Displayed quotes use the shared price source; historical closes retain their own dates. Relationships are measured associations over ${e(D.rel.window)}, not causes; scenario numbers are historical associations, not forecasts. Education only, not advice; no orders.</p>
+    <h3>Data &amp; sources</h3>
     <p>Macro observations: ${st.ok} ok, ${st.stale || 0} stale, ${st.missing || 0} missing, ${st.error || 0} error. Cross-checks: ${xc.map(c => `${e(c.check)}: ${e(c.result)}`).join('; ') || 'none'}.</p>
-    <p>Historical columns are his published SmartOptions snapshot of 2026-07-25, read-only. The component split in the detail pane uses his documented formula and is shown only where it reproduces his published composite.</p>
+    <p>Historical reference columns use the 2026-07-25 SmartOptions snapshot. The component split is shown only where the documented formula reproduces that historical composite.</p>
     <h3>App methods</h3>${Object.entries(D.methods || {}).map(([k, v]) => `<li><b>${e(k)}</b>: ${e(v)}</li>`).join('')}
     <h3>Mover ranking</h3><p>${e((D.movers || {}).method || '')}</p>
     ${md(D.docs && D.docs.methods_md, e)}

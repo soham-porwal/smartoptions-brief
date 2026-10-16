@@ -1,6 +1,6 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261016-r7-price",
+  "release_id": "brief-client-20261016-r9-main",
   "product": "SmartOptions Brief",
   "built_at": "2026-10-16T18:47:55.795362+00:00",
   "source_commit": "1927e5a",
@@ -8,10 +8,10 @@
   "tickers": 509,
   "current_constituents": 503,
   "core_sha256": "55084cd9c707d7e619308ed9c5b1b9d20beb955425bf4053a33854728db39be3",
-  "default_view": "brief",
-  "chat": "deterministic dashboard facts and confirmed actions; optional verified rephrasing",
+  "default_view": "minimal main: Market brief, Companies, Macro (index.html); expanded dashboard preserved at backup.html",
+  "chat": "not on main; retained in the expanded backup",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
-  "price_feed": "Visible quotes: one shared Worker cache/budget for interactive and sweep traffic, 58/min and 30/sec upstream limits, 30s cache, protective 40000/day. Per-name live/older/source-wait states preserve trade and successful-check times. Full-universe file is a paced snapshot; GitHub cron is best effort.",
+  "price_feed": "Main: Yahoo Finance keyless websocket stream (one socket, on-screen names first then S&P members, reconnect with backoff, paused when hidden) on the published origins; shared Worker (Finnhub, 58/min and 30/sec, 120 s cadence) and the published quote file as fallback. Each accepted quote keeps provider time; older observations never replace newer.",
   "verification": {
     "javascript_chat_worker": {
       "passed": 362,
@@ -39,5 +39,9 @@
     "Source dates and missing data remain visible.",
     "Options quotes may be modeled; chart patterns are not validated predictive edge.",
     "Full fundamentals and macro refresh uses the source build pipeline separately from the quote workflow."
-  ]
+  ],
+  "backup": {
+    "url": "backup.html",
+    "identity": "expanded dashboard (r8 quiet source, superset of published r7-price); same data and device storage"
+  }
 }

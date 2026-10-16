@@ -82,8 +82,10 @@ function colorFor(pct, period, palette) {
 /* changeOf(row, quote, period): {pct, px, src}. 1D prefers an ok quote dated on/after the core session. */
 function changeOf(row, q, period) {
   const key = (PERIODS[period] || PERIODS['1D']).key;
+  const L=root.SmartOptionsLive,state=L?.feedSummary?L.feedSummary({[row.t]:q},[row.t],Date.now()).items[0].state:null;
+  if(q&&(q.current_usable===false||['missing','stale','blocked'].includes(state)))return {pct:null,px:null,src:'unavailable',ts:q.ts||q.asof_utc};
   const qOk = q && isNum(q.price) && q.price>0 && (!row.pxd || String(q.ts || q.asof_utc || '').slice(0,10)>=row.pxd);
-  const px=qOk?q.price:(isNum(row.px)?row.px:null);
+  const px=qOk?q.price:null;
   if(period==='1D' && qOk) return {pct:isNum(q.chg_pct)?q.chg_pct:null,px,src:'quote',ts:q.ts||q.asof_utc};
   return {pct:isNum(row[key])?row[key]:null,px,src:'core',ts:row.pxd||null};
 }

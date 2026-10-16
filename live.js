@@ -16,8 +16,8 @@
 
   const ALLOWED_ORIGINS = ['https://soham-porwal.github.io', 'https://samsej.github.io'];   // Worker allow-list (chat-proxy/worker.js)
   const MAX_BATCH = 12;            // Worker accepts 1 to 12 symbols per request
-  const OPEN_POLL_MS = 15000;      // Worker caches 30 s and grants refreshes stalest-first; 15 s keeps served prints inside a minute
-  const FILE_POLL_MS = 60000;
+  const OPEN_POLL_MS = 120000;     // Selected quotes refresh every two minutes, plus navigation and wake.
+  const FILE_POLL_MS = 120000;
   const SYMBOL = /^[A-Z][A-Z0-9.-]{0,14}$/;
   const isNum = v => typeof v === 'number' && isFinite(v);
 
@@ -60,6 +60,36 @@
     if (delay === 0 && ageMin <= 1) return {word: 'live', label: 'live', ageMin};
     if (delay > 0 && ageMin <= delay + 5) return {word: 'delayed', label: 'delayed ' + delay + 'm', ageMin};
     return {word: 'stale', label: 'stale', ageMin};
+  }
+  // Yahoo PricingData protobuf (yfinance 1.7.0 schema). No browser credential.
+  function decodeYahooMessage(envelope) {
+    if(typeof envelope!=='string'||envelope.length>32768)throw new Error('Invalid stream envelope');
+    const raw=JSON.parse(envelope),b64=raw.message;
+    if(typeof b64!=='string'||b64.length>16384||!/^[-A-Za-z0-9+/=]+$/.test(b64))throw new Error('Invalid stream payload');
+    const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0)),view=new DataView(bytes.buffer);let pos=0;const out={};
+    const varint=()=>{let n=0n,shift=0n;for(let i=0;i<10;i++){if(pos>=bytes.length)throw new Error('Truncated varint');const b=bytes[pos++];n|=BigInt(b&127)<<shift;if(!(b&128))return n;shift+=7n;}throw new Error('Oversized varint');};
+    const names={1:'id',2:'price',3:'time',4:'currency',5:'exchange',7:'market_hours',8:'change_percent',9:'day_volume',10:'day_high',11:'day_low',12:'change',16:'previous_close',22:'last_size'};
+    while(pos<bytes.length){const key=Number(varint()),field=key>>>3,wire=key&7;if(!field)throw new Error('Invalid field');let v;
+      if(wire===0){const n=varint();v=Number([3,9,22].includes(field)?(n>>1n)^(-(n&1n)):n);if(!Number.isSafeInteger(v))throw new Error('Unsafe integer');}
+      else if(wire===5){if(pos+4>bytes.length)throw new Error('Truncated float');v=view.getFloat32(pos,true);pos+=4;}
+      else if(wire===1){if(pos+8>bytes.length)throw new Error('Truncated double');v=view.getFloat64(pos,true);pos+=8;}
+      else if(wire===2){const len=Number(varint());if(len<0||len>4096||pos+len>bytes.length)throw new Error('Invalid string length');v=new TextDecoder().decode(bytes.slice(pos,pos+len));pos+=len;}
+      else throw new Error('Unsupported wire type');
+      if(names[field])out[names[field]]=v;
+    }
+    return out;
+  }
+  function yahooQuote(event, previous, receivedMs) {
+    receivedMs=receivedMs==null?Date.now():receivedMs;
+    if(!event||!SYMBOL.test(event.id||'')||!isNum(event.price)||event.price<=0||!Number.isSafeInteger(event.time)||event.time<=0||event.time>receivedMs)return null;
+    if(previous&&obsMs(previous)>event.time)return null;
+    const ts=new Date(event.time).toISOString(),received=new Date(receivedMs).toISOString();
+    const price=Number(event.price.toFixed(6));
+    const prior=isNum(event.previous_close)&&event.previous_close>0?event.previous_close:isNum(event.change)&&price-event.change>0?price-event.change:previous?.prior_close_date===ts.slice(0,10)&&previous?.prior_close>0?previous.prior_close:null;
+    const chg=isNum(event.change_percent)?event.change_percent:prior?100*(price/prior-1):null;
+    return {price,chg_pct:chg,change_pct:chg,prior_close:prior,prior_close_date:prior?ts.slice(0,10):null,
+      day_volume:Number.isSafeInteger(event.day_volume)&&event.day_volume>=0?event.day_volume:null,
+      market_hours:Number.isSafeInteger(event.market_hours)?event.market_hours:null,asof_utc:ts,ts,checked_at:received,received_at:received,provider:'Yahoo Finance stream',source_url:'https://finance.yahoo.com/quote/'+encodeURIComponent(event.id),source_transport:'websocket',delay_minutes:0,status:'ok',exchange:event.exchange||null,currency:event.currency||'USD'};
   }
   // Newest observation wins per symbol; an older or equal observation never replaces a newer one.
   function merge(prev, incoming, source) {
@@ -124,7 +154,7 @@
     const state=feedSummary({SPY:q},['SPY'],nowMs==null?Date.now():nowMs,ST.worker.errors).items[0].state;
     if(!q||!isNum(q.price)||q.price<=0||['missing','stale','blocked'].includes(state)){
       const b=JSON.parse(JSON.stringify(brief));b.macro ||= {};b.pulse ||= {};
-      const line='Current SPY price assessment unavailable: '+state+'. Historical averages and reported inputs retain their dates.';
+      const line='SPY price comparison is unavailable.';
       b.macro.price_trend={status:'unavailable',line,metrics:ms.filter(m=>!/SPY close|previous-session change/.test(m.label||''))};b.pulse.headline=line;b.pulse.status='unavailable';
       for(const k of ['supports','challenges','changed'])b.pulse[k]=(b.pulse[k]||[]).filter(x=>!(x.metrics||[]).some(m=>/SPY (close|latest price|50-session|200-session)/.test(m.label||'')));
       return b;
@@ -134,7 +164,7 @@
     const status=v50>=0&&v200>=0?'supportive':v50<0&&v200<0?'adverse':'mixed';
     const where=status==='supportive'?'above both averages':status==='adverse'?'below both averages':v50<0?'below its 50-session but above its 200-session average':'above its 50-session but below its 200-session average';
     const fr=classify(q,nowMs == null ? Date.now() : nowMs).label;
-    const line=`SPY is ${where}: ${fmtPct(v50,2)} vs 50-session and ${fmtPct(v200,2)} vs 200-session. Latest reported price ${fmtPx(q.price)} (${fr}, ${q.asof_utc||q.ts}).`;
+    const line=`SPY at $${fmtPx(q.price)} is ${where}: ${fmtPct(v50,2)} versus its 50-session average and ${fmtPct(v200,2)} versus its 200-session average.`;
     const metrics=ms.filter(m=>!/SPY close|previous-session change/.test(m.label||''));
     metrics.unshift({label:'SPY latest price',value:q.price,unit:'USD/share',period:q.asof_utc||q.ts,asof:q.asof_utc||q.ts,source:q.provider,source_url:q.source_url,note:'Provider trade time; averages retain their historical session dates.'});
     metrics.push({label:'SPY versus 50-session average',value:v50,unit:'%',asof:q.asof_utc||q.ts,period:q.asof_utc||q.ts,source:q.provider},{label:'SPY versus 200-session average',value:v200,unit:'%',asof:q.asof_utc||q.ts,period:q.asof_utc||q.ts,source:q.provider});
@@ -147,12 +177,11 @@
   }
   function currentContext(t, quotes, modelAsOf) {
     const qs=quotes&&(quotes.quotes||quotes)||{},q=qs[t],spy=qs.SPY;
-    if(!q||!isNum(q.price))return 'Current observed comparison unavailable: no quote.';
+    if(!q||!isNum(q.price)||q.current_usable===false||['stale','missing','blocked'].includes(feedSummary(qs,[t],Date.now(),ST.worker.errors).items[0].state))return 'Current price comparison is unavailable.';
     const change=isNum(q.chg_pct)?q.chg_pct:q.change_pct,market=spy&&(isNum(spy.chg_pct)?spy.chg_pct:spy.change_pct);
-    let line=`Latest reported ${t} ${fmtPx(q.price)} at ${q.asof_utc||q.ts}`;
-    if(isNum(change)){line+=` (${fmtPct(change)} versus previous close)`;if(t!=='SPY'&&isNum(market)){const gap=change-market;line+=`; ${Math.abs(gap).toFixed(2)} percentage points ${gap>=0?'ahead of':'behind'} SPY (SPY trade ${spy.asof_utc||spy.ts})`;}}
-    else line+='; current return unavailable';
-    return line+`. Historical fit${modelAsOf?' through '+modelAsOf:''} remains dated; this observed comparison is not intraday factor attribution or a forecast.`;
+    let line=`${t} is $${fmtPx(q.price)}`;
+    if(isNum(change)){line+=`, ${fmtPct(change)} versus its previous close`;if(t!=='SPY'&&isNum(market)){const gap=change-market;line+=` and ${Math.abs(gap).toFixed(2)} percentage points ${gap>=0?'ahead of':'behind'} SPY`;}}
+    return line+'.';
   }
   // Header truth: worst of the price feed and every dataset in refresh-status / brief health.
   // closed outranks live so one closed name never lets the summary say live
@@ -165,7 +194,7 @@
     const clock=marketClock(nowMs),names=tickers&&tickers.length?tickers:Object.keys(quotes||{}),counts={};
     const items=names.map(t=>{const q=quotes&&quotes[t],c=classify(q,nowMs,clock),checked=q&&(q.checked_at||q.retrieved_at),cm=Date.parse(checked||'');
       const error=errors&&errors[t];let state=error?'blocked':c.word;
-      if(!error&&c.word==='stale'&&q&&q.delay_minutes===0&&c.ageMin<=15&&isFinite(cm)&&nowMs-cm<=75000&&nowMs-cm>=-60000)state='older';
+      if(!error&&c.word==='stale'&&q&&q.delay_minutes===0&&c.ageMin<=15&&isFinite(cm)&&nowMs-cm<=180000&&nowMs-cm>=-60000)state='older';
       counts[state]=(counts[state]||0)+1;
       return {t,state,observation:q&&(q.asof_utc||q.ts)||null,checked_at:checked||null,age_minutes:c.ageMin??null,error:error||null};});
     const seen=items.filter(x=>x.observation), newest=seen.slice().sort((a,b)=>Date.parse(b.observation)-Date.parse(a.observation))[0];
@@ -180,7 +209,7 @@
   /* ------------------------------------------------------------ engine state */
   const ST = {quotes: {}, file: null, subs: new Set(), owners: {}, cursor: 0, timers: [], started: false,
     worker: {url: '', enabled: false, reason: 'not configured', last: null, error: '', errors: {}},
-    fileState: {last: null, error: ''}, status: null, polling: false, vis: new Map(), seen: new WeakSet(), io: null, visTimer: null};
+    stream:{socket:null,subscribed:new Set(),pending:{},flush:null,retry:null,attempt:0,enabled:false,received:0,error:'',last:null}, fileState: {last: null, error: ''}, status: null, polling: false, vis: new Map(), seen: new WeakSet(), io: null, visTimer: null};
   const doc = root.document;
   const now = () => Date.now();
 
@@ -208,10 +237,40 @@
     order.concat(Object.keys(ST.owners).filter(k => !order.includes(k))).forEach(k => (ST.owners[k] || []).forEach(t => all.push(t)));
     return [...new Set(all.map(t => String(t).toUpperCase()).filter(t => SYMBOL.test(t)))];
   }
+  // rows come from the expanded desk (SO2.D) or from the minimal main page (setRows)
+  const coreRows=()=>ST.rows||root.SO2?.D?.()?.rows||[];
+  function setRows(rows){ST.rows=Array.isArray(rows)?rows:null;ST.rowIndex=null;if(ST.started)syncStream();}
+  function streamTargets() {
+    const rows=coreRows();
+    // on-screen names first so any provider cap keeps what the reader is looking at
+    return [...new Set(onScreen().concat(rows.filter(r=>r.sp500_member!==false).map(r=>r.t),['SPY']))].filter(t=>SYMBOL.test(t)).slice(0,600);
+  }
+  function stopStream() {
+    const st=ST.stream;clearTimeout(st.retry);st.retry=null;
+    if(st.socket){const ws=st.socket;st.socket=null;ws.onclose=null;ws.close();}st.subscribed.clear();
+  }
+  function syncStream() {
+    const st=ST.stream;if(!st.enabled||!root.WebSocket)return;
+    if(doc&&doc.visibilityState!=='visible'){stopStream();return;}
+    const targets=streamTargets(),desired=new Set(targets.map(t=>t.replace(/\./g,'-')));
+    if(!desired.size)return;
+    if(st.socket?.readyState===1){const add=[...desired].filter(t=>!st.subscribed.has(t)),remove=[...st.subscribed].filter(t=>!desired.has(t));if(remove.length)st.socket.send(JSON.stringify({unsubscribe:remove}));if(add.length)st.socket.send(JSON.stringify({subscribe:add}));st.subscribed=desired;return;}
+    if(st.socket||st.retry)return;
+    const ws=new root.WebSocket('wss://streamer.finance.yahoo.com/?version=2');st.socket=ws;
+    ws.onopen=()=>{if(st.socket!==ws)return;st.attempt=0;st.error='';syncStream();};
+    ws.onmessage=ev=>{if(st.socket!==ws)return;try{
+      const event=decodeYahooMessage(ev.data),canonical=streamTargets().find(t=>t.replace(/\./g,'-')===event.id);if(!canonical)return;
+      const quote=yahooQuote(event,st.pending[canonical]||ST.quotes[canonical],now());if(!quote)return;
+      st.pending[canonical]=quote;st.received++;st.last=quote.received_at;
+      if(!st.flush)st.flush=setTimeout(()=>{st.flush=null;const pending=st.pending;st.pending={};Object.keys(pending).forEach(t=>delete ST.worker.errors[t]);accept(pending,'stream');},250);
+    }catch(e){st.error='Invalid stream event: '+e.message;}};
+    ws.onerror=()=>{st.error='Quote stream connection failed';};
+    ws.onclose=()=>{if(st.socket!==ws)return;st.socket=null;st.subscribed.clear();st.error='Quote stream disconnected';pollWorker(null,true);if(!doc||doc.visibilityState==='visible'){const delay=Math.min(60000,1000*2**Math.min(st.attempt++,6));st.retry=setTimeout(()=>{st.retry=null;syncStream();},delay);}};
+  }
   function watch(owner, tickers) {
     ST.owners[owner] = [...new Set((tickers || []).map(t => String(t).toUpperCase()))];
     if (doc) paintHealth();   // the header's on-screen/other scope changes with the watched set
-    if (ST.started) schedule(true);
+    if (ST.started) {syncStream();schedule(true);}
   }
   function subscribe(fn) { ST.subs.add(fn); return () => ST.subs.delete(fn); }
   function get(t) {
@@ -296,18 +355,21 @@
     let cfg = null;
     try { cfg = await getJSON('data/config.json'); } catch (e) { ST.worker.reason = 'Configuration unavailable: ' + (e.message || e); }
     configure(cfg, root.location ? root.location.origin : '');
+    ST.stream.enabled=!!root.WebSocket&&ALLOWED_ORIGINS.includes(root.location?.origin);
+    syncStream();
+    ST.timers.push(setInterval(()=>{const st=ST.stream;if(st.socket?.readyState===1&&st.subscribed.size)st.socket.send(JSON.stringify({subscribe:[...st.subscribed]}));},15000));
     await loadFile();
     pollWorker(null, true);   // one fast read on arrival, even after the close, so the latest print is shown
-    ST.timers.push(setInterval(() => pollWorker(), OPEN_POLL_MS));
-    ST.timers.push(setInterval(() => { if (!doc || doc.visibilityState === 'visible') loadFile(); }, FILE_POLL_MS));
+    ST.timers.push(setInterval(async () => {if(!doc||doc.visibilityState==='visible') await refresh();}, OPEN_POLL_MS));
     ST.timers.push(setInterval(() => paint(doc, null), 15000));   // freshness words age even when no price moves
-    if (doc) doc.addEventListener('visibilitychange', () => { if (doc.visibilityState === 'visible') refresh(); });
-    if(root.addEventListener){root.addEventListener('pageshow',()=>refresh());root.addEventListener('focus',()=>refresh());}
+    // stream follows visibility; wake handlers return the refresh so callers can await one complete pass
+    if (doc) { doc.addEventListener('visibilitychange', () => syncStream()); doc.addEventListener('visibilitychange', () => { if (doc.visibilityState === 'visible') refresh(); }); }
+    if(root.addEventListener){root.addEventListener('pageshow',()=>{syncStream();});root.addEventListener('focus',()=>{syncStream();});root.addEventListener('pageshow',()=>refresh());root.addEventListener('focus',()=>refresh());}
   }
 
   /* ------------------------------------------------------------ DOM binding
      <span data-live="AAPL" data-live-f="price|chg|pe|pef|range|hi|asof|fresh|since"></span> updates itself. */
-  function coreRow(t) { const A = root.SO2; const d = A && A.D && A.D(); return d && d.rows ? d.rows.find(r => r.t === t) : null; }
+  function coreRow(t) { const rows=coreRows(); if(ST.rowIndex?.rows!==rows){ST.rowIndex={rows,map:new Map(rows.map(r=>[r.t,r]))};} return ST.rowIndex.map.get(t)||null; }
   const reduced = () => !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
   function fieldText(f, d, q, nowMs) {
     switch (f) {
@@ -331,10 +393,11 @@
       const t = el.getAttribute('data-live');
       const q = ST.quotes[t], d = derive(coreRow(t), q), f = el.getAttribute('data-live-f') || 'price';
       if(f==='watch')return;
+      if(f==='fresh'||f==='asof'){el.hidden=true;return;}
       const state=feedSummary(ST.quotes,[t],nowMs,ST.worker.errors).items[0].state;
       const unavailable=!['live','older','closed','delayed'].includes(state);
       const text=f==='fresh'?(state==='older'?'older quote':state==='blocked'?'source wait':state):(['price','pe','pef','chg','range','hi','since'].includes(f)&&unavailable)?(ST.worker.pending?.includes(t)?'Updating…':'Unavailable'):fieldText(f,d,q,nowMs);
-      if(unavailable&&q)el.title='Last reported '+fmtPx(q.price)+' at '+(q.asof_utc||q.ts)+'; source checked '+(q.checked_at||q.retrieved_at||'unknown')+(ST.worker.errors[t]?'; '+ST.worker.errors[t]:'');
+      if(q)el.title='Last reported '+fmtPx(q.price)+' at '+(q.asof_utc||q.ts)+'; source checked '+(q.checked_at||q.retrieved_at||'unknown')+(unavailable?'; current value unavailable':'');
       if (f === 'fresh') { const c = classify(q, nowMs); el.dataset.fresh = c.word; el.title = q ? (q.provider || '') + ', trade ' + etLabel(q.asof_utc || q.ts, nowMs) + (q.checked_at||q.retrieved_at ? '; source checked ' + (q.checked_at||q.retrieved_at) : '') : 'No observation'; }
       if (f === 'range' && el.style) el.style.setProperty('--pos', isNum(d.range_pct) ? d.range_pct.toFixed(1) + '%' : '50%');
       if (f === 'chg' || f === 'since') el.dataset.dir = isNum(f === 'chg' ? d.chg_pct : d.since_close_pct) ? ((f === 'chg' ? d.chg_pct : d.since_close_pct) >= 0 ? 'up' : 'dn') : '';
@@ -360,22 +423,25 @@
   }
   async function refresh(fetchImpl) {
     await loadFile(fetchImpl);const groups=batches(onScreen());
-    for(let i=0;i<Math.min(groups.length,2);i++)await pollWorker(fetchImpl,true);
+    for(let i=0;i<Math.min(groups.length,4);i++){
+      if(i)await new Promise(resolve=>setTimeout(resolve,1100));
+      await pollWorker(fetchImpl,true);
+    }
     if(doc)paint(doc,null);
   }
   function health(nowMs) {
     nowMs = nowMs == null ? now() : nowMs;
     const watched = onScreen();
     const feed = feedSummary(ST.quotes, watched.length ? watched : null, nowMs,ST.worker.errors);
-    const rows=root.SO2?.D?.()?.rows,active=rows?new Set(rows.filter(r=>r.sp500_member!==false).map(r=>r.t).concat(['SPY','RSP'])):null;
+    const rows=coreRows().length?coreRows():null,active=rows?new Set(rows.filter(r=>r.sp500_member!==false).map(r=>r.t).concat(['SPY','RSP'])):null;
     const cv=coverage(ST.quotes,watched,nowMs,active);
     const fh=Object.assign({},ST.file?.health,{median_age_minutes:cv.median_age_minutes,oldest_age_minutes:cv.oldest_age_minutes,line:`Active universe: ${cv.others} off-screen observations; median age ${cv.median_age_minutes==null?'unavailable':cv.median_age_minutes.toFixed(1)+' min'} now. ${cv.inactive_preserved} inactive/reference records excluded from these ages.`});
-    return {feed, coverage: cv, worker: Object.assign({}, ST.worker), file: Object.assign({}, ST.fileState),
+    return {feed, coverage: cv, worker: Object.assign({}, ST.worker), stream:{enabled:ST.stream.enabled,connected:ST.stream.socket?.readyState===1,received:ST.stream.received,last:ST.stream.last,error:ST.stream.error,subscriptions:ST.stream.subscribed.size}, file: Object.assign({}, ST.fileState),
       fileHealth: fh};
   }
   function paintHealth() { if (root.CustomEvent && root.dispatchEvent) root.dispatchEvent(new root.CustomEvent('so:live-health', {detail: health()})); }
 
-  return {start, refresh, configure, watch, subscribe, get, snapshot, health, coverage, paint, accept, loadFile, pollWorker, onScreen,
-    marketClock, classify, etLabel, merge, batches, derive, currentRow, currentBrief, currentContext, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH,
+  return {start, setRows, refresh, configure, watch, subscribe, get, snapshot, health, coverage, paint, accept, loadFile, pollWorker, onScreen,
+    marketClock, classify, etLabel, merge, batches, decodeYahooMessage, yahooQuote, syncStream, stopStream, derive, currentRow, currentBrief, currentContext, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH,
     _state: ST};
 });

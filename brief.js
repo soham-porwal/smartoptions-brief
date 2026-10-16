@@ -334,7 +334,6 @@
         <a href="#/brief" data-nav="brief">Brief</a><a href="#/company" data-nav="company"><span class="nav-wide">Companies</span><span class="nav-small">Company</span></a><a href="#/flows" data-nav="flows"><span class="nav-wide">Capital &amp; news</span><span class="nav-small">Capital</span></a><a href="#/my-dash" data-nav="my-dash">My Dash</a><a href="#/macro" data-nav="macro" class="nav-secondary">Macro</a><a href="#/research/overview" data-nav="research" class="nav-secondary">Research</a><button type="button" class="bv-more" id="bv-more" aria-expanded="false" aria-controls="bv-more-menu">More</button>
       </nav>
       <div class="bv-hdr-r">
-        <button type="button" class="bv-pill" id="bv-pill" aria-haspopup="dialog" aria-expanded="false"><span class="bv-dot"></span><span class="bv-pill-t">Checking data</span><span class="bv-pill-s" aria-hidden="true"></span></button>
         <button type="button" class="bv-theme" id="bv-theme" aria-label="Switch to dark theme" title="Theme"></button>
       </div></div>`;
     doc.body.prepend(hdr);
@@ -342,20 +341,13 @@
     main.className = 'bv'; main.id = 'bv-main';
     main.innerHTML = '<div id="bv-update-banner" class="bv-update-banner" role="status" hidden></div><div class="bv-view" id="bv-view" aria-live="polite"></div>';
     hdr.after(main);
-    const pop = doc.createElement('div');
-    pop.className = 'bv-pop'; pop.id = 'bv-pop'; pop.hidden = true;
-    pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Data freshness');
-    doc.body.appendChild(pop);
     const menu = doc.createElement('nav'); menu.id = 'bv-more-menu'; menu.className = 'bv-more-menu'; menu.hidden = true; menu.setAttribute('aria-label','More pages');
     menu.innerHTML = '<a href="#/macro">Macro</a><a href="#/research/overview">Research</a>'; doc.body.appendChild(menu);
     const more = hdr.querySelector('#bv-more');
     more.addEventListener('click', () => {menu.hidden=!menu.hidden; more.setAttribute('aria-expanded',String(!menu.hidden));});
     doc.addEventListener('click', e => {if (!more.contains(e.target) && !menu.contains(e.target)) {menu.hidden=true;more.setAttribute('aria-expanded','false');}});
     doc.addEventListener('keydown',e => {if(e.key==='Escape' && !menu.hidden){menu.hidden=true;more.setAttribute('aria-expanded','false');more.focus();}});
-    hdr.querySelector('#bv-pill').addEventListener('click', e => { e.stopPropagation(); togglePop(); });
     hdr.querySelector('#bv-theme').addEventListener('click', () => setTheme(theme() === 'dark' ? 'light' : 'dark', true));
-    doc.addEventListener('click', e => { if (!pop.hidden && !pop.contains(e.target)) togglePop(false); });
-    doc.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) { togglePop(false); hdr.querySelector('#bv-pill').focus(); } });
     main.addEventListener('click', onMainClick);
     // phone keyboard: when the visual viewport shrinks a lot, hide the bottom tab bar so the focused field keeps the space
     const vv = root.visualViewport;
@@ -365,7 +357,7 @@
     }
     let seatQueued = false;
     new MutationObserver(() => { if (seatQueued) return; seatQueued = true; setTimeout(() => { seatQueued = false; seatAskButtons(main); }, 0); }).observe(main, {childList: true, subtree: true});
-    root.addEventListener('resize', () => { if (!pop.hidden) placePop(); });
+    root.addEventListener('resize', () => { const pop = doc.getElementById('bv-pop'); if (pop && !pop.hidden) placePop(); });
   }
   function theme() { try { return root.localStorage.getItem('so-brief-theme') === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; } }
   function setTheme(t, user) {
@@ -763,7 +755,7 @@
         const fmt = L ? L : {fmtPx: v => String(v), fmtPct: v => String(v)};
         const px = row || d.price != null ? `<div class="b-px" aria-label="${esc(n.t)} price">
             ${liveCell(n.t, 'price', fmt.fmtPx(d.price))}${liveCell(n.t, 'chg', fmt.fmtPct(d.chg_pct), 'b-chg')}
-            ${liveCell(n.t, 'fresh', 'closed', 'bv-fresh')}<span class="b-px-asof">${liveCell(n.t, 'asof', '')}</span></div>
+            </div>
           <dl class="b-facts">
             <div><dt>P/E now</dt><dd>${liveCell(n.t, 'pe', isNum(d.pe) ? d.pe.toFixed(1) : 'Not available')}</dd></div>
             <div><dt>52-week range</dt><dd><span class="b-rng" data-live="${esc(n.t)}" data-live-f="range"><span class="b-rng-t"><i style="left:${isNum(d.range_pct) ? d.range_pct.toFixed(1) : 50}%"></i></span><b>${isNum(d.range_pct) ? Math.round(d.range_pct) + '% of range' : 'Not available'}</b></span></dd></div>
@@ -836,7 +828,7 @@
     if (!changed || !changed.some(t => t === 'SPY' || t === 'RSP')) return;
     const L=live(), b=L&&L.currentBrief?L.currentBrief(ST.brief,L.snapshot()):null;
     if(b){
-      const pulse=doc.querySelector('.b-pulse');if(pulse){const wrap=doc.createElement('div');wrap.innerHTML=pulseSection(b.pulse);pulse.replaceWith(wrap.firstElementChild);}
+      const pulse=doc.querySelector('.b-pulse');if(pulse){const ask=pulse.querySelector('.cp-context'),wrap=doc.createElement('div');wrap.innerHTML=pulseSection(b.pulse);const next=wrap.firstElementChild;if(ask)next.querySelector('.b-ask-slot')?.appendChild(ask);pulse.replaceWith(next);}
       const strip=doc.querySelector('.b-macro .b-strip');if(strip){const wrap=doc.createElement('div');wrap.innerHTML=macroStrip(b.macro);strip.replaceWith(wrap.firstElementChild);}
     }
 
@@ -882,8 +874,7 @@
     const L=live(); const b = L && L.currentBrief ? L.currentBrief(ST.brief,L.snapshot()) : ST.brief;
     if (!b) return missingPage(view);
     const html = `<div class="bv-wrap b-v3">${notice()}
-      <div class="b-title b-enter"><h1 class="b-h1">Market brief</h1><p class="b-date">${esc(sessionWords(b))}</p></div>
-      ${nowStrip()}
+      <div class="b-title b-enter"><h1 class="b-h1">Market brief</h1></div>
       ${pulseSection(b.pulse)}
       <section class="b-sec b-macro" aria-labelledby="h-macro"><h2 id="h-macro" class="b-vh">Macro assessment</h2>${macroStrip(b.macro)}
         <button type="button" class="b-detail-btn b-enter" data-detail aria-expanded="${ST.detailOpen}" aria-controls="bv-detail"><span class="bd-lbl">${ST.detailOpen ? 'Hide detailed macro observations' : 'Detailed macro observations'}</span><span class="bd-car" aria-hidden="true">&#9662;</span></button>
@@ -911,7 +902,7 @@
   function renderMacroPage(view) {
     const L=live(); const b = L && L.currentBrief ? L.currentBrief(ST.brief,L.snapshot()) : ST.brief;
     if (!b) return missingPage(view);
-    paint(view, `<div class="bv-wrap">${notice()}<div class="b-title b-enter"><h1 class="b-h1">Macro</h1><p class="b-date">${esc(sessionWords(b))}</p></div>
+    paint(view, `<div class="bv-wrap">${notice()}<div class="b-title b-enter"><h1 class="b-h1">Macro</h1></div>
       <section class="b-sec b-macro">${macroStrip(b.macro)}</section>
       <section class="b-sec b-card b-enter" aria-labelledby="h-obs"><div class="b-sec-hd"><h2 id="h-obs">Detailed observations</h2><span class="b-ask-slot"></span><button type="button" class="b-btn b-sm" data-flipall aria-pressed="false">Show numbers</button></div>${detailList(b.macro)}
       <p class="b-more"><a href="#/research/macro">Open the full macro grid and calendar</a></p></section>
@@ -967,15 +958,10 @@
       const changed = revision(next)!==revision(ST.brief) || ST.coreRevision && coreRevision && coreRevision!==ST.coreRevision;
       if(!ST.coreRevision) ST.coreRevision=coreRevision;
       if(changed) {
-        ST.nextBrief=next;
-        const banner=doc.getElementById('bv-update-banner');
-        banner.hidden=false;banner.innerHTML='<span>A newer data snapshot is available. Your current view retains its dates.</span><button type="button" class="b-btn" data-load-latest>Load latest</button>';
-        banner.querySelector('button').onclick=()=>{
-          ST.brief=ST.nextBrief;ST.nextBrief=null;ST.coreRevision=coreRevision;banner.hidden=true;
-          if(root.SmartOptionsIntelligence) root.SmartOptionsIntelligence.load({refresh:true}).then(()=>applyRoute(true));
-          else applyRoute(true);
-          renderPill();if(root.CustomEvent) root.dispatchEvent(new root.CustomEvent('so:data-update',{detail:{brief:ST.brief,coreRevision}}));
-        };
+        ST.brief=next;ST.coreRevision=coreRevision;
+        if(root.SmartOptionsIntelligence) root.SmartOptionsIntelligence.load({refresh:true}).then(()=>applyRoute(true));
+        else applyRoute(true);
+        if(root.CustomEvent)root.dispatchEvent(new root.CustomEvent('so:data-update',{detail:{brief:ST.brief,coreRevision}}));
       }
     } catch(e) { console.warn('[brief] snapshot check failed; retaining current view',e); }
   }
@@ -993,7 +979,7 @@
       Promise.all([loadBrief(), r0.view === 'research' ? null : loadReceipt()]).then(() => { applyRoute(true); startLive(); renderPill(); });
       root.addEventListener('hashchange', () => applyRoute(false));
       setInterval(() => { if (doc.visibilityState === 'visible' && ST.route.view !== 'research') loadReceipt().then(renderPill); }, 60 * 1000);
-      setInterval(checkRevision,5*60*1000);
+      setInterval(checkRevision,120000);
 
       doc.addEventListener('visibilitychange',()=>{if(doc.visibilityState==='visible')checkRevision();});
       // once the Edge desk is ready: sync theme, refresh the company list
