@@ -243,7 +243,7 @@
   }
   async function loadModules(){
     for(const [file,key]of [['universe','SmartOptionsUniverse'],['intents','SmartOptionsIntents'],['facts','SmartOptionsFacts'],['verify','SmartOptionsVerify'],['polish','SmartOptionsPolish'],['actions','SmartOptionsActions'],['dashboard','SmartOptionsDashboardSpec'],['relationships','SmartOptionsRelationships'],['runtime','SmartOptionsBriefChat']]){
-      if(root[key])continue;await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js';s.onload=resolve;s.onerror=()=>reject(new Error('Chat module failed to load: '+file));doc.head.appendChild(s);});
+      if(root[key])continue;await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js?v=client-20261016r7-price';s.onload=resolve;s.onerror=()=>reject(new Error('Chat module failed to load: '+file));doc.head.appendChild(s);});
     }
   }
   function _start() {

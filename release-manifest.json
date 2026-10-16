@@ -28,8 +28,8 @@
       "bytes": 8355
     },
     "chat-popup.js": {
-      "sha256": "29b56f5891ec0dfa6d9d2e8bd6202f93aa7cdbae0112cae2a9c68d9a29e3a696",
-      "bytes": 24009
+      "sha256": "228ed01929cac108a6edaac6917cda9b73431db4cb2bc42dac10bb36b82be7af",
+      "bytes": 24301
     },
     "company.css": {
       "sha256": "c609d67c2473e2862b329188883536858d68d1fd4bfaf33bfb9b3a3077aea447",
@@ -120,8 +120,8 @@
       "bytes": 22208
     },
     "index.html": {
-      "sha256": "28d1cbbe3c2c719b42a1fb12659aefabbc6242348d1f1421441b2f16ba835579",
-      "bytes": 5958
+      "sha256": "0f7cb81dc829b18c836a7ef2bd36f835f27028ba252c1a7f1ad7e6edd27a7a1a",
+      "bytes": 6270
     },
     "intelligence.css": {
       "sha256": "adc81cb529dfa2a34c95bbcc0d09e64411552bc274a3c7c5a3a946c8f81ceeff",
@@ -156,8 +156,8 @@
       "bytes": 4982
     },
     "my-dashboard.js": {
-      "sha256": "e3713aaa4d25a76061c632badfca6f81d6e393beb74891c3e0fa41a3f875d427",
-      "bytes": 19867
+      "sha256": "6be128d5a011f906f1f524aa116835c8b2e36f755941cc3589e9ae0c83e30a13",
+      "bytes": 19893
     },
     "overview.css": {
       "sha256": "4e347a69023fd77efc18ab12189358f144ba89b2cbb6bc49848314d46d42a039",

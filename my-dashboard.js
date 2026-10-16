@@ -7,7 +7,7 @@
   let modules;
   function record(status,stage,detail){if(root.SmartOptionsBriefChat)root.SmartOptionsBriefChat.record(status,stage,detail);else root.console?.warn('[dashboard '+status+'] '+detail);}
   async function ensure(){
-    if(!modules)modules=(async()=>{for(const [file,key]of [['universe','SmartOptionsUniverse'],['dashboard','SmartOptionsDashboardSpec'],['relationships','SmartOptionsRelationships']]){if(root[key])continue;if(!doc)throw new Error('Dashboard modules are unavailable.');await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js';s.onload=resolve;s.onerror=()=>reject(new Error('Dashboard module failed to load: '+file));doc.head.appendChild(s);});}})().catch(e=>{modules=null;throw e;});
+    if(!modules)modules=(async()=>{for(const [file,key]of [['universe','SmartOptionsUniverse'],['dashboard','SmartOptionsDashboardSpec'],['relationships','SmartOptionsRelationships']]){if(root[key])continue;if(!doc)throw new Error('Dashboard modules are unavailable.');await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js?v=client-20261016r7-price';s.onload=resolve;s.onerror=()=>reject(new Error('Dashboard module failed to load: '+file));doc.head.appendChild(s);});}})().catch(e=>{modules=null;throw e;});
     await modules;
     if(!ST.store){let storage;try{storage=root.localStorage;}catch(e){record('FAIL','dashboard','Browser storage unavailable.');}ST.store=root.SmartOptionsDashboardSpec.createStore(storage,new Set(root.SmartOptionsUniverse.rows.map(r=>r[0])),record);}
     return root.SmartOptionsDashboardSpec;
