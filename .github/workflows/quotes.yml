@@ -2,6 +2,11 @@ name: Refresh quotes
 
 on:
   workflow_dispatch:
+    inputs:
+      full_sweep:
+        description: 'Fetch all names even outside market hours (paced, one sweep)'
+        type: boolean
+        default: false
   schedule:
     # Covers both DST variants and one close sweep. Job checks the ET clock.
     - cron: '*/8 13-21 * * 1-5'
@@ -41,9 +46,18 @@ jobs:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
           APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
           QUOTE_WATCHLIST: ${{ vars.QUOTE_WATCHLIST }}
+          FULL_SWEEP: ${{ inputs.full_sweep }}
         run: |
           mkdir -p logs
-          python scripts/gh_quotes_refresh.py --core data/core.json --out data/quotes.json > logs/refresh.txt 2>&1
+          if [ "$GITHUB_REPOSITORY" = 'samsej/sp500-screener-dashboard' ]; then
+            python scripts/gh_quotes_refresh.py --out data/quotes.json --mirror-url https://soham-porwal.github.io/smartoptions-brief/data/quotes.json > logs/refresh.txt 2>&1
+          elif [ "$FULL_SWEEP" = 'true' ]; then
+            cp data/quotes.json logs/previous-quotes.json
+            python scripts/gh_quotes_refresh.py --core data/core.json --out logs/candidate-quotes.json > logs/refresh.txt 2>&1
+            cp logs/candidate-quotes.json data/quotes.json
+          else
+            python scripts/gh_quotes_refresh.py --core data/core.json --out data/quotes.json > logs/refresh.txt 2>&1
+          fi
       - name: Commit only changed quotes
         shell: bash
         run: |
@@ -53,6 +67,7 @@ jobs:
             exit 0
           fi
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Refresh timestamped quotes' -- data/quotes.json
+          git pull --rebase origin main
           git push origin HEAD:main
       # GITHUB_TOKEN commits do not trigger a branch-based Pages build. Deploy
       # explicitly so the newly committed quotes also reach the public site.
@@ -60,7 +75,7 @@ jobs:
       - name: Prepare committed public files
         run: |
           mkdir -p _site
-          git archive HEAD | tar -x -C _site
+          git archive HEAD | tar -x -C _site --exclude='_pipeline' --exclude='.github' --exclude='logs' --exclude='tests' --exclude='out'
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
