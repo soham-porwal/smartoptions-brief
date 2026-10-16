@@ -304,8 +304,6 @@ function renderTable() {
   const sc = scenOn() ? ' · scenario on: ' + FACTORS.filter(f => S.shock[f]).map(f => `${FLABEL[f]} ${S.shock[f] > 0 ? '+' : ''}${S.shock[f]}${SHOCK_U[f]}`).join(', ') + ' (historical association, not a forecast)' : '';
   const sk = V.sort.k.startsWith('c:') ? ` · sorted by ${FLABEL[V.sort.k.slice(2)]} coef` : '';
   if (window.SmartOptionsLive) {
-    // budget: only the top rows of the current sort are polled; the rest keep their file quote and its own time
-    if (document.body.classList.contains('bv-research')) window.SmartOptionsLive.watch('table', rows.slice(0, 12).map(r => r.t));
     window.SmartOptionsLive.paint(document.getElementById('tbody'));
   }
   $('#tmeta').innerHTML = `<span>${rows.length} of ${D.rows.length}${V.sector ? ' · ' + esc(V.sector) : ''}${sk}${sc}</span><span>Historical scores are optional in Settings</span>`;

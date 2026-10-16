@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 
 ET = ZoneInfo("America/New_York")
 TAPE = ("SPY", "RSP", "^VIX", "^VIX3M", "DX-Y.NYB", "CL=F", "BZ=F", "HG=F", "^TNX")
-FINNHUB_SPACING = 1.22  # <=50 starts per rolling minute; no burst.
+FINNHUB_SPACING = 1.8  # ~33 starts/minute; the Worker fast path holds 22/min of the same free 60/min key (55 total).
 QUOTE_INTERVAL_SECONDS = 450
 DEFAULT_SECRETS = Path(r"D:\soham\myeverything\Secrets")
 
@@ -424,7 +424,7 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
     median_age, oldest_age = (round(max(0, statistics.median(ages)), 1), round(max(0, max(ages)), 1)) if ages else (None, None)
     health = {"line": mix + (f"; median age {median_age}m, oldest {oldest_age}m" if ages else ""),
               "median_age_minutes": median_age, "oldest_age_minutes": oldest_age, "provider_mix": dict(served),
-              "estimated_sweep_minutes": sweep_minutes, "cadence_basis": "450s minimum interval or universe dispatch time at 1.22s/start; excludes slow responses",
+              "estimated_sweep_minutes": sweep_minutes, "cadence_basis": "450s minimum interval or universe dispatch time at 1.8s/start; excludes slow responses",
               "sources": [{"id": "finnhub", "status": "rejected" if fh_note == "key rejected by provider" else "missing" if not keys.get("FINNHUB_API_KEY") else "configured", "note": fh_note}]}
     spy_observed = stamp(quotes.get("SPY", {}).get("asof_utc"))
     if market_state(finished_at, spy_observed) == "closed" and spy_observed:
@@ -442,7 +442,7 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
                         "retained": sum(bool(q.get("retained")) for q in quotes.values()),
                         "elapsed_seconds": round(time.monotonic() - started, 3), "providers": dict(served),
                         "finnhub_checked": len(checked), "priority_overflow": overflow,
-                        "plan": "Watchlist, shortlist, top 100, remainder; 450s real-time interval, 900s Yahoo; 50 starts/minute",
+                        "plan": "Watchlist, shortlist, top 100, remainder; 450s real-time interval, 900s Yahoo; 33 starts/minute",
                         "warnings": ["Provider display/redistribution rights must be approved before client publication"]}}
 
 

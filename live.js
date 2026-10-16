@@ -16,7 +16,7 @@
 
   const ALLOWED_ORIGINS = ['https://soham-porwal.github.io', 'https://samsej.github.io'];   // Worker allow-list (chat-proxy/worker.js)
   const MAX_BATCH = 12;            // Worker accepts 1 to 12 symbols per request
-  const OPEN_POLL_MS = 20000;      // Worker caches 30 s; 20 s keeps observations under a minute without extra provider calls
+  const OPEN_POLL_MS = 15000;      // Worker caches 30 s and grants refreshes stalest-first; 15 s keeps served prints inside a minute
   const FILE_POLL_MS = 60000;
   const SYMBOL = /^[A-Z][A-Z0-9.-]{0,14}$/;
   const isNum = v => typeof v === 'number' && isFinite(v);
@@ -129,12 +129,29 @@
   /* ------------------------------------------------------------ engine state */
   const ST = {quotes: {}, file: null, subs: new Set(), owners: {}, cursor: 0, timers: [], started: false,
     worker: {url: '', enabled: false, reason: 'not configured', last: null, error: '', errors: {}},
-    fileState: {last: null, error: ''}, status: null, polling: false};
+    fileState: {last: null, error: ''}, status: null, polling: false, vis: new Map(), seen: new WeakSet(), io: null, visTimer: null};
   const doc = root.document;
   const now = () => Date.now();
 
+  // Every rendered price cell ([data-live]) is observed; the names actually in the viewport are polled, whatever
+  // view drew them (Research rows after scroll/sort/filter, heatmap, dashboards). Removed cells drop out.
+  const VISIBLE_MAX = 24;
+  function visibleTickers() {
+    const out = [];
+    for (const [el, t] of ST.vis) { if (!el.isConnected) ST.vis.delete(el); else if (!out.includes(t)) out.push(t); }
+    return out.slice(0, VISIBLE_MAX);
+  }
+  function observe(scope) {
+    if (!root.IntersectionObserver || !scope || !scope.querySelectorAll) return;
+    ST.io ||= new root.IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) ST.vis.set(e.target, e.target.getAttribute('data-live')); else ST.vis.delete(e.target); });
+      clearTimeout(ST.visTimer); ST.visTimer = setTimeout(() => { if (ST.started) schedule(true); paintHealth(); }, 250);
+    });
+    scope.querySelectorAll('[data-live]').forEach(el => { if (!ST.seen.has(el)) { ST.seen.add(el); ST.io.observe(el); } });
+  }
   function onScreen() {
-    const order = ['company', 'index', 'shortlist', 'watchlist', 'other'];
+    const order = ['company', 'index', 'research', 'visible', 'shortlist', 'watchlist', 'other'];
+    ST.owners.visible = visibleTickers();
     const all = [];
     order.concat(Object.keys(ST.owners).filter(k => !order.includes(k))).forEach(k => (ST.owners[k] || []).forEach(t => all.push(t)));
     return [...new Set(all.map(t => String(t).toUpperCase()).filter(t => SYMBOL.test(t)))];
@@ -254,6 +271,7 @@
   }
   function paint(scope, changed) {
     if (!scope || !scope.querySelectorAll) return;
+    observe(scope);
     const nowMs = now(), set = changed ? new Set(changed) : null, anim = !reduced();
     scope.querySelectorAll('[data-live]').forEach(el => {
       const t = el.getAttribute('data-live');

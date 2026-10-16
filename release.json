@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261016-r5",
+  "release_id": "brief-client-20261016-r6",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-16T18:00:00+00:00",
-  "source_commit": "c9d9b92",
+  "built_at": "2026-10-16T18:45:00+00:00",
+  "source_commit": "17d2f92",
   "data_session": "2026-10-15",
   "tickers": 509,
   "current_constituents": 503,
@@ -11,19 +11,19 @@
   "default_view": "brief",
   "chat": "deterministic dashboard facts and confirmed actions; optional verified rephrasing",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
-  "price_feed": "On-screen names: Finnhub real-time quotes through the shared Worker, polled about every 20 seconds in market hours. Other names: shared quote file (Finnhub, Alpaca IEX, then delayed Yahoo per quote), scheduled about every 8 minutes in market hours; GitHub can delay scheduled runs. The header names the on-screen scope and dates the other prices; every price shows its own observation time. The client site mirrors the preview quote file on its own schedule.",
+  "price_feed": "Names in view: Finnhub real-time quotes through the shared Worker, polled every 15 seconds in market hours; the free key is split 22 calls/minute for viewed names (granted stalest-first, shared across visitors, 30 s cache) and about 33/minute for the paced index sweep, so about 11 names stay inside a one-minute window and larger views rotate. Other names: shared quote file (Finnhub, Alpaca IEX, then delayed Yahoo per quote), a full sweep takes about 15 minutes and GitHub can delay scheduled runs; the client site mirrors the preview file. The header names the on-screen scope and dates the other prices; every price shows its own observation time.",
   "verification": {
     "python": {
       "passed": 1005,
       "failed": 0,
-      "receipt": "claude-final-python.txt",
-      "run_at": "2026-10-16, source c9d9b92"
+      "receipt": "live-final-python.txt",
+      "run_at": "2026-10-16, source 17d2f92"
     },
     "javascript_chat_worker": {
-      "passed": 345,
+      "passed": 347,
       "failed": 0,
-      "receipt": "claude-final-js.txt",
-      "run_at": "2026-10-16, source c9d9b92"
+      "receipt": "live-final-js.txt",
+      "run_at": "2026-10-16, source 17d2f92"
     },
     "evidence_dir": "Data/Logs/brief-client-recovery-20261016 (private)"
   },

@@ -490,7 +490,7 @@ function mount(el, ticker, opts) {
     if (!st.alive) return false;
     const q = quotes && quotes.quotes && quotes.quotes[t], previous = st.q;
     const asof = q && Date.parse(q.asof_utc || q.ts), last = previous && Date.parse(previous.asof_utc || previous.ts);
-    if (!q || q.status !== 'ok' || !isNum(q.price) || q.price <= 0 || !isFinite(asof) || asof > Date.now() + 60000 || isFinite(last) && asof < last) return false;
+    if (!q || q.status === 'missing' || !isNum(q.price) || q.price <= 0 || !isFinite(asof) || asof > Date.now() + 60000 || isFinite(last) && asof < last) return false;
     st.quotes = quotes; applyLive(true);
     return true;
   }

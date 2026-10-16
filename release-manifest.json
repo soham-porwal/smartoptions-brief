@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261016-r5",
-  "built_at": "2026-10-16T17:38:23.429126+00:00",
-  "source_base": "c9d9b92c96be62a3b2284236778d69c538393925",
+  "release_id": "brief-client-20261016-r6",
+  "built_at": "2026-10-16T18:13:28.720550+00:00",
+  "source_base": "17d2f92a451cf24e3f8c8e043c51081ac9da8807",
   "ui_assets": {
     "about.js": {
       "sha256": "367867c42efae1fd57d519675f4f4f6521bb69d52d5e2625bd6e32ee053e7be5",
@@ -12,16 +12,16 @@
       "bytes": 11449
     },
     "app.js": {
-      "sha256": "bcf5fee48964af29870cf0b6ea5d199ed278283e8e71fe1b98f79b87a7c4f220",
-      "bytes": 56280
+      "sha256": "9aa84a63a50b0c53de6c35162b9f5c2fb3627808e31be258dc6cee0c733ddc1b",
+      "bytes": 56037
     },
     "brief.css": {
       "sha256": "2dc63a07d3a99b62b52c646c0e4571ec71adb11416eec35cbd3d5a9d25745d8a",
       "bytes": 32611
     },
     "brief.js": {
-      "sha256": "d7d142b964f50143f99313d90ff333f5a646dbe08576e3ac4029d378965ec941",
-      "bytes": 79318
+      "sha256": "0193a968e0a060c07aa575e9f2a48a9acfb0b95666a0612f6fb1c9c95dc2e093",
+      "bytes": 79350
     },
     "chat-popup.css": {
       "sha256": "4e1618d9c6933a29420fcabe93f731cd2372e03512b36346b1029fd9a1fc7911",
@@ -36,8 +36,8 @@
       "bytes": 21432
     },
     "company.js": {
-      "sha256": "446ad83967a7a49d34adfad60c52b37678152537d7676fca5941c1319f9a5b69",
-      "bytes": 53212
+      "sha256": "bcff7001236c3346eca19a4da1005e150bc7273da8b29a014c0efc9e80ec6c03",
+      "bytes": 53217
     },
     "confidence.css": {
       "sha256": "fecd45a5e740b9bbc84729b47c758acd0b2402784b14ea0a965252eca6ba095e",
@@ -120,7 +120,7 @@
       "bytes": 22208
     },
     "index.html": {
-      "sha256": "d5c280359f2c7b86446e206bc3d6a6a0d05f5151aff45d67f04627c64de2eb87",
+      "sha256": "e716a1f559b4ca7d944eb7967d27c442708edcb6f691aefae3aba9b3e61eaa74",
       "bytes": 5839
     },
     "intelligence.css": {
@@ -136,8 +136,8 @@
       "bytes": 4572
     },
     "live.js": {
-      "sha256": "05811edba5eaa76e7a4e17b0f7058632b56aeffa8159a19a5be1c8e061a21b80",
-      "bytes": 18572
+      "sha256": "f7a13f4a792819acbd6de8e69c5607b166415116003ef5ce4c85d1367ae30d27",
+      "bytes": 19752
     },
     "macro.js": {
       "sha256": "ef630bc6efc0d92d1e5a9e11b217e283f5344af3c03108bcd9ecfdbaf8b7418f",
@@ -256,8 +256,8 @@
       "bytes": 163551
     },
     "release.json": {
-      "sha256": "d3341d5b811c7b20d4e0c5b0b9e571ba01535816084becb539121be7e8e79d91",
-      "bytes": 2051
+      "sha256": "110221a06c7d8b02ff3af119871acfc82f88b2191965df744684365330b3e78f",
+      "bytes": 2241
     }
   },
   "data_at_publication": {

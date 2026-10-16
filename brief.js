@@ -403,7 +403,7 @@
     if (lh) {
       const f = lh.feed, w = lh.worker;
       rows.push({label: 'Prices on this screen (' + (lh.coverage ? lh.coverage.watched : 0) + ' names)', asof: f.words.replace(/^[^,]*, /, ''), status: f.word === 'live' ? 'live' : f.word,
-        cadence: w.enabled ? 'Every 20 seconds in market hours' : 'Shared file, checked every minute',
+        cadence: w.enabled ? 'Every 15 seconds in market hours; about 11 names per 30 s shared' : 'Shared file, checked every minute',
         provider: (f.providers || []).join('; ') || 'Not available',
         note: (w.enabled ? 'Fast path: ' + w.reason + '.' : w.reason + '.') + (w.error ? ' ' + w.error : '') + (f.missing ? ' ' + f.missing + ' of ' + f.of + ' names have no price.' : '') +
           (Object.keys(w.errors || {}).length ? ' ' + Object.entries(w.errors).slice(0, 3).map(([t, e]) => t + ': ' + e).join('; ') + '.' : '')});
