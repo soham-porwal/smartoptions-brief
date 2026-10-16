@@ -124,7 +124,7 @@
       else { status = 'stale'; words = 'Prices ' + ageWords(ageH); }
     } else {
       status = ageH <= 20 ? 'fresh' : ageH <= 72 ? 'delayed' : 'stale';
-      words = ageH <= 20 ? 'Market closed, prices at last close' : 'Market closed, prices ' + ageWords(ageH);
+      words = 'Market closed, prices ' + ageWords(ageH);   // quotes may include after-hours prints, so never say "at close"
     }
     return {status, words, ageH, note: src};
   }
@@ -145,7 +145,7 @@
       const o = String(health.overall).toLowerCase();
       if ((RANK[o] == null ? 3 : RANK[o]) > RANK[worst]) worst = o;
     }
-    return {text: parts.join(', '), status: worst, prices: pf};
+    return {text: parts.join(', '), short: pf.words.split(',')[0], status: worst, prices: pf};
   }
 
   // display a Metric value with its unit; null -> "Not available"
@@ -265,7 +265,7 @@
         <a href="#/brief" data-nav="brief">Brief</a><a href="#/company" data-nav="company">Companies</a><a href="#/macro" data-nav="macro">Macro</a><a href="#/research/overview" data-nav="research">Research</a>
       </nav>
       <div class="bv-hdr-r">
-        <button type="button" class="bv-pill" id="bv-pill" aria-haspopup="dialog" aria-expanded="false"><span class="bv-dot"></span><span class="bv-pill-t">Checking data</span></button>
+        <button type="button" class="bv-pill" id="bv-pill" aria-haspopup="dialog" aria-expanded="false"><span class="bv-dot"></span><span class="bv-pill-t">Checking data</span><span class="bv-pill-s" aria-hidden="true"></span></button>
         <button type="button" class="bv-theme" id="bv-theme" aria-label="Switch to dark theme" title="Theme"></button>
       </div></div>`;
     doc.body.prepend(hdr);
@@ -306,6 +306,7 @@
     const p = pillText(h, ST.quotes, Date.now());
     const el = doc.getElementById('bv-pill'); if (!el) return;
     el.querySelector('.bv-pill-t').textContent = p.text;
+    el.querySelector('.bv-pill-s').textContent = p.short;
     el.dataset.st = tone(p.status);
     el.setAttribute('aria-label', 'Data freshness: ' + p.text + '. Show details.');
     if (!doc.getElementById('bv-pop').hidden) renderPop();
@@ -320,7 +321,7 @@
       note: (ST.quotes ? ST.quotes.source + '. Checked every minute while this page is open.' : 'Quotes file did not load.')});
     // group per-category macro series and build receipts so the table stays short; worst status and oldest age win
     const groups = {};
-    (h.sources || []).filter(s => !(ST.quotes && s.id === 'quotes')).forEach(s => {
+    (h.sources || []).filter(s => !(ST.quotes && s.id === 'quotes') && s.id !== 'sam').forEach(s => {   // Sam's scores get their own line below
       const g = /^macro_/.test(s.id) ? 'macro_obs' : /receipt/i.test(s.label || '') ? 'build' : s.id;
       (groups[g] = groups[g] || []).push(s);
     });
