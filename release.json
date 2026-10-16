@@ -3,7 +3,7 @@
   "release_id": "brief-client-20261016-r7-price",
   "product": "SmartOptions Brief",
   "built_at": "2026-10-16T18:47:55.795362+00:00",
-  "source_commit": "4323b511ab07ff6bdc0f3497c7f6277e7b55fbcb",
+  "source_commit": "1927e5a",
   "data_session": "2026-10-15",
   "tickers": 509,
   "current_constituents": 503,
@@ -14,15 +14,19 @@
   "price_feed": "Visible quotes: one shared Worker cache/budget for interactive and sweep traffic, 58/min and 30/sec upstream limits, 30s cache, protective 40000/day. Per-name live/older/source-wait states preserve trade and successful-check times. Full-universe file is a paced snapshot; GitHub cron is best effort.",
   "verification": {
     "javascript_chat_worker": {
-      "passed": 361,
+      "passed": 362,
       "failed": 0,
       "skipped": 0,
-      "receipt": "price-now-js-final.txt",
-      "run_at": "2026-10-16T18:47:55.795362+00:00"
+      "receipt": "price-now-js-wake-2.txt",
+      "run_at": "2026-10-16T18:53:27.637576+00:00"
     },
     "python": {
       "status": "pending final rerun; previous full run interrupted during priority steering",
-      "receipt": "reliability-full-python-1.txt"
+      "receipt": "reliability-full-python-1.txt",
+      "targeted_quotes": {
+        "passed": 14,
+        "receipt": "price-now-python.txt"
+      }
     },
     "scope": "Price milestone; full analytics acceptance pending",
     "evidence_dir": "Data/Logs/brief-client-recovery-20261016"
