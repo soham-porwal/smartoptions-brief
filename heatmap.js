@@ -82,11 +82,10 @@ function colorFor(pct, period, palette) {
 /* changeOf(row, quote, period): {pct, px, src}. 1D prefers an ok quote dated on/after the core session. */
 function changeOf(row, q, period) {
   const key = (PERIODS[period] || PERIODS['1D']).key;
-  const qOk = q && q.status === 'ok' && (q.change_status == null || q.change_status === 'ok') && isNum(q.price) && isNum(q.chg_pct)
-    && (!row.pxd || String(q.ts || '').slice(0, 10) >= row.pxd);
-  const px = qOk ? q.price : (isNum(row.px) ? row.px : null);
-  if (period === '1D' && qOk) return {pct: q.chg_pct, px, src: 'quote', ts: q.ts};
-  return {pct: isNum(row[key]) ? row[key] : null, px, src: 'core', ts: row.pxd || null};
+  const qOk = q && isNum(q.price) && q.price>0 && (!row.pxd || String(q.ts || q.asof_utc || '').slice(0,10)>=row.pxd);
+  const px=qOk?q.price:(isNum(row.px)?row.px:null);
+  if(period==='1D' && qOk) return {pct:isNum(q.chg_pct)?q.chg_pct:null,px,src:'quote',ts:q.ts||q.asof_utc};
+  return {pct:isNum(row[key])?row[key]:null,px,src:'core',ts:row.pxd||null};
 }
 /* sectorStats(rows, quotes, period): cap-weighted % change per sector over names with a value. */
 function sectorStats(rows, quotes, period) {
@@ -180,7 +179,7 @@ function mount(el, opts) {
       const showT = tl.w >= 26 && tl.h >= 15 && fs >= 9, showP = showT && tl.h >= fs * 2.3 + 4 && pTxt.length * pfs * 0.6 <= tl.w - 4;
       const cx = tl.x + tl.w / 2, cy = tl.y + tl.h / 2;
       const delay = anim && !reduced() ? Math.min(420, i * 1.2) : 0;
-      parts.push(`<g class="hm-tile${na ? ' hm-na' : ''}" data-t="${esc(tl.t)}" style="--d:${delay}ms">` +
+      parts.push(`<g class="hm-tile${na ? ' hm-na' : ''}" data-live="${esc(tl.t)}" data-live-f="watch" data-t="${esc(tl.t)}" style="--d:${delay}ms">` +
         `<rect x="${tl.x + 0.5}" y="${tl.y + 0.5}" width="${Math.max(0, tl.w - 1)}" height="${Math.max(0, tl.h - 1)}" style="fill:${colorFor(c.pct, st.period, st.pal)}"/>` +
         (showT ? `<text class="hm-t" x="${cx}" y="${showP ? cy - fs * 0.12 : cy + fs * 0.35}" style="font-size:${fs.toFixed(1)}px">${esc(tl.t)}</text>` : '') +
         (showP ? `<text class="hm-p" x="${cx}" y="${cy + fs * 0.95}" style="font-size:${pfs.toFixed(1)}px">${esc(pTxt)}</text>` : '') + '</g>');
@@ -190,6 +189,7 @@ function mount(el, opts) {
     svg.querySelectorAll('.hm-tile').forEach(g => tileEls.set(g.dataset.t, g));
     applyHighlight();
     renderSectors(); renderLegend();
+    if(root.SmartOptionsLive?.paint)root.SmartOptionsLive.paint(svg);
   }
   // re-color in place (period change / live quotes): CSS transition on fill gives the cross-fade
   function recolor() {
@@ -232,10 +232,11 @@ function mount(el, opts) {
   }
   function showTip(t, ev) {
     const r = byT.get(t); if (!r) return;
+    root.SmartOptionsLive?.watch('heatmap-hover',[t]);
     const c = changeOf(r, st.quotes[t], st.period);
     const peers = st.rows.filter(x => x.sec === r.sec && x.t !== t).sort((a, b) => b.mcap - a.mcap).slice(0, 5);
     tip.innerHTML = `<div class="hm-tip-h"><b>${esc(t)}</b> <span>${esc(r.n || '')}</span></div>
-      <div class="hm-tip-row"><span>Price</span><b>${esc(fmtPx(c.px))}</b></div>
+      <div class="hm-tip-row"><span>Price</span><b>${esc(fmtPx(c.px))}</b><small>${esc(st.quotes[t] ? (st.quotes[t].ts||st.quotes[t].asof_utc||'') : r.pxd||'')} · ${esc(root.SmartOptionsLive?.classify(st.quotes[t],Date.now()).label||'last close')}</small></div>
       <div class="hm-tip-row"><span>Change, ${esc(st.period)}</span><b class="${isNum(c.pct) ? (c.pct >= 0 ? 'up' : 'dn') : ''}">${esc(fmtPct(c.pct))}</b></div>
       <div class="hm-tip-row"><span>Market cap</span><b>${esc(fmtCap(r.mcap))}</b></div>
       <div class="hm-tip-row"><span>Sector</span><b>${esc(r.sec || 'Not available')}</b></div>
@@ -283,6 +284,7 @@ function mount(el, opts) {
     return n;
   }
   const L = root.SmartOptionsLive;
+  if(L&&L.paint)L.paint(el);
   const unsub = L && L.subscribe ? L.subscribe(ev => {
     if (!st.alive || !st.rows.length || !ev.changed || !ev.changed.length) return;
     const xs = {}; ev.changed.forEach(t => { if (byT.has(t)) { const q = L.get(t); if (q) xs[t] = q; } });

@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261016-r6",
-  "built_at": "2026-10-16T18:13:28.720550+00:00",
-  "source_base": "17d2f92a451cf24e3f8c8e043c51081ac9da8807",
+  "release_id": "brief-client-20261016-r7-price",
+  "built_at": "2026-10-16T18:47:55.795362+00:00",
+  "source_base": "4323b511ab07ff6bdc0f3497c7f6277e7b55fbcb",
   "ui_assets": {
     "about.js": {
       "sha256": "367867c42efae1fd57d519675f4f4f6521bb69d52d5e2625bd6e32ee053e7be5",
@@ -12,16 +12,16 @@
       "bytes": 11449
     },
     "app.js": {
-      "sha256": "9aa84a63a50b0c53de6c35162b9f5c2fb3627808e31be258dc6cee0c733ddc1b",
-      "bytes": 56037
+      "sha256": "00ed477e8ab4c43ef7088244ea3b938ea4f465c31c05db66c7dbe45ee861ebd6",
+      "bytes": 56987
     },
     "brief.css": {
       "sha256": "2dc63a07d3a99b62b52c646c0e4571ec71adb11416eec35cbd3d5a9d25745d8a",
       "bytes": 32611
     },
     "brief.js": {
-      "sha256": "0193a968e0a060c07aa575e9f2a48a9acfb0b95666a0612f6fb1c9c95dc2e093",
-      "bytes": 79350
+      "sha256": "f45a3f7d820b0c9dde006b7cefb4c132c0c0eae6db28e30fa891f1b7e5ec9827",
+      "bytes": 82376
     },
     "chat-popup.css": {
       "sha256": "4e1618d9c6933a29420fcabe93f731cd2372e03512b36346b1029fd9a1fc7911",
@@ -36,8 +36,8 @@
       "bytes": 21432
     },
     "company.js": {
-      "sha256": "bcff7001236c3346eca19a4da1005e150bc7273da8b29a014c0efc9e80ec6c03",
-      "bytes": 53217
+      "sha256": "cd207c572102ed14eefc9979870b990f51ba9d2af8639f2d620f57f70f593ba1",
+      "bytes": 56084
     },
     "confidence.css": {
       "sha256": "fecd45a5e740b9bbc84729b47c758acd0b2402784b14ea0a965252eca6ba095e",
@@ -68,8 +68,8 @@
       "bytes": 16722
     },
     "edge-desk.js": {
-      "sha256": "d307b451deaf6f394e7fcd4634b0045140d43b4609aa1225bda394a044f70305",
-      "bytes": 67945
+      "sha256": "9cc1f1b990ba949c8f7827b07c36dd96b19332f478f413139b905e7992735e9e",
+      "bytes": 69479
     },
     "explore.css": {
       "sha256": "41e12753586c4348a5e93ba3a43544c7d0f93e0166b675a3ce54de94936cab51",
@@ -100,8 +100,8 @@
       "bytes": 6716
     },
     "heatmap.js": {
-      "sha256": "274a9fca4ef7065c32798b3e5218403cabdec13e5cb5402bf7a18415537b8b4c",
-      "bytes": 23415
+      "sha256": "240ae540e7566fa287f93d89b64432d3804f8208f05750e299e5a1c6e3c256d4",
+      "bytes": 24068
     },
     "impact.css": {
       "sha256": "5037786233789fd0f1b85554b51404d8e8731e5a80ad9e927453f231d4b5c0cc",
@@ -120,24 +120,24 @@
       "bytes": 22208
     },
     "index.html": {
-      "sha256": "e716a1f559b4ca7d944eb7967d27c442708edcb6f691aefae3aba9b3e61eaa74",
-      "bytes": 5839
+      "sha256": "28d1cbbe3c2c719b42a1fb12659aefabbc6242348d1f1421441b2f16ba835579",
+      "bytes": 5958
     },
     "intelligence.css": {
       "sha256": "adc81cb529dfa2a34c95bbcc0d09e64411552bc274a3c7c5a3a946c8f81ceeff",
       "bytes": 5333
     },
     "intelligence.js": {
-      "sha256": "8737567dad25f5a2f2f7aea4bf3a92946044ebb276f06744ef8f910e34996af0",
-      "bytes": 13248
+      "sha256": "debc045de57a95dd27f0e230aae2dac2f060fb610bbc27ed3c01ad6706bad88c",
+      "bytes": 13955
     },
     "live.css": {
       "sha256": "da19182dbdd860e491667b35be962b34eb785a52885e31564e02f99a5b3b50a7",
       "bytes": 4572
     },
     "live.js": {
-      "sha256": "f7a13f4a792819acbd6de8e69c5607b166415116003ef5ce4c85d1367ae30d27",
-      "bytes": 19752
+      "sha256": "403fda4a239b98f5f5d0a731c8541def8ffd8076f497f16f9dbdf25f92099956",
+      "bytes": 27280
     },
     "macro.js": {
       "sha256": "ef630bc6efc0d92d1e5a9e11b217e283f5344af3c03108bcd9ecfdbaf8b7418f",
@@ -156,16 +156,16 @@
       "bytes": 4982
     },
     "my-dashboard.js": {
-      "sha256": "5f377ef65f5753363479d9dbb7e82cbbc4e0b4bcddf0e0606961a52a0c3b476d",
-      "bytes": 19563
+      "sha256": "e3713aaa4d25a76061c632badfca6f81d6e393beb74891c3e0fa41a3f875d427",
+      "bytes": 19867
     },
     "overview.css": {
       "sha256": "4e347a69023fd77efc18ab12189358f144ba89b2cbb6bc49848314d46d42a039",
       "bytes": 10832
     },
     "overview.js": {
-      "sha256": "0b8e4eed0e2495a039004d555ba04808ba469723f5e4063b97a36ebf44db6feb",
-      "bytes": 28191
+      "sha256": "b1ec4a365583bc758e0cb6736051addecebeef80e497551d08a42beafa88368a",
+      "bytes": 28922
     },
     "patterns.css": {
       "sha256": "2d041b4ce26f2494264e5bcbdc2286f61c055a6eef34b223f01963868419dd00",
@@ -188,8 +188,8 @@
       "bytes": 4607
     },
     "strategies.js": {
-      "sha256": "965979fd8b250311b9a5cc0dea60408187d4f30871e410176276a2ea1b23400e",
-      "bytes": 61606
+      "sha256": "e99a069c475949927acf164d828a3c074f3883d457eab2d6ee44e93d07c20e58",
+      "bytes": 62675
     },
     "technicals.css": {
       "sha256": "f7bd3abc8f2dd85b0bbb46c4e9043e2fc4903ec1dfee282b56c3d090e758142f",
@@ -236,8 +236,8 @@
       "bytes": 2416
     },
     "chat/runtime.js": {
-      "sha256": "29cfe738cbeac5e358c8415c7e0d9ef30c4bdbbb0d35ee8bcc82dfbba3ae5bfd",
-      "bytes": 3917
+      "sha256": "f00817e142fd92404e27c7d67fda243a7ab40151fa6118804c68ed6cf35d5724",
+      "bytes": 4180
     },
     "chat/universe.js": {
       "sha256": "b7c2ee0134e9eb2041e4833db1df993f61c2ac39b8d55cb9b11af5e7a3e3444d",
@@ -256,8 +256,8 @@
       "bytes": 163551
     },
     "release.json": {
-      "sha256": "110221a06c7d8b02ff3af119871acfc82f88b2191965df744684365330b3e78f",
-      "bytes": 2241
+      "sha256": "712eda1c0bd3e89c6421f10a6a12896ae5757d42b6adf93feb5337d96590399b",
+      "bytes": 2077
     }
   },
   "data_at_publication": {
@@ -286,6 +286,6 @@
       "bytes": 11881
     }
   },
-  "note": "Dataset hashes describe publication, not subsequent scheduled refreshes; observations retain individual dates. data/quotes.json is owned by each site's scheduled quote refresh and is compared by per-symbol observation, not file hash.",
+  "note": "Price milestone. Dynamic quote files retain newer scheduled observations; full analytics acceptance is pending.",
   "publication_encoding": "UTF-8, LF; exact Git/Pages asset bytes"
 }

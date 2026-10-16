@@ -29,7 +29,7 @@ def guard_core(core):
                 ('sam_drift', 'tgt', 'pe', 'pef', 'eps_g_imp', 'pef_sec_rel', 'mcap', 'lo', 'hi')}))
             row['basis_warning'] = ACTION_REASON
             row['basis_source_url'] = ACTION_URL
-            for key in ('sam_drift', 'tgt', 'pe', 'pef', 'eps_g_imp', 'pef_sec_rel', 'lo', 'hi'):
+            for key in ('sam_drift', 'tgt', 'up', 'pe', 'pef', 'eps_g_imp', 'pef_sec_rel', 'lo', 'hi'):
                 row[key] = None
             row['target_reason'] = ACTION_REASON
             row['eps_ratio_note'] = ACTION_REASON

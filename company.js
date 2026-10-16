@@ -117,8 +117,17 @@ function trendWord(s) {
   if (!s || !isNum(s.vs50) || !isNum(s.vs200)) return null;
   return s.vs50 >= 0 && s.vs200 >= 0 ? 'uptrend' : s.vs50 < 0 && s.vs200 < 0 ? 'downtrend' : 'mixed trend';
 }
+function currentDocument(doc,s,asof) {
+  if(!doc||!s)return doc;
+  const old=doc.cards&&doc.cards.valuation,med=old&&(old.metrics||[]).find(m=>m.label==='Sector trailing P/E median');
+  if(!med||!isNum(med.value)||med.value<=0||!isNum(s.pe))return doc;
+  const ratio=s.pe/med.value,status=ratio<=0.8?'strong':ratio>=1.5?'weak':'ok';
+  const metrics=(old.metrics||[]).map(m=>m.label==='Trailing P/E'?Object.assign({},m,{value:s.pe,asof,period:asof}):m.label==='Trailing P/E / sector median'?Object.assign({},m,{value:ratio,asof,period:'Latest price / dated sector earnings multiple'}):m);
+  return Object.assign({},doc,{cards:Object.assign({},doc.cards,{valuation:Object.assign({},old,{status,line:`Trailing P/E is ${ratio.toFixed(2)} times the dated sector median on the latest price.`,metrics})})});
+}
 /* verdict(doc, stats): one observed line plus a one or two sentence reason. Deterministic; not advice. */
 function verdict(doc, s) {
+  doc=currentDocument(doc,s);
   const tl = doc ? tally(doc) : null, cards = (doc && doc.cards) || {};
   const measured = tl ? tl.strong + tl.ok + tl.weak : 0;
   let fund = null, tone = 'none';
@@ -152,7 +161,7 @@ function verdict(doc, s) {
 function watchRow(row, q, nowMs) {
   const price = q && isNum(q.price) && q.price > 0 ? q.price : row && isNum(row.px) ? row.px : null;
   const s = liveStats(row, price, null, nowMs);
-  s.chg = q && isNum(q.chg_pct) ? q.chg_pct : q && isNum(q.change_pct) ? q.change_pct : row && isNum(row.d1) ? row.d1 : null;
+  s.chg = q && isNum(q.chg_pct) ? q.chg_pct : q && isNum(q.change_pct) ? q.change_pct : !q && row && isNum(row.d1) ? row.d1 : null;
   s.rating = row && row.rating ? String(row.rating).replace(/_/g, ' ') : null; s.analysts = row && isNum(row.nan) ? row.nan : null;
   s.fromQuote = !!(q && isNum(q.price) && q.price > 0);
   return s;
@@ -235,6 +244,8 @@ function pickQuote(t, quotes) {
   return a || b;
 }
 function freshOf(q, quotes) {
+  if(q?.delivery_state==='older')return {word:'older',label:'Older quote',text:'Latest provider report '+(q.asof_utc||q.ts)+'; source checked '+(q.checked_at||q.retrieved_at)};
+  if(q?.delivery_state==='blocked')return {word:'blocked',label:'Source wait',text:'Current source request unavailable; original observation retained'};
   if (!q) return {word: 'snapshot', label: 'Last close', text: 'No current quote; showing the snapshot close'};
   const L = live();
   if (L && L.classify) { const c = L.classify(q, Date.now()); return {word: c.word, label: c.label, text: (q.provider || 'Quote feed') + ', ' + fmtET(q.asof_utc || q.ts)}; }
@@ -416,7 +427,7 @@ function mount(el, ticker, opts) {
     const q = pickQuote(t, st.quotes), row = st.row || {};
     const prevPrice = st.q && st.q.price;
     st.q = q;
-    const price = q ? q.price : isNum(row.px) ? row.px : null;
+    const price = q?.current_usable===false ? null : q ? q.price : isNum(row.px) ? row.px : null;
     const chg = q && isNum(q.chg_pct) ? q.chg_pct : q && isNum(q.change_pct) ? q.change_pct : !q && isNum(row.d1) ? row.d1 : null;
     const fr = freshOf(q, st.quotes), ftone = FRESH_TONE[fr.word] || 'none';
     const px = el.querySelector('.co-px');
@@ -424,11 +435,14 @@ function mount(el, ticker, opts) {
       px.innerHTML = `<b class="co-price">${isNum(price) ? usd(price) : 'Not available'}</b>
         ${isNum(chg) ? `<span class="co-chg ${chg >= 0 ? 'up' : 'dn'}">${sgnPct(chg, 2)}</span>` : ''}
         <span class="b-chip sm t-${ftone} co-fresh" title="${esc(fr.text)}">${ICON[ftone]}${esc(cap1(fr.label))}</span>
-        <span class="co-src">${q ? esc(fmtET(q.asof_utc || q.ts)) + ' · ' + esc(shortProvider(q.provider)) + (q.cached ? ' · cached' : '') : row.pxd ? 'Close of ' + esc(row.pxd) + ' · Yahoo Finance' : 'No price observation'}</span>`;
+        <span class="co-src">${q ? esc(fmtET(q.asof_utc || q.ts)) + ' · ' + esc(shortProvider(q.provider)) + (q.cached ? ' · cached' : '') + (q.checked_at||q.retrieved_at ? ' · source checked '+esc(q.checked_at||q.retrieved_at) : '') + (q.current_usable===false?' · Last reported '+usd(q.price)+'; current price unavailable':'') : row.pxd ? 'Close of ' + esc(row.pxd) + ' · Yahoo Finance' : 'No price observation'}</span>`;
       if (flash && isNum(prevPrice) && isNum(price) && prevPrice !== price && !reduced() && px.animate) px.querySelector('.co-price').animate([{backgroundColor: price > prevPrice ? 'var(--b-good-bg, #e3f1e8)' : 'var(--b-bad-bg, #f7e2df)'}, {backgroundColor: 'transparent'}], {duration: 600, easing: 'ease-out'});
     }
+    let context=el.querySelector('.co-live-context');if(!context){context=root.document.createElement('p');context.className='co-live-context co-src';el.querySelector('.co-head')?.appendChild(context);}const engine=live();if(context&&engine?.currentContext)context.textContent=engine.currentContext(t,engine.snapshot(),st.intel?.companies?.[t]?.model_asof);
     const s = liveStats(row, price, st.lv, Date.now());
-    const V = verdict(st.doc, s), vEl = el.querySelector('.co-verdict');
+    const current=currentDocument(st.doc,s,q&&(q.asof_utc||q.ts));
+    const card=el.querySelector('#co-valuation'); if(card&&current&&current.cards&&current.cards.valuation){const open=card.classList.contains('co-open');const wrap=root.document.createElement('div');const entry=CARDS.find(x=>x[0]==='valuation');wrap.innerHTML=cardHtml('valuation',entry[1],entry[2],current.cards.valuation,4,st.doc.asof_session,t);card.replaceWith(wrap.firstElementChild);if(open)setCard(el.querySelector('#co-valuation'),true);}
+    const V = verdict(current, s), vEl = el.querySelector('.co-verdict');
     if (vEl) { vEl.className = 'co-verdict t-' + V.tone; vEl.innerHTML = `<p class="co-vl"><span class="co-kind">Observed</span>${esc(V.line)}</p><p class="co-vr">${esc(V.reason)}</p>`; }
     st.tiles = statTiles(s, row);
     const box = el.querySelector('.co-stats');
@@ -555,7 +569,7 @@ function renderWatchlist(el, opts) {
 }
 const Watchlist = {render: renderWatchlist, row: watchRow};
 
-const API = {CARDS, TONE, fmtMetric, headline, tally, safeURL, mount, cardHtml, metricTable, liveStats, levels, verdict, trendWord, daysUntil, statTiles, relRows, sensLine, watchRow, Watchlist};
+const API = {CARDS, TONE, fmtMetric, headline, tally, safeURL, mount, cardHtml, metricTable, liveStats, levels, currentDocument, verdict, trendWord, daysUntil, statTiles, relRows, sensLine, watchRow, Watchlist};
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 root.SmartOptionsCompany = API;
 // app.js replaces window.SO2 when it loads; attach now and again once the page has loaded

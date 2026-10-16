@@ -312,7 +312,7 @@
     if (r.view !== 'research') { L.watch('research', []); L.watch('table', []); }   // Research owners stop polling when it closes
     else if (root.SO2 && root.SO2.V && root.SO2.filtered) {
       const sel = root.SO2.V.sel; L.watch('research', sel && sel.kind === 't' ? [sel.id] : []);
-      try { L.watch('table', root.SO2.filtered().slice(0, 12).map(x => x.t)); } catch (e) { console.warn('[brief] research rows not watched', e); }
+      try { L.watch('table', []); } catch (e) { console.warn('[brief] research rows not watched', e); }
     }
   }
   function startLive() {
@@ -403,9 +403,9 @@
     if (lh) {
       const f = lh.feed, w = lh.worker;
       rows.push({label: 'Prices on this screen (' + (lh.coverage ? lh.coverage.watched : 0) + ' names)', asof: f.words.replace(/^[^,]*, /, ''), status: f.word === 'live' ? 'live' : f.word,
-        cadence: w.enabled ? 'Every 15 seconds in market hours; about 11 names per 30 s shared' : 'Shared file, checked every minute',
-        provider: (f.providers || []).join('; ') || 'Not available',
-        note: (w.enabled ? 'Fast path: ' + w.reason + '.' : w.reason + '.') + (w.error ? ' ' + w.error : '') + (f.missing ? ' ' + f.missing + ' of ' + f.of + ' names have no price.' : '') +
+        cadence: w.enabled ? 'Visible names checked every 15 seconds; shared capacity from the current runtime' : 'Shared file, checked every minute',
+        quoteDetails:f.items||[], provider: (f.providers || []).join('; ') || 'Not available',
+        note: (w.enabled ? 'Source: ' + w.reason + '. ' + (w.delivery ? w.delivery.shared_provider_requests_per_minute+' checks/min shared, '+w.delivery.cache_seconds+'s cache. ' : '') : w.reason + '.') + (w.error ? ' ' + w.error : '') + (f.missing ? ' ' + f.missing + ' of ' + f.of + ' names have no price.' : '') +
           (Object.keys(w.errors || {}).length ? ' ' + Object.entries(w.errors).slice(0, 3).map(([t, e]) => t + ': ' + e).join('; ') + '.' : '')});
       const fh = lh.fileHealth;
       const cv = lh.coverage || {};
@@ -429,9 +429,9 @@
         cadence: CAD[g] || 'Daily', provider: xs[0].provider || xs[0].source || '', note: worst.note || ''});
     });
     const rc = ST.receipt;
-    rows.push(rc ? {label: 'Scheduled refresh', asof: fmtAsof(rc.finished_at || rc.attempted_at), status: RECEIPT_WORD[rc.status] || 'missing', cadence: 'Daily, GitHub Actions',
+    rows.push(rc ? {label: 'Scheduled fundamentals/macro snapshot', asof: fmtAsof(rc.finished_at || rc.attempted_at), status: RECEIPT_WORD[rc.status] || 'missing', cadence: 'Daily, GitHub Actions',
       provider: 'Refresh receipt', note: 'Last run ' + rc.status + '.' + Object.entries(rc.stages || {}).filter(([, v]) => v && v.status && !/^ok$/i.test(v.status)).map(([k, v]) => ' ' + k + ': ' + v.status + (v.error || v.note ? ' (' + (v.error || v.note) + ')' : '') + '.').join('')}
-      : {label: 'Scheduled refresh', status: 'missing', cadence: 'Daily', provider: 'Refresh receipt', note: ST.receiptErr || 'Not available.'});
+      : {label: 'Scheduled fundamentals/macro snapshot', status: 'missing', cadence: 'Daily', provider: 'Refresh receipt', note: ST.receiptErr || 'Not available.'});
     return rows;
   }
   // whenever unpolled prices exist, the pill states both scopes: on-screen quotes and the dated rest
@@ -451,13 +451,14 @@
     const lh = L ? L.health(now) : null, st = pillState(now), f = lh ? lh.feed : null, sc = priceScope(lh);
     // a live subset must not read as the whole universe: name the on-screen scope and date the rest
     const lead = f ? (sc ? f.words.replace(', as of', ' on screen, as of') + ' · others ' + sc.others_label : f.words) : 'Prices not available';
+    if(ST.route.view==='brief'){const date=doc.querySelector('.b-title .b-date'),latest=f?.items?.filter(x=>x.observation).sort((a,b)=>Date.parse(b.observation)-Date.parse(a.observation))[0];if(date&&latest)date.textContent='Quote session '+latest.observation.slice(0,10)+' · completed snapshot '+(ST.brief?.asof_session||'unavailable')+'. Reported fundamentals and models retain their dates.';}
     const worst = st.word, others = st.rows.slice(1).filter(r => (RANK[r.status] ?? 3) >= 2);
     el.querySelector('.bv-pill-t').textContent = lead + (others.length ? ' · ' + others.length + (others.length === 1 ? ' dataset needs attention' : ' datasets need attention') : '');
     const when = f ? f.words.replace(/^[^,]*, as of /, '').replace(/ ET$/, '') : '';
     const restWhen = sc ? sc.others_label.replace(/^as of /, '').replace(/ ET$/, '').split(',')[0].replace(/ [AP]M$/, '') : '';
-    el.querySelector('.bv-pill-s').textContent = !f ? 'Prices n/a' : sc ? (PILL_WORD[f.word] || f.word) + ' here' + String.fromCharCode(10) + 'rest ' + restWhen :
+    el.querySelector('.bv-pill-s').textContent = f?.summary ? f.summary : !f ? 'Prices n/a' : sc ? (PILL_WORD[f.word] || f.word) + ' here' + String.fromCharCode(10) + 'rest ' + restWhen :
       (PILL_WORD[f.word] || f.word) + (f.word === 'missing' ? '' : ' ' + (when.includes(',') ? when.split(',')[0] : when));
-    el.dataset.st = ['live', 'fresh', 'closed'].includes(worst) ? 'good' : worst === 'delayed' ? 'mixed' : 'bad';
+    el.dataset.st = f&&['live','closed'].includes(f.word)?'good':f&&['mixed','older','delayed'].includes(f.word)?'mixed':'bad';
     el.dataset.fresh = f ? f.word : 'missing';
     el.title = 'Data health: ' + lead + '. Show details.';
     el.setAttribute('aria-label', 'Data health: ' + lead + (others.length ? '; ' + others.length + ' datasets need attention' : '') + '. Show details.');
@@ -473,9 +474,10 @@
       ${!ST.brief ? `<p class="bv-sample">Brief data not available: ${esc(ST.briefErr || 'not built yet')}.</p>` : ''}
       <ul class="bv-hl">${st.rows.map(r => `<li class="bv-hr"><div class="bv-hr-top"><b>${esc(r.label)}</b><span class="bv-fresh" data-fresh="${esc(r.status)}">${esc(r.status === 'delayed' && /^Prices/.test(r.label) ? 'delayed 15m' : r.status)}</span></div>
         <div class="bv-hr-meta"><span>${esc(r.asof || 'Time not available')}</span>${r.cadence ? `<span>${esc(r.cadence)}</span>` : ''}${r.provider ? `<span>${esc(r.provider)}</span>` : ''}</div>
-        ${r.note ? `<p class="bv-hr-note">${esc(r.note)}</p>` : ''}</li>`).join('')}</ul>
+        ${r.note ? `<p class="bv-hr-note">${esc(r.note)}</p>` : ''}${r.quoteDetails?`<details><summary>Per-name observation and source check</summary><ul>${r.quoteDetails.map(q=>`<li><b>${esc(q.t)}: ${esc(q.state)}</b><br>Observation ${esc(q.observation||'unavailable')}<br>Source checked ${esc(q.checked_at||'not available')}${q.error?'<br>'+esc(q.error):''}</li>`).join('')}</ul></details>`:''}</li>`).join('')}</ul>
       <details class="bv-scr"><summary>Historical score reference</summary>${chip(scr.status || 'stale', 'sm')}<p>${esc(screenerLabel('long'))}${scr.note ? ' ' + esc(scr.note) : ''}</p></details>
-      <p class="bv-pop-foot">Live means a real-time price no more than one minute old. Delayed means the provider states a delay. Closed means the regular session has ended; the last print is shown with its time. Market hours are New York time; exchange holidays are not modelled.</p>`;
+      <button type="button" class="b-btn" data-refresh-prices>Refresh visible prices</button><p class="bv-pop-foot">Older quote means the source was successfully checked recently but its latest same-session report is older than one minute; the original trade time is retained. Live means a real-time price no more than one minute old. Delayed means the provider states a delay. Closed means the regular session has ended; the last print is shown with its time. Market hours are New York time; exchange holidays are not modelled.</p>`;
+    pop.querySelector('[data-refresh-prices]').addEventListener('click',async e=>{e.target.disabled=true;await live()?.refresh();await loadReceipt();renderPill();renderPop();});
     pop.querySelector('.bv-x').addEventListener('click', () => togglePop(false));
     placePop();
   }
@@ -526,7 +528,7 @@
       return;
     }
     const view = doc.getElementById('bv-view');
-    if (ST.receipt === undefined) loadReceipt().then(renderPill);
+    loadReceipt().then(renderPill);
     if (r.view === 'brief') { renderBrief(view); doc.title = 'Brief | SmartOptions'; }
     else if (r.view === 'macro') { renderMacroPage(view); doc.title = 'Macro | SmartOptions Brief'; }
     else if (r.view === 'company') { if (r.ticker) renderCompany(view, r.ticker); else renderCompanies(view); doc.title = (r.ticker ? r.ticker + ' | ' : 'Companies | ') + 'SmartOptions Brief'; }
@@ -832,6 +834,12 @@
   // called by the Live subscription: numbers are already repainted by data-live; refresh the derived sentences
   function liveBrief(changed) {
     if (!changed || !changed.some(t => t === 'SPY' || t === 'RSP')) return;
+    const L=live(), b=L&&L.currentBrief?L.currentBrief(ST.brief,L.snapshot()):null;
+    if(b){
+      const pulse=doc.querySelector('.b-pulse');if(pulse){const wrap=doc.createElement('div');wrap.innerHTML=pulseSection(b.pulse);pulse.replaceWith(wrap.firstElementChild);}
+      const strip=doc.querySelector('.b-macro .b-strip');if(strip){const wrap=doc.createElement('div');wrap.innerHTML=macroStrip(b.macro);strip.replaceWith(wrap.firstElementChild);}
+    }
+
     const ul = doc.getElementById('bv-now-lines'); if (!ul) return;
     const lines = nowLines();
     const html = lines.length ? lines.map(nowLine).join('') : '<li class="b-na">Not available: index prices have not arrived yet.</li>';
@@ -871,7 +879,7 @@
     });
   }
   function renderBrief(view) {
-    const b = ST.brief;
+    const L=live(); const b = L && L.currentBrief ? L.currentBrief(ST.brief,L.snapshot()) : ST.brief;
     if (!b) return missingPage(view);
     const html = `<div class="bv-wrap b-v3">${notice()}
       <div class="b-title b-enter"><h1 class="b-h1">Market brief</h1><p class="b-date">${esc(sessionWords(b))}</p></div>
@@ -901,7 +909,7 @@
     seatAskButtons(view);
   }
   function renderMacroPage(view) {
-    const b = ST.brief;
+    const L=live(); const b = L && L.currentBrief ? L.currentBrief(ST.brief,L.snapshot()) : ST.brief;
     if (!b) return missingPage(view);
     paint(view, `<div class="bv-wrap">${notice()}<div class="b-title b-enter"><h1 class="b-h1">Macro</h1><p class="b-date">${esc(sessionWords(b))}</p></div>
       <section class="b-sec b-macro">${macroStrip(b.macro)}</section>
@@ -984,7 +992,7 @@
       // the research desk has no health sheet; the receipt is read only where the pill and sheet are shown
       Promise.all([loadBrief(), r0.view === 'research' ? null : loadReceipt()]).then(() => { applyRoute(true); startLive(); renderPill(); });
       root.addEventListener('hashchange', () => applyRoute(false));
-      setInterval(() => { if (doc.visibilityState === 'visible' && ST.route.view !== 'research') loadReceipt().then(renderPill); }, 5 * 60 * 1000);
+      setInterval(() => { if (doc.visibilityState === 'visible' && ST.route.view !== 'research') loadReceipt().then(renderPill); }, 60 * 1000);
       setInterval(checkRevision,5*60*1000);
 
       doc.addEventListener('visibilitychange',()=>{if(doc.visibilityState==='visible')checkRevision();});
@@ -995,5 +1003,5 @@
   }
 
   return {parseRoute, legacyHash, routeHash, tone, ageWords, shortDate, screenerLabel, setScreener, pillText, priceFreshness, fmtValue, sortRisks, nyClock,mergeQuotes,
-    isResearch, data: () => ST.brief, dataSource: () => ST.briefSrc, chip: w => chip(w), metricRows, esc, SCREENER_ASOF_FALLBACK, _start: start};
+    isResearch, data: () => live() && live().currentBrief ? live().currentBrief(ST.brief,live().snapshot()) : ST.brief, dataSource: () => ST.briefSrc, chip: w => chip(w), metricRows, esc, SCREENER_ASOF_FALLBACK, _start: start};
 });

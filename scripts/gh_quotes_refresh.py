@@ -452,11 +452,11 @@ def refresh(core, previous=None, *, shortlist=(), watchlist=(), now=None, keys=N
     ages = [(finished_at - stamp(q.get("asof_utc"))).total_seconds() / 60 for q in quotes.values() if q.get("price") is not None and stamp(q.get("asof_utc"))]
     eligible_count = sum(bool(re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", t)) for t in symbols)
     sweep_minutes = round(max(QUOTE_INTERVAL_SECONDS, max(0, eligible_count - 1) * FINNHUB_SPACING) / 60, 1)
-    mix = f"real-time quotes from Finnhub, about {int(sweep_minutes)} minutes apart" if any("Finnhub" in str(q.get("provider")) for q in quotes.values()) else "Yahoo, about 15 minutes delayed" if any("Yahoo" in str(q.get("provider")) for q in quotes.values()) else "Quote provider not available"
+    mix = f"Finnhub observations; idle sweep lower bound about {int(sweep_minutes)} minutes apart; interactive demand can lengthen it" if any("Finnhub" in str(q.get("provider")) for q in quotes.values()) else "Yahoo, about 15 minutes delayed" if any("Yahoo" in str(q.get("provider")) for q in quotes.values()) else "Quote provider not available"
     median_age, oldest_age = (round(max(0, statistics.median(ages)), 1), round(max(0, max(ages)), 1)) if ages else (None, None)
     health = {"line": mix + (f"; median age {median_age}m, oldest {oldest_age}m" if ages else ""),
               "median_age_minutes": median_age, "oldest_age_minutes": oldest_age, "provider_mix": dict(served),
-              "estimated_sweep_minutes": sweep_minutes, "cadence_basis": "450s minimum interval or universe dispatch time at 1.8s/start; excludes slow responses",
+              "estimated_sweep_minutes": sweep_minutes, "cadence_basis": "Idle lower bound: 450s minimum interval or paced dispatch; shared interactive demand and slow responses extend it",
               "sources": [{"id": "finnhub", "status": "rejected" if fh_note == "key rejected by provider" else "missing" if not keys.get("FINNHUB_API_KEY") else "configured", "note": fh_note}]}
     spy_observed = stamp(quotes.get("SPY", {}).get("asof_utc"))
     if market_state(finished_at, spy_observed) == "closed" and spy_observed:

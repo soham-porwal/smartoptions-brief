@@ -10,11 +10,13 @@
     }
     const [brief,raw,quotes]=await Promise.all([get('brief.json'),get('core.json'),get('quotes.json',true)]);
     if(!Array.isArray(raw.rows)||!raw.rows.length)throw new Error('The core file contains no company rows.');
-    const core=Object.fromEntries(raw.rows.map(r=>[r.t,r]));
+    const L=root.SmartOptionsLive; const canonical=L&&L.snapshot?L.snapshot():quotes;
+    const core=Object.fromEntries(raw.rows.map(r=>[r.t,L&&L.currentRow?L.currentRow(r):r]));
+    const currentBrief=L&&L.currentBrief?L.currentBrief(brief,canonical):brief;
     const rows=(root.SmartOptionsUniverse?.rows||[]).filter(r=>core[r[0]]);
     for(const r of raw.rows)if(!rows.some(x=>x[0]===r.t))rows.push([r.t,r.n,r.sec]);
     const wl=root.SmartOptionsWatchlist;
-    return {brief,core,quotes:quotes?.quotes||{},quotesMeta:quotes,universe:rows,covered:new Set(Object.keys(core)),watch:wl?wl.get():[],company:{},now:new Date(),page:{ticker:(root.location?.hash.match(/^#\/company\/([^/]+)/)||[])[1]},get};
+    return {brief:currentBrief,core,quotes:canonical?.quotes||{},quotesMeta:canonical,universe:rows,covered:new Set(Object.keys(core)),watch:wl?wl.get():[],company:{},now:new Date(),page:{ticker:(root.location?.hash.match(/^#\/company\/([^/]+)/)||[])[1]},get};
   }
   async function answer(question,direct,signal,plannerConfig){
     if(!direct&&root.SmartOptionsMyDashboard){

@@ -83,7 +83,8 @@ async function px(t) {
   try { pxCache[t] = await fetchJSON(`data/px/${encodeURIComponent(t)}.json`); } catch (e) { pxCache[t] = {t, bars: [], err: String(e)}; }
   return pxCache[t];
 }
-const rowOf = t => D.rows.find(r => r.t === t);
+const currentRow = r => window.SmartOptionsLive && window.SmartOptionsLive.currentRow ? window.SmartOptionsLive.currentRow(r) : r;
+const rowOf = t => currentRow(D.rows.find(r => r.t === t));
 function obsOf(id) { for (const g in D.macro) { const o = D.macro[g].find(x => x.id === id); if (o) return o; } return null; }
 function seriesData(id) {
   if (id === 'SPY') return D.spy_close;
@@ -217,7 +218,7 @@ function screenPass(r) {
 function filtered() {
   const p = PRESETS.find(x => x.id === V.preset) || PRESETS[0];
   const q = V.q.trim().toLowerCase();
-  let rows = D.rows.filter(r => (!p.f || p.f(r)) && screenPass(r) && (!V.sector || r.sec === V.sector) &&
+  let rows = D.rows.map(currentRow).filter(r => (!p.f || p.f(r)) && screenPass(r) && (!V.sector || r.sec === V.sector) &&
     (!q || r.t.toLowerCase().startsWith(q) || (r.n || '').toLowerCase().includes(q) || (r.sec || '').toLowerCase().includes(q)));
   const {k, dir, abs} = V.sort;
   rows.sort((a, b) => {
@@ -705,7 +706,7 @@ async function boot() {
     COLS, DEFAULT_COLS, activeCols, PRESETS, OVERLAYS, renderTape, drawChart, setRange, writeHash, toggleDrawer, rowOf, setS: x => { S = x; }, chartObj: () => chart};
   wire();
   renderAll();
-  if (window.SmartOptionsLive) { window.SmartOptionsLive.paint(document); window.SmartOptionsLive.subscribe(() => window.SmartOptionsLive.paint(document)); }
+  if (window.SmartOptionsLive) { window.SmartOptionsLive.paint(document); window.SmartOptionsLive.subscribe(() => { if(document.body.classList.contains('bv-research')) renderTable(); window.SmartOptionsLive.paint(document); }); }
   const op = new URLSearchParams(location.hash.slice(1)).get('open');
   showTab(V.tab);
   if (op === 'controls' || op === 'about') toggleDrawer(op);

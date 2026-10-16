@@ -256,7 +256,7 @@
         if (!h.customPx && finite(r.px)) h.price = r.px;
         if (!h.customIv) h.iv = finite(r.iv) ? r.iv : (finite(r.rv20) ? r.rv20 : (finite(r.iv_sec_med) ? r.iv_sec_med : 30));
         if (!h.earn && r.er) h.earn = r.er;
-        if (!finite(h.basis) || h.basis <= 0) h.basis = +(h.price * 0.94).toFixed(2);
+        if (!finite(h.basis) || h.basis < 0) h.basis = null;
       }
     });
     return merged;
@@ -275,7 +275,7 @@
       const book = {...(cur.book || {})};
       ST.hold.forEach(h => {
         if (h.t && h.shares > 0) {
-          book[h.t] = {qty: h.shares, cost: finite(h.basis) ? h.basis : h.price};
+          book[h.t] = {qty: h.shares, cost: finite(h.basis) ? h.basis : null};
         }
       });
       localStorage.setItem('so_import_v1', JSON.stringify({
@@ -301,8 +301,8 @@
       const existing = ST.hold.find(h => h.t === sym);
       nextHold.push({
         t: sym,
-        shares: finite(pos.qty) && pos.qty > 0 ? pos.qty : 100,
-        basis: finite(pos.cost) && pos.cost > 0 ? pos.cost : r.px,
+        shares: finite(pos.qty) && pos.qty >= 0 ? pos.qty : null,
+        basis: finite(pos.cost) && pos.cost >= 0 ? pos.cost : null,
         price: existing && existing.customPx ? existing.price : (root.SmartOptionsLive && root.SmartOptionsLive.get(sym) || {}).price || r.px,
         iv: existing && existing.customIv ? existing.iv : (finite(r.iv) ? r.iv : (finite(r.rv20) ? r.rv20 : 30)),
         earn: (r && r.er) || ''
@@ -795,7 +795,7 @@
       const r = byTicker.get(h.t);
       const val = (+h.shares || 0) * (+h.price || 0);
       const wt = val / totalVal;
-      const pnl = (+h.shares || 0) * ((+h.price || 0) - (+h.basis || h.price || 0));
+      const pnl = finite(h.shares)&&finite(h.price)&&finite(h.basis) ? h.shares*(h.price-h.basis) : null;
       totPnl += pnl;
       const coef = r && r.rel ? (ST.useTactical60 && r.rel.c60 ? r.rel.c60 : r.rel.c) : null;
       let scPct = 0;
@@ -840,7 +840,7 @@
 
         <div class="ed-capsum">
           <div class="ed-cs"><span>Portfolio Market Value</span><b class="ed-num">${fmtMoney(totalVal)}</b></div>
-          <div class="ed-cs"><span>Unrealized P&L</span><b class="ed-num" style="color:${totPnl >= 0 ? 'var(--ed-good)' : 'var(--ed-bad)'}">${fmtMoney(totPnl)}</b></div>
+          <div class="ed-cs"><span>Unrealized P&L</span><b class="ed-num" style="color:${totPnl >= 0 ? 'var(--ed-good)' : 'var(--ed-bad)'}">${fmtMoney(ST.hold.every(h=>finite(h.basis)&&finite(h.shares))?totPnl:null)}</b></div>
           <div class="ed-cs"><span>Net Shock Impact ($)</span><b class="ed-num" style="color:${totShockDollar >= 0 ? 'var(--ed-good)' : 'var(--ed-bad)'}">${fmtMoney(totShockDollar)}</b></div>
           <div class="ed-cs"><span>Net Shock Impact (%)</span><b class="ed-num" style="color:${totShockPct >= 0 ? 'var(--ed-good)' : 'var(--ed-bad)'}">${fmtSignedPct(totShockPct, 2)}</b></div>
           <p class="ed-cs-note">Value-Weighted Portfolio Betas: β_SPY <b>${wBeta.spy.toFixed(2)}%</b> · β_10Y (+10bp) <b>${(wBeta.us10y_bps * 10).toFixed(2)}%</b> · β_VIX (+1pt) <b>${wBeta.vix.toFixed(2)}%</b> · β_WTI (+1%) <b>${wBeta.wti.toFixed(2)}%</b> · β_DXY (+1%) <b>${wBeta.dxy.toFixed(2)}%</b></p>
@@ -1010,7 +1010,9 @@
     const tab = $('#ed-tab');
     if (tab) tab.classList.toggle('on', on);
     if (on) {
+      root.SmartOptionsLive?.watch('edge',ST.hold.map(h=>h.t));
       pullFromMyBook(api.D());
+      root.SmartOptionsLive?.watch('edge',ST.hold.map(h=>h.t));
       document.body.classList.remove('so-overview', 'so-flow', 'so-patterns', 'so-cycles');
       ['#pg-overview', '#pg-flow', '#pg-markets', '#pg-macro', '#pg-patterns', '#pg-cycles'].forEach(sel => {
         const el = $(sel);

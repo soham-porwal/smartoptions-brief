@@ -341,7 +341,8 @@ function termRatio(D) { const v = D && D.rel && D.rel.vol_breadth && D.rel.vol_b
 function findIn(groups, id) { for (const g of Object.values(groups || {})) if (Array.isArray(g)) { const x = g.find(o => o && o.id === id); if (x) return x; } return null; }
 async function ctxFromData(t) {
   const D = coreData() || {}, r = (D.rows || []).find(x => x.t === t) || {}, ctx = {ticker: t, price: r.px, iv: r.iv, rv20_core: r.rv20, iv_sec_med: r.iv_sec_med, days_to_earnings: r.ern, sector: r.sec, prov: {}};
-  ctx.prov.price = `${r.pxd || 'n/a'} close/last (core.json)`; ctx.prov.iv = isNum(r.iv) ? `${r.ivs || 'option chain'}; expiry ${r.ivx || '?'} strike ${r.ivk || '?'}` : 'no IV stored for this ticker (20d RV proxy available)';
+  const quote=root.SmartOptionsLive?.get(t);if(quote&&isNum(quote.price)){ctx.price=quote.price;}
+  ctx.prov.price = quote ? `${quote.asof_utc||quote.ts} ${quote.provider||'canonical quote'} (${root.SmartOptionsLive.classify?.(quote,Date.now()).label||quote.freshness||'observation'})` : `${r.pxd || 'n/a'} close/last (core.json)`; ctx.prov.iv = isNum(r.iv) ? `${r.ivs || 'option chain'}; expiry ${r.ivx || '?'} strike ${r.ivk || '?'}` : 'no IV stored for this ticker (20d RV proxy available)';
   const bill = findIn(D.macro, 'us3m'); if (bill && isNum(bill.v)) { ctx.r = bill.v / 100; ctx.prov.r = `3M T-bill ${bill.v}% (${bill.provider || 'US Treasury'}, ${bill.period || ''})`; } else { ctx.r = 0; ctx.prov.r = 'no T-bill rate stored: r = 0'; }
   const reg = D.rel && D.rel.regime; if (reg && isNum(reg.score)) { ctx.regime = reg.score; ctx.prov.regime = `${reg.score} ${reg.tier || ''} (dashboard regime)`; }
   const tr = termRatio(D); if (isNum(tr)) { ctx.vol_regime = tr > 1 ? 'stress' : 'normal'; ctx.prov.vol_regime = `VIX/VIX3M ${tr} (term ratio > 1 = stress)`; }
@@ -389,6 +390,7 @@ async function mount(el, ticker) {
   if (!el) return; const t = String(ticker || '').toUpperCase();
   el.innerHTML = '<div class="st dim">loading strategy ideas...</div>';
   const base = await ctxFromData(t);
+  const L=root.SmartOptionsLive;if(el._stUnsub)el._stUnsub();L?.watch('strategy',[t]);el._stUnsub=L?.subscribe(ev=>{if(!el.isConnected){el._stUnsub?.();return;}if(ev.changed.includes(t)){const q=L.get(t);if(q&&isNum(q.price)){base.price=q.price;base.prov.price=`${q.asof_utc||q.ts} ${q.provider}`;el._stDraw();}}});
   const draw = () => render(el, base);
   if (!el._stBound) {
     el._stBound = true;

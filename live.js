@@ -68,10 +68,10 @@
       if (!q || !isNum(q.price) || q.price <= 0) return;
       const cur = out[t], tn = obsMs(q), tc = obsMs(cur);
       if (tn == null) return;
-      if (cur && tc != null && tc >= tn && cur.price === q.price) return;
+      if(cur && tc===tn && cur.price===q.price){const nc=Date.parse(q.checked_at||q.retrieved_at||''),pc=Date.parse(cur.checked_at||cur.retrieved_at||'');if(!isFinite(nc)||(isFinite(pc)&&nc<=pc))return;}
       if (cur && tc != null && tc > tn) return;
       out[t] = Object.assign({}, q, {_src: source});
-      if (!cur || cur.price !== q.price || tc !== tn) changed.push(t);
+      if (!cur || cur.price !== q.price || tc !== tn || (q.checked_at || q.retrieved_at) !== (cur.checked_at || cur.retrieved_at)) changed.push(t);
     });
     return {quotes: out, changed};
   }
@@ -85,8 +85,8 @@
   // Quote-dependent numbers for one company row (core.json) at the current price.
   function derive(row, q) {
     row = row || {};
-    const price = q && isNum(q.price) && q.price > 0 ? q.price : isNum(row.px) ? row.px : null;
-    const out = {price, chg_pct: q && isNum(q.chg_pct) ? q.chg_pct : q && isNum(q.change_pct) ? q.change_pct : isNum(row.d1) ? row.d1 : null};
+    const price = q?.current_usable===false ? null : q && isNum(q.price) && q.price > 0 ? q.price : isNum(row.px) ? row.px : null;
+    const out = {price, chg_pct: q && isNum(q.chg_pct) ? q.chg_pct : q && isNum(q.change_pct) ? q.change_pct : !q && isNum(row.d1) ? row.d1 : null};
     if (price == null) return out;
     const base = isNum(row.px) && row.px > 0 ? row.px : null;
     // P/E scales with price at fixed earnings: eps = close / P/E at the close
@@ -103,6 +103,49 @@
     out.since_close_pct = base ? 100 * (price / base - 1) : null;
     return out;
   }
+  function currentRow(row, quote) {
+    if (!row) return row;
+    const q = quote === undefined ? get(row.t) : quote;
+    if(q?.current_usable===false)return Object.assign({},row,{px:null,d1:null,pe:null,pef:null,peg:null,mcap:null,up:null,pef_sec_rel:null,quote_asof:q.asof_utc||q.ts});
+    if (!q || !isNum(q.price) || q.price <= 0) return row;
+    const d = derive(row, q), k = isNum(row.px) && row.px > 0 ? q.price / row.px : null;
+    return Object.assign({}, row, {px:d.price, d1:d.chg_pct, pe:d.pe, pef:d.pef,
+      peg:k && isNum(row.peg) && row.peg > 0 ? row.peg*k : null,
+      mcap:k && isNum(row.mcap) ? row.mcap*k : null, up:d.tgt_up_pct,
+      pef_sec_rel:isNum(d.pef) && row.pef_sec_med > 0 ? d.pef/row.pef_sec_med : null,
+      quote_asof:q.asof_utc || q.ts, quote_checked_at:q.checked_at || q.retrieved_at});
+  }
+  function currentBrief(brief, quotes, nowMs) {
+    if (!brief) return brief;
+    const q = quotes && (quotes.quotes || quotes).SPY;
+    const ms = brief.macro && brief.macro.price_trend && brief.macro.price_trend.metrics || [];
+    const avg = label => (ms.find(m => m.label === label) || {}).value;
+    const a50=avg('SPY 50-session average'), a200=avg('SPY 200-session average');
+    if (!q || !isNum(q.price) || q.price<=0 || !isNum(a50) || !isNum(a200)) return brief;
+    const b=JSON.parse(JSON.stringify(brief)), v50=100*(q.price/a50-1), v200=100*(q.price/a200-1);
+    const status=v50>=0&&v200>=0?'supportive':v50<0&&v200<0?'adverse':'mixed';
+    const where=status==='supportive'?'above both averages':status==='adverse'?'below both averages':v50<0?'below its 50-session but above its 200-session average':'above its 50-session but below its 200-session average';
+    const fr=classify(q,nowMs == null ? Date.now() : nowMs).label;
+    const line=`SPY is ${where}: ${fmtPct(v50,2)} vs 50-session and ${fmtPct(v200,2)} vs 200-session. Latest reported price ${fmtPx(q.price)} (${fr}, ${q.asof_utc||q.ts}).`;
+    const metrics=ms.filter(m=>!/SPY close|previous-session change/.test(m.label||''));
+    metrics.unshift({label:'SPY latest price',value:q.price,unit:'USD/share',period:q.asof_utc||q.ts,asof:q.asof_utc||q.ts,source:q.provider,source_url:q.source_url,note:'Provider trade time; averages retain their historical session dates.'});
+    metrics.push({label:'SPY versus 50-session average',value:v50,unit:'%',asof:q.asof_utc||q.ts,period:q.asof_utc||q.ts,source:q.provider},{label:'SPY versus 200-session average',value:v200,unit:'%',asof:q.asof_utc||q.ts,period:q.asof_utc||q.ts,source:q.provider});
+    b.macro.price_trend={status,line,metrics};
+    const isPrice=x=>(x.metrics||[]).some(m=>/SPY (close|latest price|50-session|200-session)/.test(m.label||''));
+    for(const key of ['supports','challenges','changed']) b.pulse[key]=(b.pulse[key]||[]).filter(x=>!isPrice(x));
+    b.pulse[status==='supportive'?'supports':'challenges'].unshift({line,text:line,metrics,status});
+    b.pulse.headline=line;b.pulse.status=status;b.quote_asof=q.asof_utc||q.ts;
+    return b;
+  }
+  function currentContext(t, quotes, modelAsOf) {
+    const qs=quotes&&(quotes.quotes||quotes)||{},q=qs[t],spy=qs.SPY;
+    if(!q||!isNum(q.price))return 'Current observed comparison unavailable: no quote.';
+    const change=isNum(q.chg_pct)?q.chg_pct:q.change_pct,market=spy&&(isNum(spy.chg_pct)?spy.chg_pct:spy.change_pct);
+    let line=`Latest reported ${t} ${fmtPx(q.price)} at ${q.asof_utc||q.ts}`;
+    if(isNum(change)){line+=` (${fmtPct(change)} versus previous close)`;if(t!=='SPY'&&isNum(market)){const gap=change-market;line+=`; ${Math.abs(gap).toFixed(2)} percentage points ${gap>=0?'ahead of':'behind'} SPY (SPY trade ${spy.asof_utc||spy.ts})`;}}
+    else line+='; current return unavailable';
+    return line+`. Historical fit${modelAsOf?' through '+modelAsOf:''} remains dated; this observed comparison is not intraday factor attribution or a forecast.`;
+  }
   // Header truth: worst of the price feed and every dataset in refresh-status / brief health.
   // closed outranks live so one closed name never lets the summary say live
   const RANK = {live: 0, fresh: 0, ok: 0, closed: 0.5, delayed: 1, warn: 1, stale: 2, fail: 3, missing: 3};
@@ -110,18 +153,18 @@
     const xs = (words || []).map(x => String(x).toLowerCase());
     return xs.length ? xs.reduce((w, x) => (RANK[x] ?? 3) > (RANK[w] ?? 3) ? x : w, xs[0]) : 'missing';
   }
-  function feedSummary(quotes, tickers, nowMs) {
-    const clock = marketClock(nowMs);
-    const names = (tickers && tickers.length ? tickers : Object.keys(quotes || {}));
-    const cls = names.map(t => ({t, c: classify(quotes && quotes[t], nowMs, clock), q: quotes && quotes[t]}));
-    const seen = cls.filter(x => x.c.word !== 'missing');
-    if (!seen.length) return {word: 'missing', words: 'Prices not available', n: 0, of: names.length};
-    const word = worstOf(seen.map(x => x.c.word));
-    const newest = seen.reduce((a, x) => (obsMs(x.q) > obsMs(a.q) ? x : a), seen[0]);
-    const providers = [...new Set(seen.map(x => x.q.provider || 'provider not stated'))];
-    const lead = word === 'live' ? 'Prices live' : word === 'delayed' ? 'Prices delayed 15 min' : word === 'closed' ? 'Market closed' : 'Prices stale';
-    return {word, words: lead + ', ' + etLabel(newest.q.asof_utc || newest.q.ts, nowMs), n: seen.length, of: names.length, providers,
-      missing: names.length - seen.length, open: clock.open};
+  function feedSummary(quotes, tickers, nowMs, errors) {
+    const clock=marketClock(nowMs),names=tickers&&tickers.length?tickers:Object.keys(quotes||{}),counts={};
+    const items=names.map(t=>{const q=quotes&&quotes[t],c=classify(q,nowMs,clock),checked=q&&(q.checked_at||q.retrieved_at),cm=Date.parse(checked||'');
+      const error=errors&&errors[t];let state=error?'blocked':c.word;
+      if(!error&&c.word==='stale'&&q&&q.delay_minutes===0&&c.ageMin<=15&&isFinite(cm)&&nowMs-cm<=75000&&nowMs-cm>=-60000)state='older';
+      counts[state]=(counts[state]||0)+1;
+      return {t,state,observation:q&&(q.asof_utc||q.ts)||null,checked_at:checked||null,age_minutes:c.ageMin??null,error:error||null};});
+    const seen=items.filter(x=>x.observation), newest=seen.slice().sort((a,b)=>Date.parse(b.observation)-Date.parse(a.observation))[0];
+    const word=counts.live===names.length?'live':counts.closed===names.length?'closed':!seen.length?'missing':Object.keys(counts).length===1?items[0].state:'mixed';
+    const labels={live:'live',older:'older quote',stale:'stale',missing:'missing',blocked:'source wait',delayed:'delayed',closed:'closed'};
+    const summary=Object.entries(counts).map(([k,n])=>n+' '+(labels[k]||k)+(k==='older'&&n!==1?'s':'')).join(' / ');
+    return {word,summary,words:summary+(newest?', '+etLabel(newest.observation,nowMs):''),n:seen.length,of:names.length,counts,items,providers:[...new Set(names.map(t=>quotes&&quotes[t]&&quotes[t].provider).filter(Boolean))],missing:counts.missing||0,open:clock.open};
   }
   const fmtPx = v => isNum(v) ? (v >= 1000 ? v.toLocaleString('en-US', {maximumFractionDigits: 0}) : v.toFixed(2)) : 'Not available';
   const fmtPct = (v, d) => isNum(v) ? (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d == null ? 2 : d) + '%' : 'Not available';
@@ -153,6 +196,7 @@
     const order = ['company', 'index', 'research', 'visible', 'shortlist', 'watchlist', 'other'];
     ST.owners.visible = visibleTickers();
     const all = [];
+    if(doc){for(const [owner,selector] of Object.entries({dashboard:'.md',strategy:'.st',edge:'#pg-edge'})){const el=doc.querySelector(selector);if(!el||!el.getClientRects().length)ST.owners[owner]=[];}}
     order.concat(Object.keys(ST.owners).filter(k => !order.includes(k))).forEach(k => (ST.owners[k] || []).forEach(t => all.push(t)));
     return [...new Set(all.map(t => String(t).toUpperCase()).filter(t => SYMBOL.test(t)))];
   }
@@ -165,8 +209,8 @@
   function get(t) {
     const q = ST.quotes[String(t || '').toUpperCase()];
     if (!q) return null;
-    const c = classify(q, now());
-    return Object.assign({}, q, {t: String(t).toUpperCase(), freshness_word: c.word, freshness_label: c.label, asof_label: etLabel(q.asof_utc || q.ts, now())});
+    const c = classify(q, now()),state=feedSummary({[t]:q},[t],now(),ST.worker.errors).items[0].state;
+    return Object.assign({}, q, {delivery_state:state,current_usable:!['stale','missing','blocked'].includes(state)}, {t: String(t).toUpperCase(), freshness_word: c.word, freshness_label: c.label, asof_label: etLabel(q.asof_utc || q.ts, now())});
   }
   // quotes.json-shaped snapshot for older consumers (company view, intelligence, chat)
   function snapshot() {
@@ -211,18 +255,19 @@
     const groups = batches(onScreen());
     if (!groups.length) return;
     const group = groups[ST.cursor % groups.length]; ST.cursor++;
-    ST.polling = true;
+    ST.polling = true; w.pending=group; if(doc)paint(doc,null);
     try {
       const url = new URL(w.url); url.searchParams.set('symbols', group.join(','));
       const data = await getJSON(url.toString(), fetchImpl);
       if (!data || typeof data.quotes !== 'object') throw new Error('response had no quotes');
       w.errors = Object.assign({}, w.errors, data.errors || {});
-      group.forEach(t => { if (data.quotes[t]) delete w.errors[t]; });
+      group.forEach(t => { if (data.quotes[t] && !data.errors?.[t]) delete w.errors[t]; });
+      w.delivery=data.delivery||w.delivery;
       w.last = now(); w.error = '';
       accept(data.quotes, 'worker');
     } catch (e) {
-      w.error = 'Fast price path unavailable: ' + (e.message || e) + '. Showing the shared file.';
-    } finally { ST.polling = false; if (doc) paintHealth(); }
+      w.error = 'Fast price path unavailable: ' + (e.message || e) + '. Last observations retained separately.';group.forEach(t=>w.errors[t]=w.error);
+    } finally { ST.polling = false;w.pending=[]; if (doc) paint(doc,null); }
   }
   function schedule(immediate) {
     if (immediate) pollWorker(null, !marketClock(now()).open && !ST.worker.last);
@@ -247,8 +292,9 @@
     pollWorker(null, true);   // one fast read on arrival, even after the close, so the latest print is shown
     ST.timers.push(setInterval(() => pollWorker(), OPEN_POLL_MS));
     ST.timers.push(setInterval(() => { if (!doc || doc.visibilityState === 'visible') loadFile(); }, FILE_POLL_MS));
-    ST.timers.push(setInterval(() => paint(doc, null), 30000));   // freshness words age even when no price moves
-    if (doc) doc.addEventListener('visibilitychange', () => { if (doc.visibilityState === 'visible') { loadFile(); pollWorker(); } });
+    ST.timers.push(setInterval(() => paint(doc, null), 15000));   // freshness words age even when no price moves
+    if (doc) doc.addEventListener('visibilitychange', () => { if (doc.visibilityState === 'visible') refresh(); });
+    if(root.addEventListener){root.addEventListener('pageshow',()=>refresh());root.addEventListener('focus',()=>refresh());}
   }
 
   /* ------------------------------------------------------------ DOM binding
@@ -264,7 +310,7 @@
       case 'range': return isNum(d.range_pct) ? Math.round(d.range_pct) + '% of range' : 'Not available';
       case 'hi': return isNum(d.from_hi_pct) ? (d.new_high ? 'New high' : fmtPct(d.from_hi_pct, 1)) : 'Not available';
       case 'asof': return q ? etLabel(q.asof_utc || q.ts, nowMs) : 'session close';
-      case 'fresh': return q ? classify(q, nowMs).label : 'missing';
+      case 'fresh': {const state=feedSummary(ST.quotes,[q?.t||''],nowMs,ST.worker.errors).items[0]?.state;return state==='older'?'older quote':q?classify(q,nowMs).label:'missing';}
       case 'since': return isNum(d.since_close_pct) ? fmtPct(d.since_close_pct) : '';
       default: return '';
     }
@@ -276,8 +322,12 @@
     scope.querySelectorAll('[data-live]').forEach(el => {
       const t = el.getAttribute('data-live');
       const q = ST.quotes[t], d = derive(coreRow(t), q), f = el.getAttribute('data-live-f') || 'price';
-      const text = fieldText(f, d, q, nowMs);
-      if (f === 'fresh') { const c = classify(q, nowMs); el.dataset.fresh = c.word; el.title = q ? (q.provider || '') + ', ' + etLabel(q.asof_utc || q.ts, nowMs) : 'No observation'; }
+      if(f==='watch')return;
+      const state=feedSummary(ST.quotes,[t],nowMs,ST.worker.errors).items[0].state;
+      const unavailable=!['live','older','closed','delayed'].includes(state);
+      const text=f==='fresh'?(state==='older'?'older quote':state==='blocked'?'source wait':state):(['price','pe','pef','chg','range','hi','since'].includes(f)&&unavailable)?(ST.worker.pending?.includes(t)?'Updating…':'Unavailable'):fieldText(f,d,q,nowMs);
+      if(unavailable&&q)el.title='Last reported '+fmtPx(q.price)+' at '+(q.asof_utc||q.ts)+'; source checked '+(q.checked_at||q.retrieved_at||'unknown')+(ST.worker.errors[t]?'; '+ST.worker.errors[t]:'');
+      if (f === 'fresh') { const c = classify(q, nowMs); el.dataset.fresh = c.word; el.title = q ? (q.provider || '') + ', trade ' + etLabel(q.asof_utc || q.ts, nowMs) + (q.checked_at||q.retrieved_at ? '; source checked ' + (q.checked_at||q.retrieved_at) : '') : 'No observation'; }
       if (f === 'range' && el.style) el.style.setProperty('--pos', isNum(d.range_pct) ? d.range_pct.toFixed(1) + '%' : '50%');
       if (f === 'chg' || f === 'since') el.dataset.dir = isNum(f === 'chg' ? d.chg_pct : d.since_close_pct) ? ((f === 'chg' ? d.chg_pct : d.since_close_pct) >= 0 ? 'up' : 'dn') : '';
       if (f === 'range') { const bar = el.querySelector && el.querySelector('i'); if (bar) bar.style.left = isNum(d.range_pct) ? d.range_pct.toFixed(1) + '%' : '50%'; const lab = el.querySelector && el.querySelector('b'); if (lab) lab.textContent = text; return; }
@@ -291,25 +341,33 @@
     paintHealth();
   }
   // Prices not on screen are not polled: describe them by their median observation, never by the live subset.
-  function coverage(quotes, watched, nowMs) {
+  function coverage(quotes, watched, nowMs, active) {
     const set = new Set(watched || []);
-    const rest = Object.entries(quotes || {}).filter(([t, q]) => !set.has(t) && q && isNum(q.price) && q.price > 0 && obsMs(q) != null)
+    const rest = Object.entries(quotes || {}).filter(([t, q]) => !set.has(t) && (!active||active.has(t)) && q && isNum(q.price) && q.price > 0 && obsMs(q) != null)
       .map(([, q]) => q).sort((a, b) => obsMs(a) - obsMs(b));
     const mid = rest.length ? rest[Math.floor(rest.length / 2)] : null;
     const c = mid ? classify(mid, nowMs) : null;
     return {watched: set.size, others: rest.length, others_asof: mid ? (mid.asof_utc || mid.ts) : null, others_word: c ? c.word : 'missing',
-      others_label: mid ? etLabel(mid.asof_utc || mid.ts, nowMs) : 'time not available'};
+      others_label: mid ? etLabel(mid.asof_utc || mid.ts, nowMs) : 'time not available', median_age_minutes:mid?Math.max(0,(nowMs-obsMs(mid))/60000):null, oldest_age_minutes:rest.length?Math.max(0,(nowMs-obsMs(rest[0]))/60000):null, inactive_preserved:active?Object.keys(quotes||{}).filter(t=>!active.has(t)).length:0};
+  }
+  async function refresh(fetchImpl) {
+    await loadFile(fetchImpl);const groups=batches(onScreen());
+    for(let i=0;i<Math.min(groups.length,2);i++)await pollWorker(fetchImpl,true);
+    if(doc)paint(doc,null);
   }
   function health(nowMs) {
     nowMs = nowMs == null ? now() : nowMs;
     const watched = onScreen();
-    const feed = feedSummary(ST.quotes, watched.length ? watched : null, nowMs);
-    return {feed, coverage: coverage(ST.quotes, watched, nowMs), worker: Object.assign({}, ST.worker), file: Object.assign({}, ST.fileState),
-      fileHealth: ST.file && ST.file.health || null};
+    const feed = feedSummary(ST.quotes, watched.length ? watched : null, nowMs,ST.worker.errors);
+    const rows=root.SO2?.D?.()?.rows,active=rows?new Set(rows.filter(r=>r.sp500_member!==false).map(r=>r.t).concat(['SPY','RSP'])):null;
+    const cv=coverage(ST.quotes,watched,nowMs,active);
+    const fh=Object.assign({},ST.file?.health,{median_age_minutes:cv.median_age_minutes,oldest_age_minutes:cv.oldest_age_minutes,line:`Active universe: ${cv.others} off-screen observations; median age ${cv.median_age_minutes==null?'unavailable':cv.median_age_minutes.toFixed(1)+' min'} now. ${cv.inactive_preserved} inactive/reference records excluded from these ages.`});
+    return {feed, coverage: cv, worker: Object.assign({}, ST.worker), file: Object.assign({}, ST.fileState),
+      fileHealth: fh};
   }
   function paintHealth() { if (root.CustomEvent && root.dispatchEvent) root.dispatchEvent(new root.CustomEvent('so:live-health', {detail: health()})); }
 
-  return {start, configure, watch, subscribe, get, snapshot, health, coverage, paint, accept, loadFile, pollWorker, onScreen,
-    marketClock, classify, etLabel, merge, batches, derive, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH,
+  return {start, refresh, configure, watch, subscribe, get, snapshot, health, coverage, paint, accept, loadFile, pollWorker, onScreen,
+    marketClock, classify, etLabel, merge, batches, derive, currentRow, currentBrief, currentContext, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH,
     _state: ST};
 });

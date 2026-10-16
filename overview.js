@@ -43,12 +43,13 @@
     const book = local && local.book ? local.book : null;
     const keys = book ? Object.keys(book).filter(t => byTicker.has(t)) : [];
     if (!keys.length) return '';
+    if(keys.some(t=>!finite(book[t].qty)||book[t].qty<0||!finite(byTicker.get(t).px))) return '<p class="ov-warning">Portfolio value and P&amp;L unavailable: a holding has missing quantity or price. Add the measured input; no position is assumed.</p>';
     let totVal = 0, totCost = 0, hasCost = false;
     const pos = keys.map(t => {
       const r = byTicker.get(t), b = book[t] || {};
-      const qty = finite(b.qty) && b.qty > 0 ? b.qty : 100;
+      const qty = finite(b.qty) && b.qty >= 0 ? b.qty : null;
       const val = finite(r.px) ? qty * r.px : 0;
-      const cost = finite(b.cost) && b.cost > 0 ? qty * b.cost : null;
+      const cost = finite(b.cost) && b.cost >= 0 ? qty * b.cost : null;
       totVal += val;
       if (cost != null) { totCost += cost; hasCost = true; }
       return {t, r, qty, costPerShare: b.cost, val, cost, pnl: cost != null ? val - cost : null, pnlPct: cost != null && cost > 0 ? (val / cost - 1) * 100 : null};
@@ -72,8 +73,9 @@
       }
     }
     const scenPct = (scenDollar / totVal) * 100;
-    const totPnl = hasCost ? totVal - totCost : null;
-    const totPnlPct = hasCost && totCost > 0 ? (totVal / totCost - 1) * 100 : null;
+    const completeCost=pos.every(p=>p.cost!=null);
+    const totPnl = completeCost ? totVal - totCost : null;
+    const totPnlPct = completeCost && totCost > 0 ? (totVal / totCost - 1) * 100 : null;
     const alerts = pos.filter(p => (finite(p.r.ern) && p.r.ern >= 0 && p.r.ern <= 14) || (finite(p.r.res20d) && p.r.res20d <= -3) || (finite(p.r.ivrv_eff) && p.r.ivrv_eff >= 1.2)).slice(0, 4);
     return `<section class="ov-book-panel" aria-label="My Book Portfolio Edge and Macro Stress" style="margin:8px 0 12px;padding:10px 14px;border:1px solid #26323d;border-radius:6px;background:#0e1318">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
@@ -97,7 +99,7 @@
         if (finite(p.r.ern) && p.r.ern >= 0 && p.r.ern <= 14) reasons.push(`earn ${p.r.ern}d`);
         if (finite(p.r.res20d) && p.r.res20d <= -3) reasons.push(`20d α ${signed(p.r.res20d, 1)}%`);
         if (finite(p.r.ivrv_eff) && p.r.ivrv_eff >= 1.2) reasons.push(`IV/RV ${fmt(p.r.ivrv_eff, 2)}x`);
-        const contracts = Math.max(1, Math.floor(p.qty / 100));
+        const contracts = Math.floor(p.qty / 100);
         return `<span style="padding:2px 6px;background:#162029;border-radius:4px">${esc(p.t)} (${p.qty} sh · ${reasons.join(', ')}) <button type="button" data-book-hedge="${esc(p.t)}" style="margin-left:4px;cursor:pointer">Hedge / Collar (${contracts}c) →</button></span>`;
       }).join('')}</div>` : ''}
     </section>`;
@@ -167,7 +169,7 @@
   }
   function render() {
     if (!page) return;
-    const d=api.D(), list=root.SmartOptionsWatchlist.get(), byTicker=new Map(d.rows.map(r=>[r.t,r]));
+    const d=api.D(), list=root.SmartOptionsWatchlist.get(), byTicker=new Map(d.rows.map(r=>[r.t,root.SmartOptionsLive?.currentRow?root.SmartOptionsLive.currentRow(r):r]));
     const today = $('#ov-today');
     if (today) today.innerHTML = root.SO2_flow ? root.SO2_flow.taskRow(d, false) : '<p>Market assessment loading. You can explore the watchlist below.</p>';
     const local=root.SmartOptionsImport && root.SmartOptionsImport.getData();
@@ -263,6 +265,7 @@
       } catch (err) { notice('Could not load demo book: ' + err.message); }
     });
     root.addEventListener('so:import',render);
+    root.addEventListener('so:quotes-update',()=>{if(!page.hidden)render();});
     root.addEventListener('so:flow-ready',render);
     root.addEventListener('resize',()=>{if(!page.hidden)page.style.setProperty('--ov-height',`${innerHeight-page.getBoundingClientRect().top}px`);});
     root.SmartOptionsOverview={render,show:()=>show(true),openTicker,compare:()=>{query='';sort={key:'pef',dir:1};$('#ov-search').value='';show(true);$('#ov-warning').textContent='Comparing your watchlist by forward P/E, low to high. Missing values appear last; open a company for context.';const heading=$('#ov-thead button[data-sort="pef"]');if(heading)heading.focus();}};

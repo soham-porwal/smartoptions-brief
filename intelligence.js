@@ -103,7 +103,8 @@
     }catch(e){state.receiptError=e.message||'Receipt could not be read.';if(root.console)root.console.warn('[intelligence] WARN refresh receipt',state.receiptError);}
   }
   function render(container, html) { if (container) container.innerHTML = html; }
-  function renderMarket(container) { render(container, '<p class="in-na" role="status">Loading market relationships.</p>'); return load().then(d => render(container, marketHTML(d,state.error))); }
-  function renderCompany(container,ticker) { render(container, '<p class="in-na" role="status">Loading company relationships.</p>'); return load().then(d => render(container,companyHTML(d,ticker,state.error))); }
-  return {SCHEMA,load,company:t => state.data && state.data.companies[String(t).toUpperCase()] || null,renderMarket,renderCompany,onQuotes:q => {state.quotes=q;},validData,value,safeURL,evidenceHTML,observationHTML,marketHTML,companyHTML,validationHTML,status:() => ({available:!!state.data,error:state.error})};
+  function contextHTML(t){const L=root.SmartOptionsLive;return `<p class="in-basis" data-in-live="${esc(t)}">${esc(L?.currentContext?L.currentContext(t,state.quotes,state.data?.companies?.[t]?.model_asof||state.data?.basis?.model_asof):'Current observed comparison unavailable.')}</p>`;}
+  function renderMarket(container) { render(container, '<p class="in-na" role="status">Loading market relationships.</p>'); return load().then(d => render(container,contextHTML('SPY')+marketHTML(d,state.error))); }
+  function renderCompany(container,ticker) { render(container, '<p class="in-na" role="status">Loading company relationships.</p>'); return load().then(d => render(container,contextHTML(ticker)+companyHTML(d,ticker,state.error))); }
+  return {SCHEMA,load,company:t => state.data && state.data.companies[String(t).toUpperCase()] || null,renderMarket,renderCompany,onQuotes:q => {state.quotes=q;if(root.document)root.document.querySelectorAll('[data-in-live]').forEach(el=>{const t=el.dataset.inLive;el.textContent=root.SmartOptionsLive?.currentContext(t,q,state.data?.companies?.[t]?.model_asof||state.data?.basis?.model_asof)||'Current comparison unavailable.';});},validData,value,safeURL,evidenceHTML,observationHTML,marketHTML,companyHTML,validationHTML,status:() => ({available:!!state.data,error:state.error})};
 });

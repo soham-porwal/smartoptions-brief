@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261016-r6",
+  "release_id": "brief-client-20261016-r7-price",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-16T18:45:00+00:00",
-  "source_commit": "17d2f92",
+  "built_at": "2026-10-16T18:47:55.795362+00:00",
+  "source_commit": "4323b511ab07ff6bdc0f3497c7f6277e7b55fbcb",
   "data_session": "2026-10-15",
   "tickers": 509,
   "current_constituents": 503,
@@ -11,21 +11,21 @@
   "default_view": "brief",
   "chat": "deterministic dashboard facts and confirmed actions; optional verified rephrasing",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
-  "price_feed": "Names in view: Finnhub real-time quotes through the shared Worker, polled every 15 seconds in market hours; the free key is split 22 calls/minute for viewed names (granted stalest-first, shared across visitors, 30 s cache) and about 33/minute for the paced index sweep, so about 11 names stay inside a one-minute window and larger views rotate. Other names: shared quote file (Finnhub, Alpaca IEX, then delayed Yahoo per quote), a full sweep takes about 15 minutes and GitHub can delay scheduled runs; the client site mirrors the preview file. The header names the on-screen scope and dates the other prices; every price shows its own observation time.",
+  "price_feed": "Visible quotes: one shared Worker cache/budget for interactive and sweep traffic, 58/min and 30/sec upstream limits, 30s cache, protective 40000/day. Per-name live/older/source-wait states preserve trade and successful-check times. Full-universe file is a paced snapshot; GitHub cron is best effort.",
   "verification": {
-    "python": {
-      "passed": 1005,
-      "failed": 0,
-      "receipt": "live-final-python.txt",
-      "run_at": "2026-10-16, source 17d2f92"
-    },
     "javascript_chat_worker": {
-      "passed": 347,
+      "passed": 361,
       "failed": 0,
-      "receipt": "live-final-js.txt",
-      "run_at": "2026-10-16, source 17d2f92"
+      "skipped": 0,
+      "receipt": "price-now-js-final.txt",
+      "run_at": "2026-10-16T18:47:55.795362+00:00"
     },
-    "evidence_dir": "Data/Logs/brief-client-recovery-20261016 (private)"
+    "python": {
+      "status": "pending final rerun; previous full run interrupted during priority steering",
+      "receipt": "reliability-full-python-1.txt"
+    },
+    "scope": "Price milestone; full analytics acceptance pending",
+    "evidence_dir": "Data/Logs/brief-client-recovery-20261016"
   },
   "screener_scores": "dated 2026-07-25 snapshot; separate from refreshed prices and fundamentals",
   "methods": "docs/BRIEF-METHODS.md",

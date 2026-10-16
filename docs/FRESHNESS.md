@@ -83,3 +83,12 @@ Rollback uses a normal new revert commit of the installation/data change and the
 ```
 
 All scripts return nonzero on blocked verification. Reports list field, source, observation/reference date, cadence or tolerance, and cause. Network failures and zero-result responses never pass silently. The audit uses standard NYSE holidays/typical early closes; exceptional closures require calendar maintenance. It does not infer a fresh observation from a new build timestamp.
+
+
+## Price delivery correction — 2026-10-16
+
+The visible path and authenticated static sweep share one Worker cache and limiter: 58 upstream starts per rolling minute (account response independently reported 60/min), at most 30 starts per rolling second, 30-second cache. Idle sweep capacity can be used by the visible path. The 40,000/day counter is our abuse guard, not a claimed Finnhub daily entitlement. The full 509-name file remains a paced snapshot; cron is best effort and interactive demand can lengthen a sweep.
+
+The phone header reports per-name counts, for example 8 live / 2 older quotes. Live still requires a <=60-second observation. An older quote is a <=15-minute same-session report returned by a successful source check within75seconds; it is not relabeled live. Original trade and successful-check timestamps are distinct, and cache hits update neither. Denial/network errors remain source-wait/unavailable, with dated last observations retained. Deep-old observations are unavailable as current fields. Visible symbols refresh on navigation/viewport changes, foreground, pageshow/BFCache return, focus and the Data health refresh button.
+
+Shared-file ages are recalculated against the current clock for the active universe; preserved inactive/reference records are counted separately. The fundamentals/macro snapshot receipt describes its own build, separately from current quote delivery. Price milestone proof: Data/Logs/brief-client-recovery-20261016/PRICE-NOW-PROOF.md. Full analytics acceptance remains pending.
