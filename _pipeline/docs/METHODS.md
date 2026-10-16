@@ -25,15 +25,15 @@ Factor construction: Δ10y/Δ2y = Treasury yield change in bp (`macro/collect.py
 | Stock-specific | actual % − explained | `relate.py:299` |
 | Caveat | in-sample fit, same day; descriptive split only | |
 
-## Sam's regime (reproduced with free data)
+## Historical SmartOptions regime (reproduced with free data)
 | Component | Weight | Formula | Code |
 |---|---|---|---|
-| VIX | 0.40 | piecewise-linear score from his `market_regime.py:84-114` | `relate.py:144-155` |
+| VIX | 0.40 | piecewise-linear score from the original `market_regime.py:84-114` | `relate.py:144-155` |
 | Advance/decline | 0.25 | adv/(adv+dec) over A∪B tickers' 1d change; score = clamp((r−0.30)/0.40×100) | `relate.py:158-163` |
 | New high/low | 0.15 | hi = price within 3% of 52w high, lo = ≥22% below; score = hi/(hi+lo)×200−10, clamped | `relate.py:166-170` |
 | UpVol, TRIN | 0.10 + 0.10 | **not available** (needs up/down volume); remaining weights ÷0.80 | `relate.py:191` |
 | Tier | | <30 AVOID, <50 DEFENSIVE, <70 NORMAL, <85 FAVORABLE, else OPTIMAL | `relate.py:173-174` |
-| Limit | | universe = our A+B tickers, not his full pull; history shows VIX+A/D only (÷0.65) | `relate.py:192-207` |
+| Limit | | universe = our A+B tickers, not the original full pull; history shows VIX+A/D only (÷0.65) | `relate.py:192-207` |
 
 ## Volatility and breadth
 | Number | Formula | Window | Code |
@@ -58,7 +58,7 @@ Factor construction: Δ10y/Δ2y = Treasury yield change in bp (`macro/collect.py
 | Top movers | 15 gainers + 15 losers by 1d %; exact ties by market cap | `equities/pipeline.py:22-51` |
 | Unusual volume | last volume / mean prior 20 sessions, ≥2.0, top 15 (not padded) | `equities/prices.py:102-103`, `pipeline.py:22,48` |
 | 52w range | unadjusted High/Low, last 252 sessions; pctile = (px−low)/(high−low)×100 | `equities/prices.py:104-106` |
-| Universe | S&P 500 from Wikipedia (sanity 495-510); set B = 343 tickers parsed from Sam's page | `equities/universe.py`, `equities/sam.py` |
+| Universe | S&P 500 from Wikipedia (sanity 495-510); set B = 343 tickers parsed from the historical screener page | `equities/universe.py`, `equities/sam.py` |
 
 ## Fundamentals
 | Item | Method | Code |

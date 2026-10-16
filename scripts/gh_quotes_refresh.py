@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 
 ET = ZoneInfo("America/New_York")
 TAPE = ("SPY", "RSP", "^VIX", "^VIX3M", "DX-Y.NYB", "CL=F", "BZ=F", "HG=F", "^TNX")
-FINNHUB_SPACING = 1.8  # ~33 starts/minute; the Worker fast path holds 22/min of the same free 60/min key (55 total).
+FINNHUB_SPACING = 1.1  # Shared Worker grants <=58/min across sweep and interactive traffic.
 QUOTE_INTERVAL_SECONDS = 450
 DEFAULT_SECRETS = Path(r"D:\soham\myeverything\Secrets")
 
@@ -191,6 +191,38 @@ def finnhub_one(symbol, key, now, get=None):
 
 
 def finnhub_batch(symbols, key, now, get=None, spacing=FINNHUB_SPACING):
+    worker = os.environ.get("QUOTE_WORKER_URL")
+    if worker and get is None:
+        import requests
+        found, errors, checked = {}, {}, []
+        bucket = TokenBucket(spacing)
+        deadline = time.monotonic() + 1080
+        for t in dict.fromkeys(symbols):
+            while time.monotonic() < deadline:
+                bucket.take()
+                try:
+                    response = requests.get(worker, params={"symbols": t}, headers={"Origin": "https://samsej.github.io", "X-Quote-Sweep-Key": key}, timeout=12)
+                    if response.status_code != 200:
+                        errors[t] = "Shared quote path HTTP " + str(response.status_code)
+                        break
+                    data = response.json()
+                    value = data.get("quotes", {}).get(t)
+                    error = data.get("errors", {}).get(t)
+                    if error and "capacity busy" in error:
+                        time.sleep(2)
+                        continue
+                    checked.append(t)
+                    if value and finite(value.get("price"), True) is not None:
+                        found[t] = value
+                    if error:
+                        errors[t] = error
+                    break
+                except Exception:
+                    errors[t] = "Shared quote request failed; last observation retained"
+                    break
+            else:
+                errors[t] = "Sweep time budget reached; last observation retained"
+        return found, errors, checked
     found, errors, checked = {}, {}, []
     bucket = TokenBucket(spacing)
     started = time.monotonic()

@@ -194,8 +194,8 @@ def regime(macro: dict, eq: dict) -> dict:
         day = [r[d] for r in rets.values() if d in r]
         if len(day) >= 100:
             hist.append([d, int(round((0.40 * score_vix(vix_h[d]) + 0.25 * score_ad(day)[1]) / 0.65))])
-    return {"score": score, "tier": tier(score), "method": "Sam's SmartOptions regime (market_regime.py) - VIX, A/D, NewHi/Lo; "
-            "UpVol + TRIN not available, weights renormalized /0.80. Universe = A+B tickers, not his full pull.",
+    return {"score": score, "tier": tier(score), "method": "Historical SmartOptions regime method (market_regime.py) - VIX, A/D, NewHi/Lo; "
+            "UpVol + TRIN not available, weights renormalized /0.80. Universe = A+B tickers, not the original full pull.",
             "components": {"vix": {"value": vix, "score": sv, "weight": 0.40},
                            "ad": {"ratio": adr, "n": len(pct), "score": sad, "weight": 0.25},
                            "newhl": {"near_high": nh, "near_low": nl, "score": snh, "weight": 0.15},

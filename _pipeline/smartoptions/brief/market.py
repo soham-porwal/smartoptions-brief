@@ -248,6 +248,14 @@ def macro_assessment(core,position,cfg,risks):
     return dict(price_trend=price,participation=position['breadth'],backdrop=backdrop,risk=risk,detail=details)
 
 
+def session_label(asof):
+    try:
+        d=date.fromisoformat(str(asof)[:10])
+        return f"{d:%b} {d.day}"
+    except ValueError:
+        return 'previous'
+
+
 def pulse(macro):
     price=macro['price_trend'];supports=[];challenges=[]
     for obj in [price,macro['participation'],macro['risk']]:
@@ -257,5 +265,6 @@ def pulse(macro):
     for detail in macro['detail']:
         if detail['group']=='inflation' and macro['backdrop']['inflation']['direction']=='up':challenges.append(bullet(detail['line'],detail['metrics'][-2:],'bad'))
     change=next((m for m in price['metrics'] if m['label']=='SPY previous-session change'),None)
-    changed=[bullet(f"SPY changed {change['value']:+.2f}% since the previous close.",[change])] if change and change['value'] is not None else [bullet('Not available: previous-session price change is missing',price['metrics'][:1])]
+    # dated session close, so it is not read as a second current SPY price beside the live quote card
+    changed=[bullet(f"SPY closed {change['value']:+.2f}% in the {session_label(change.get('asof'))} session.",[change])] if change and change['value'] is not None else [bullet('Not available: previous-session price change is missing',price['metrics'][:1])]
     return dict(status=price['status'],headline='Prices, participation and risks give a mixed market read.' if price['status']=='mixed' else price['line'],changed=changed,supports=supports[:3],challenges=challenges[:3])
