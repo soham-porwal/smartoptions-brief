@@ -15,7 +15,8 @@
 })(typeof window !== 'undefined' ? window : globalThis, function (root) {
 
   const ALLOWED_ORIGINS = ['https://soham-porwal.github.io', 'https://samsej.github.io'];   // Worker allow-list (chat-proxy/worker.js)
-  const MAX_BATCH = 12;            // Worker accepts 1 to 12 symbols per request
+  const MAX_BATCH = 12;
+  const STREAM_MAX = 100;         // bounded stream subscription (see streamTargets)            // Worker accepts 1 to 12 symbols per request
   const OPEN_POLL_MS = 120000;     // Selected quotes refresh every two minutes, plus navigation and wake.
   const FILE_POLL_MS = 120000;
   const SYMBOL = /^[A-Z][A-Z0-9.-]{0,14}$/;
@@ -243,7 +244,10 @@
   function streamTargets() {
     const rows=coreRows();
     // on-screen names first so any provider cap keeps what the reader is looking at
-    return [...new Set(onScreen().concat(rows.filter(r=>r.sp500_member!==false).map(r=>r.t),['SPY']))].filter(t=>SYMBOL.test(t)).slice(0,600);
+    // Observed, not a published entitlement: one subscription delivered events for at most ~100 names, so the
+    // socket carries a bounded, prioritised set: SPY, then on-screen names, then members by market value.
+    const ranked=rows.filter(r=>r.sp500_member!==false).slice().sort((x,y)=>(y.mcap||0)-(x.mcap||0)).map(r=>r.t);
+    return [...new Set(['SPY'].concat(onScreen(),ranked))].filter(t=>SYMBOL.test(t)).slice(0,STREAM_MAX);
   }
   function stopStream() {
     const st=ST.stream;clearTimeout(st.retry);st.retry=null;
@@ -442,6 +446,6 @@
   function paintHealth() { if (root.CustomEvent && root.dispatchEvent) root.dispatchEvent(new root.CustomEvent('so:live-health', {detail: health()})); }
 
   return {start, setRows, refresh, configure, watch, subscribe, get, snapshot, health, coverage, paint, accept, loadFile, pollWorker, onScreen,
-    marketClock, classify, etLabel, merge, batches, decodeYahooMessage, yahooQuote, syncStream, stopStream, derive, currentRow, currentBrief, currentContext, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH,
+    marketClock, classify, etLabel, merge, batches, decodeYahooMessage, yahooQuote, syncStream, stopStream, derive, currentRow, currentBrief, currentContext, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH, STREAM_MAX,
     _state: ST};
 });

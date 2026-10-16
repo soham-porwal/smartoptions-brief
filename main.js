@@ -40,23 +40,54 @@
     const fmt = x => x.sector + ' (' + pct(x.coef * f.scale, 2) + ')';
     let lead = f.name;
     if (lvl && isNum(lvl.v)) lead += ' ' + (factor === 'us10y_bps' ? lvl.v.toFixed(2) + '%' : lvl.v.toFixed(2)) + (lvl.period ? ' (' + lvl.period + ')' : '');
-    if (mv && isNum(mv.v)) lead += ', ' + (f.moveUnit === 'bp' ? (mv.v > 0 ? '+' : mv.v < 0 ? '−' : '') + Math.abs(mv.v).toFixed(0) + ' bp on the day' : pct(mv.v, 1) + ' over ' + f.moveSpan);
+    if (mv && isNum(mv.v)) lead += ', ' + (f.moveUnit === 'bp' ? (mv.v > 0 ? '+' : mv.v < 0 ? '−' : '') + Math.abs(mv.v).toFixed(0) + ' bp on ' + (mv.period || 'the latest day') : pct(mv.v, 1) + ' over ' + f.moveSpan + (mv.period ? ' to ' + mv.period : ''));
     else if (lvl && isNum(lvl.prior)) lead += ' (prior ' + lvl.prior.toFixed(2) + ')';
-    return {factor, lead, text: `${lead}. Over the past year, per ${f.per} move the median stock fell most in ${listJoin(low.map(fmt))} and ${high.every(x => x.coef > 0) ? 'rose most' : 'held up best'} in ${listJoin(high.map(fmt))}, other factors held fixed.`, low, high};
+    return {factor, lead, text: `${lead}. Over the past year, for each ${f.per} move the estimated median stock response was lowest in ${listJoin(low.map(fmt))} and highest in ${listJoin(high.map(fmt))}, other factors held fixed.`, low, high};
   }
-  // Live breadth and sector day change from accepted quotes. Cap weights use the close market cap.
-  function liveBreadth(rows, getQuote) {
-    let up = 0, n = 0, newest = null; const sec = {};
-    (rows || []).forEach(r => {
-      if (r.sp500_member === false) return;
+  // Breadth and cap-weighted sector change from ONE reporting session. Quotes are grouped by the New York date of
+  // their observation; the newest session holding at least 90% of members is used, so a few streamed names never
+  // pass as a whole-index reading and yesterday's prints never mix with today's. Cap weights use the close market cap.
+  function liveBreadth(rows, getQuote, minCover) {
+    const etDay = ms => new Date(ms).toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
+    const members = (rows || []).filter(r => r.sp500_member !== false), by = {};
+    members.forEach(r => {
       const q = getQuote(r.t); if (!q || q.current_usable === false) return;
-      const c = isNum(q.chg_pct) ? q.chg_pct : q.change_pct; if (!isNum(c)) return;
-      n++; if (c > 0) up++;
-      const t = Date.parse(q.asof_utc || q.ts || ''); if (isFinite(t) && (newest == null || t > newest)) newest = t;
-      if (isNum(r.mcap) && r.mcap > 0) { const s = sec[r.sec] ||= {w: 0, wc: 0, n: 0}; s.w += r.mcap; s.wc += r.mcap * c; s.n++; }
+      const c = isNum(q.chg_pct) ? q.chg_pct : q.change_pct, t = Date.parse(q.asof_utc || q.ts || '');
+      if (!isNum(c) || !isFinite(t)) return;
+      (by[etDay(t)] ||= []).push({r, c, t});
     });
-    const sectors = Object.entries(sec).map(([sector, s]) => ({sector, chg: s.wc / s.w, n: s.n})).sort((a, b) => b.chg - a.chg);
-    return {up, n, up_pct: n ? 100 * up / n : null, sectors, newest};
+    const days = Object.keys(by).sort().reverse(), need = Math.ceil((minCover == null ? 0.9 : minCover) * members.length);
+    const day = days.find(d => by[d].length >= need) || null, newest = days[0] || null;
+    const out = {session: day, members: members.length, newest_session: newest, newest_n: newest ? by[newest].length : 0, complete: !!day, up: 0, n: 0, up_pct: null, sectors: [], newest: null};
+    if (!day) return out;
+    const sec = {};
+    by[day].forEach(({r, c, t}) => {
+      out.n++; if (c > 0) out.up++; if (out.newest == null || t > out.newest) out.newest = t;
+      if (isNum(r.mcap) && r.mcap > 0) { const x = sec[r.sec] ||= {w: 0, wc: 0, n: 0}; x.w += r.mcap; x.wc += r.mcap * c; x.n++; }
+    });
+    out.up_pct = 100 * out.up / out.n;
+    out.sectors = Object.entries(sec).map(([sector, x]) => ({sector, chg: x.wc / x.w, n: x.n})).sort((a, b) => b.chg - a.chg);
+    return out;
+  }
+  // Current valuation words and numbers from the same accepted price. Earnings and sector medians keep their dates.
+  function valuationText(cur, closeRatio, secTrail, secFwd, asof) {
+    const word = r => r > 1.05 ? 'above' : r < 0.95 ? 'below' : 'in line with';
+    if (!cur || !isNum(cur.px) || !(cur.px > 0) || !isNum(cur.pe)) {
+      return isNum(closeRatio) ? `Current price unavailable, so no current comparison. At the ${asof} close trailing P/E was ${closeRatio.toFixed(2)}× the sector median.` : 'Valuation comparison unavailable.';
+    }
+    const parts = [];
+    if (isNum(secTrail) && secTrail > 0) { const r = cur.pe / secTrail; parts.push(`trailing P/E ${cur.pe.toFixed(1)} is ${r.toFixed(2)}× the sector median of ${secTrail.toFixed(1)}, ${word(r)} it`); }
+    else parts.push(`trailing P/E ${cur.pe.toFixed(1)}`);
+    if (isNum(cur.pef) && isNum(secFwd) && secFwd > 0) { const r = cur.pef / secFwd; parts.push(`forward P/E ${cur.pef.toFixed(1)} is ${r.toFixed(2)}× the sector forward median, ${word(r)} it`); }
+    return `At ${px(cur.px)}, ${parts.join('; ')}. Earnings and sector medians are as of ${asof}.`;
+  }
+  // Strongest measured counterpoint, or an explicit statement that none is supported. Never an all-clear.
+  function counterpoint(text, cur, er, nowMs) {
+    if (text && !/no weak area/i.test(text) && !/^not available/i.test(text)) return text;
+    const out = [];
+    if (cur && isNum(cur.pef_sec_rel) && cur.pef_sec_rel >= 1.25 && isNum(cur.pef)) out.push(`Valuation: forward P/E ${cur.pef.toFixed(1)} is ${cur.pef_sec_rel.toFixed(2)}× the sector median at the current price.`);
+    const d = Date.parse(er || ''); if (isFinite(d) && d >= nowMs - 864e5 && d - nowMs <= 21 * 864e5) out.push(`Earnings expected ${er} (provider date); results can reset the case.`);
+    return out.length ? out.join(' ') : 'No counterargument is supported by the retained inputs; that is not an all-clear.';
   }
   // Price versus averages: averages keep their dated sessions; the price is the latest accepted quote.
   function vsAverages(price, a50, a200) {
@@ -82,7 +113,7 @@
     const day = x => new Date(x).toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
     return day(ms) === day(nowMs) ? 'today' : 'on ' + new Date(ms).toLocaleDateString('en-US', {timeZone: 'America/New_York', month: 'short', day: 'numeric'});
   }
-  const API = {sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px};
+  const API = {valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px};
   if (typeof module !== 'undefined' && module.exports) { module.exports = API; return; }
   root.SmartOptionsMain = API;
   const doc = root.document; if (!doc) return;
@@ -143,11 +174,12 @@
       <div><h4>Challenges</h4><ul>${ch.map(item).join('') || '<li class="dim">None measured.</li>'}</ul></div></div>`;
   }
   function breadthSlot() {
-    const lb = liveBreadth(S.core.rows, q);
-    if (!lb.n) return '<span class="dim">Today’s breadth is unavailable until prices arrive.</span>';
+    const lb = liveBreadth(S.core.rows, q), now = Date.now();
+    const pending = lb.newest_session && lb.newest_session !== lb.session ? ` ${lb.newest_n} names already have ${lb.newest_session} prices, too few for an index-wide reading.` : '';
+    if (!lb.complete) return `<span class="dim">No session has prices for at least 90% of the ${lb.members} members yet, so index-wide breadth is withheld.${esc(pending)}</span>`;
     const lead = lb.sectors[0], lag = lb.sectors[lb.sectors.length - 1];
-    return `${lb.up} of ${lb.n} priced S&amp;P 500 names were up versus their previous close ${sessionWord(lb.newest, Date.now())} (${lb.up_pct.toFixed(0)}%).` +
-      (lead && lag && lead !== lag ? ` Cap-weighted, ${esc(lead.sector)} leads (${pct(lead.chg)}) and ${esc(lag.sector)} trails (${pct(lag.chg)}).` : '');
+    return `${lb.up} of ${lb.n} S&amp;P 500 names priced for the ${esc(lb.session)} session (${lb.n} of ${lb.members} members) were up versus their previous close ${sessionWord(lb.newest, now)} (${lb.up_pct.toFixed(0)}%).` +
+      (lead && lag && lead !== lag ? ` Cap-weighted, ${esc(lead.sector)} led (${pct(lead.chg)}) and ${esc(lag.sector)} trailed (${pct(lag.chg)}).` : '') + `<span class="dim">${esc(pending)}</span>`;
   }
   function heatSlot() {
     const lb = liveBreadth(S.core.rows, q), live = lb.sectors, sw = sessionWord(lb.newest, Date.now()), closes = (S.brief.positioning && S.brief.positioning.sectors) || [];
@@ -194,7 +226,7 @@
         <div class="ideas">${short.map(x => `<article><h3><a href="#/company/${esc(x.t)}">${esc(x.t)}</a> <span class="dim">${esc(x.name)} · ${esc(x.sector)}</span>
           <span class="px">${liveSpan(x.t, 'price')} <span class="chg">${liveSpan(x.t, 'chg')}</span></span></h3>
           <ul>${(x.why || []).slice(0, 2).map(w => `<li>${esc(w.text)}</li>`).join('')}</ul>
-          <p class="counter"><b>Against:</b> ${esc(x.counter && x.counter.text || 'Not available')}</p>
+          <p class="counter"><b>Against:</b> ${slot('ctr-' + x.t, () => esc(counterpoint(x.counter && x.counter.text, row(x.t) && Live.currentRow(row(x.t)), row(x.t) && row(x.t).er, Date.now())))}</p>
           <p>${slot('idea-' + x.t, ideaSlot(x.t))}</p></article>`).join('')}</div></section>`;
   }
 
@@ -229,24 +261,23 @@
       return `At ${px(cur.px)} the stock is ${listJoin(parts)}.${rng}`;
     };
   }
-  function valSlot(t) {
+  function valSlot(t, card) {
+    const m = l => ((card && card.metrics) || []).find(x => x.label === l) || {};
     return () => {
-      const r = row(t), cur = r && Live.currentRow(r); if (!cur || !isNum(cur.px)) return '';
-      const p = [];
-      if (isNum(cur.pe)) p.push(`trailing P/E ${cur.pe.toFixed(1)}`);
-      if (isNum(cur.pef)) p.push(`forward P/E ${cur.pef.toFixed(1)}` + (isNum(cur.pef_sec_rel) ? ` (${cur.pef_sec_rel.toFixed(2)}× the sector median)` : ''));
-      if (isNum(cur.mcap)) p.push(`market value $${big(cur.mcap)}`);
-      return p.length ? `At the current price: ${p.join(', ')}. Earnings stay at their last reported basis.` : '';
+      const r = row(t), cur = r && Live.currentRow(r);
+      let txt = valuationText(cur, m('Trailing P/E / sector median').value, m('Sector trailing P/E median').value, r && r.pef_sec_med, m('Sector trailing P/E median').period || (r && r.pxd) || 'the last');
+      if (cur && isNum(cur.mcap) && isNum(cur.px)) txt += ` Market value $${big(cur.mcap)}.`;
+      return esc(txt);
     };
   }
   function relSentence(r, card) {
     const rel = r && r.rel; if (!rel || !rel.c || !(rel.n >= 120)) return 'Macro relationships are unavailable for this name (fewer than 120 common sessions).';
     const out = [];
-    if (isNum(rel.c.spy)) out.push(`moved ${rel.c.spy.toFixed(2)}% per 1% SPY move`);
+    if (isNum(rel.c.spy)) out.push(`tended to move ${rel.c.spy.toFixed(2)}% per 1% SPY move`);
     ['us10y_bps', 'wti', 'dxy', 'vix'].forEach(f => { const c = rel.c[f], tt = rel.t && rel.t[f]; if (isNum(c) && isNum(tt) && Math.abs(tt) >= 2) out.push(`${pct(c * FACTORS[f].scale, 2)} per ${FACTORS[f].per} in the ${FACTORS[f].name}`); });
     let s = `Over ${rel.n} sessions ${r.t} ${listJoin(out)}` + (out.length < 2 ? ' with no statistically clear rate, oil, dollar or VIX link' : '') + ` (R² ${isNum(rel.r2) ? rel.r2.toFixed(2) : 'n/a'}).`;
     const a = r.att;
-    if (a && isNum(a.actual_20d) && isNum(a.explained_20d)) s += ` Over the 20 sessions to ${esc(a.date)}, those factors account for ${pct(a.explained_20d, 1)} of its ${pct(a.actual_20d, 1)} move; the remaining ${pct(a.resid_20d, 1)} is company-specific.`;
+    if (a && isNum(a.actual_20d) && isNum(a.explained_20d)) s += ` Over the 20 sessions to ${esc(a.date)} the stock moved ${pct(a.actual_20d, 1)}; the model's fitted factor moves sum to ${pct(a.explained_20d, 1)}, leaving ${pct(a.resid_20d, 1)} not explained by these factors.`;
     const lev = card && (card.metrics || []).find(m => m.label === 'Net debt / EBITDA');
     if (isNum(rel.c.us10y_bps) && Math.abs((rel.t || {}).us10y_bps || 0) >= 2 && lev && isNum(lev.value)) s += ` Net debt is ${lev.value.toFixed(2)}× EBITDA (${esc(lev.period)}), relevant to that rate sensitivity.`;
     return s;
@@ -267,9 +298,9 @@
         <p>${slot('ctx', () => esc(Live.currentContext(t, Live.snapshot())))}</p>
         <p class="lead">${esc(c && c.summary || 'Company detail is unavailable in the published data.')}</p></section>
       <section><h2>Fundamentals</h2><div class="cards">
-        ${Object.keys(CARD_TITLES).map(k => cards[k] ? `<div class="card"><h4>${CARD_TITLES[k]}</h4><p>${esc(cards[k].line)}</p>${k === 'valuation' ? `<p>${slot('val', valSlot(t))}</p>` : ''}${metricTable(cards[k].metrics)}</div>` : '').join('')}
+        ${Object.keys(CARD_TITLES).map(k => cards[k] ? `<div class="card"><h4>${CARD_TITLES[k]}</h4>${k === 'valuation' ? `<p>${slot('val', valSlot(t, cards.valuation))}</p>` : `<p>${esc(cards[k].line)}</p>`}${metricTable(cards[k].metrics)}</div>` : '').join('')}
       </div>
-      <p class="counter"><b>Strongest counterargument:</b> ${esc(cards.counter && cards.counter.line || 'Not available')}</p></section>
+      <p class="counter"><b>Strongest counterargument:</b> ${slot('ctr', () => esc(counterpoint(cards.counter && cards.counter.line, Live.currentRow(r), r.er, Date.now())))}</p></section>
       <section><h2>Macro relationship</h2><p>${esc(relSentence(r, cards.resilience))}</p><p class="dim">Historical association, not a forecast.</p></section>
       <section><h2>Price and trend</h2><div id="chart" class="chart"></div><p>${slot('tech', techSlot(t, c && c.technical))}</p></section>
       <section><h2>Events</h2><p>${esc(ev.line || 'No dated events in the published data.')}</p>

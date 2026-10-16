@@ -1,8 +1,8 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261016-r9-main",
+  "release_id": "brief-client-20261016-r10-main",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-16T18:47:55.795362+00:00",
+  "built_at": "2026-10-16T11:47:55.795362-07:00",
   "source_commit": "1927e5a",
   "data_session": "2026-10-15",
   "tickers": 509,
@@ -18,7 +18,7 @@
       "failed": 0,
       "skipped": 0,
       "receipt": "price-now-js-wake-2.txt",
-      "run_at": "2026-10-16T18:53:27.637576+00:00"
+      "run_at": "2026-10-16T11:53:27.637576-07:00"
     },
     "python": {
       "status": "pending final rerun; previous full run interrupted during priority steering",
