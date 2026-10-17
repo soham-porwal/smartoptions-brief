@@ -40,12 +40,14 @@ def fetch_statement(ticker, name, cache_dir, config, provider, now=None, offline
     now = now or datetime.now(timezone.utc)
     path = Path(cache_dir) / f'{ticker}.{name}.json'
     cached = load_json(path) if path.exists() else None
-    stamp = parsed((cached or {}).get('retrieved_at'))
+    stamp = parsed((cached or {}).get('checked_at') or (cached or {}).get('retrieved_at'))
     if stamp and 0 <= (now - stamp).total_seconds() < config['cache_ttl_hours'] * 3600:
         return cached
     if offline:
         reason = 'Cached statement expired' if cached else 'No cached statement; offline build'
         event('brief.statements', ticker + ':' + name, 'WARN', reason)
+        if cached and cached.get('data') and parsed(cached.get('retrieved_at')):
+            return dict(cached, status='retained', retention_reason=reason + '; original observation date retained')
         return dict(data={}, retrieved_at=None, error=reason, status='missing')
     error = None
     for attempt in range(2):
@@ -53,10 +55,22 @@ def fetch_statement(ticker, name, cache_dir, config, provider, now=None, offline
             throttle(config['request_spacing_seconds'])
             data = frame_record(getattr(provider, name))
             rec = dict(data=data, retrieved_at=utcnow(), error=None, status='ok')
+            # A partial provider table must not erase valid previous fields. Use the
+            # oldest actual retrieval stamp for a merged table; new attempt time is separate.
+            if cached and cached.get('data') and parsed(cached.get('retrieved_at')):
+                retained = 0
+                for period, fields in cached['data'].items():
+                    for field, value in fields.items():
+                        if value is not None and data.setdefault(period, {}).get(field) is None:
+                            data[period][field] = value
+                            retained += 1
+                if retained:
+                    rec.update(retrieved_at=cached['retrieved_at'], checked_at=utcnow(), status='retained',
+                               retained_fields=retained, retention_reason='Partial provider table; prior fields kept with original observation date')
             write_json(path, rec)
             return rec
         except Exception as exc:
-            error = f'{type(exc).__name__}: {str(exc)[:180]}'
+            error = type(exc).__name__  # provider strings can contain credential-bearing URLs
             event('brief.statements', ticker + ':' + name, 'WARN', f'attempt {attempt + 1}: {error}')
             if attempt == 0:
                 time.sleep(config['retry_backoff_seconds'])
@@ -67,6 +81,9 @@ def fetch_statement(ticker, name, cache_dir, config, provider, now=None, offline
                 except Exception as retry_exc:
                     event('brief.statements', ticker, 'WARN', f'retry init: {type(retry_exc).__name__}')
     rec = dict(data={}, retrieved_at=utcnow(), error=error, status='missing')
+    if cached and cached.get('data') and parsed(cached.get('retrieved_at')):
+        rec = dict(cached, checked_at=utcnow(), error=error, status='retained',
+                   retention_reason='Provider unavailable after retry; original observations retained')
     write_json(path, rec)  # Negative cache also prevents hammering unsupported statements.
     event('brief.statements', ticker + ':' + name, 'WARN', 'unavailable after retry: ' + str(error))
     return rec

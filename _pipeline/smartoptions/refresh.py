@@ -24,17 +24,19 @@ import requests
 from smartoptions.brief.common import ROOT, load_json, write_json
 from smartoptions.brief.intelligence import build as intelligence_build, validate as validate_intelligence
 from smartoptions.shocks import build as shocks_build, validate as validate_shocks
+from smartoptions.brief.relationships import stage as relationships_stage, validate as validate_relationships
 from smartoptions.log import event
 
 MAX_BUNDLE_BYTES = 64 * 1024 * 1024
-REQUIRED_SNAPSHOT_FILES = {'core.json', 'brief.json', 'intelligence.json', 'shocks.json', 'money-flow.json', 'refresh-status.json'}
+REQUIRED_SNAPSHOT_FILES = {'core.json', 'brief.json', 'intelligence.json', 'shocks.json', 'money-flow.json', 'refresh-status.json', 'relationships.json'}
+SESSION_FILES = ('core.json', 'brief.json', 'shocks.json', 'relationships.json')
 
 
 def bundle_path_allowed(name):
     path = Path(name)
     if path.is_absolute() or '..' in path.parts or '\\' in name:
         return False
-    return name in {'core.json', 'brief.json', 'intelligence.json', 'shocks.json', 'refresh-status.json', 'money-flow.json'} or (
+    return name in {'core.json', 'brief.json', 'intelligence.json', 'shocks.json', 'refresh-status.json', 'money-flow.json', 'relationships.json'} or (
         path.suffix == '.json' and (len(path.parts) == 2 and path.parts[0] == 'px' or
                                   len(path.parts) == 3 and path.parts[:2] == ('brief', 'company')))
 
@@ -46,8 +48,7 @@ def write_bundle(data_root):
     if not REQUIRED_SNAPSHOT_FILES <= files.keys():
         raise ValueError('Snapshot bundle is missing a coordinated dataset')
     intelligence = json.loads(files['intelligence.json'])
-    if any(json.loads(files[name]).get('asof_session') != intelligence['asof_session']
-           for name in ('core.json', 'brief.json', 'shocks.json')):
+    if any(json.loads(files[name]).get('asof_session') != intelligence['asof_session'] for name in SESSION_FILES):
         raise ValueError('Snapshot bundle sessions disagree')
     manifest = dict(schema='smartoptions.snapshot-bundle.v1', asof_session=intelligence['asof_session'],
                     generated_at=intelligence['generated_at'],
@@ -86,7 +87,7 @@ def read_bundle(raw, candidate):
             json.loads(body)
             contents[name] = body
         if any(json.loads(contents[name]).get('asof_session') != manifest.get('asof_session')
-               for name in ('core.json', 'brief.json', 'intelligence.json', 'shocks.json')):
+               for name in SESSION_FILES + ('intelligence.json',)):
             raise ValueError('Snapshot bundle sessions disagree')
         for name, body in contents.items():
             path = candidate / name
@@ -139,6 +140,43 @@ def run_stage(module, arguments, receipt, timeout, log_root):
         raise
     finally:
         record['finished_at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
+
+
+def retain_macro_observations(stage_root, old_core):
+    """Carry valid prior observations on an optional source outage, never the attempt date.
+    The compact publication is the portable retention source (also present on CI).
+    """
+    path = stage_root / 'macro.json'
+    macro = load_json(path, required=True)
+    old = {o['id']: o for group in (old_core.get('macro') or {}).values() for o in group}
+    retained = []
+    for group in macro.get('groups', {}).values():
+        for i, current in enumerate(group):
+            previous = old.get(current.get('id'), {})
+            if current.get('value') is not None or previous.get('v') is None or not previous.get('date') or not previous.get('retrieved_at'):
+                continue
+            restored = dict(previous, value=previous['v'], history=previous.get('h') or [],
+                            source_url=previous.get('url'), status='stale',
+                            note='Provider unavailable in this attempt; retained prior observation and retrieval dates')
+            restored.pop('v', None); restored.pop('h', None); restored.pop('url', None)
+            group[i] = restored
+            retained.append(current['id'])
+    # Required historical factor inputs can likewise retain actual changes derived
+    # from their dated source levels; no forward fill or synthetic final bar.
+    from smartoptions.shocks_sources import FACTOR_SPECS
+    for _, (_, unit, field, _, obs_id) in FACTOR_SPECS.items():
+        if not field or macro.get('daily_factors', {}).get(field):
+            continue
+        h = old.get(obs_id, {}).get('h') or []
+        changes = []
+        for (d0, v0), (d1, v1) in zip(h, h[1:]):
+            if isinstance(v0, (int,float)) and isinstance(v1, (int,float)) and (unit != '%' or v0 > 0):
+                changes.append([d1, 100*(v1/v0-1) if unit == '%' else (v1-v0)*(100 if obs_id in ('us10y','us2y') else 1)])
+        macro.setdefault('daily_factors', {})[field] = changes
+    write_json(path, macro)
+    if retained:
+        event('refresh.retention', 'macro', 'WARN', 'Retained dated observations: ' + ','.join(retained), len(retained))
+    return dict(status='degraded' if retained else 'ok', retained=retained, observation_dates_preserved=True)
 
 
 def coverage_guard(old_data, new_data):
@@ -199,8 +237,18 @@ def coverage_guard(old_data, new_data):
     capital = load_json(new_data / 'money-flow.json', required=True)
     if capital.get('schema') != 'smartoptions.capital.v1' or capital.get('status') not in ('ok', 'degraded'):
         raise ValueError('Refresh capital provenance is missing or invalid')
+    # Explore relationship catalog: present, internally valid and built from this exact core session.
+    if not (new_data / 'relationships.json').is_file():
+        raise ValueError('Refresh relationship catalog is missing')
+    relationships = load_json(new_data / 'relationships.json', required=True)
+    validate_relationships(relationships, core)
+    old_path = old_data / 'relationships.json'
+    old_relationships = load_json(old_path, {}) if old_path.is_file() else {}
+    if old_relationships.get('asof_session') and relationships['asof_session'] < old_relationships['asof_session']:
+        raise ValueError('Refresh relationship catalog session moved backward')
     return dict(companies=len(rows), retained_previous=len(old_rows), macro_observations=len(core_macro),
-                intelligence_companies=len(intelligence['companies']), shock_companies=len(shocks['companies']))
+                intelligence_companies=len(intelligence['companies']), shock_companies=len(shocks['companies']),
+                relationship_pairs=len(relationships['pairs']), relationship_baskets=len(relationships['baskets']))
 
 
 def source_dates(data_root):
@@ -312,38 +360,50 @@ def refresh(data_root, work_root, cache_root, *, source_snapshot=None, offline=F
                 event('refresh.capital', 'optional collector', 'WARN', f'{type(exc).__name__}; retained copied prior capital data')
                 return dict(status='degraded', reason='Optional capital collector failed; prior document retained if present')
         for name, action in (
+            ('macro_retention', lambda: retain_macro_observations(stage_root, old_core)),
             ('relations', lambda: write_json(stage_root / 'relations.json', relate_build(stage_root))),
             ('export', lambda: export_build(stage_root.name, candidate, input_dir=stage_root)),
             ('brief', lambda: brief_build(candidate, cache_root,
                  yaml.safe_load(Path(config_path or ROOT / 'config/brief.yaml').read_text(encoding='utf-8')), offline=offline)),
             ('capital', capital_stage),
             ('shocks', lambda: write_json(candidate / 'shocks.json',
-                 shocks_build(candidate, stage_root, now=now, offline=offline, log_dir=log_root / 'shocks'))),
+                 shocks_build(candidate, stage_root, now=now, offline=offline, log_dir=log_root / 'shocks',
+                              previous_events=load_json(data_root / 'shocks.json', {}).get('event_study', {})))),
             ('intelligence', lambda: write_json(candidate / 'intelligence.json', intelligence_build(candidate, stage_root, now))),
+            # Built from the same final candidate histories (core + px) that will be published.
+            ('relationships', lambda: relationships_stage(candidate, now=now.isoformat(timespec='seconds'))),
             ('verify', lambda: coverage_guard(data_root, candidate)),
         ):
             receipt['stages'][name] = dict(status='running')
             try:
                 result = action()
-                receipt['stages'][name] = result if name == 'capital' else dict(status='ok')
+                receipt['stages'][name] = result if name in ('capital', 'relationships', 'macro_retention') else dict(status='ok')
                 if name == 'verify':
                     receipt['coverage'] = result
                 event('refresh.stage', name, 'WARN' if receipt['stages'][name]['status'] != 'ok' else 'OK', 'Completed staged snapshot')
             except Exception as exc:
-                receipt['stages'][name].update(status='failed', error_type=type(exc).__name__)
+                diagnostic = dict(stage=name, code=getattr(exc, 'code', 'STAGE_EXCEPTION'),
+                                  error_type=type(exc).__name__, context=getattr(exc, 'context', {}))
+                receipt['stages'][name].update(status='failed', diagnostic=diagnostic, error_type=type(exc).__name__)
+                event('refresh.validation', name, 'FAIL', json.dumps(diagnostic, sort_keys=True))
                 raise
         intelligence = load_json(candidate / 'intelligence.json', required=True)
         shocks = load_json(candidate / 'shocks.json', required=True)
         capital_degraded = receipt['stages']['capital']['status'] != 'ok'
-        receipt.update(status='degraded' if intelligence['status']['state'] == 'degraded' or shocks['status']['state'] == 'degraded' or offline or capital_degraded else 'ok',
+        retained_macro = receipt['stages']['macro_retention']['retained']
+        relations_degraded = receipt['stages']['relationships']['status'] != 'ok'
+        receipt.update(status='degraded' if intelligence['status']['state'] == 'degraded' or shocks['status']['state'] == 'degraded' or offline or capital_degraded or retained_macro or relations_degraded else 'ok',
                        reasons=intelligence['status']['reasons'] + shocks['status']['reasons'] + (['Offline source observations reused; this is a pipeline validation, not a live refresh'] if offline else []) +
-                               (['Capital & news collection is degraded or unavailable; inspect its separate provenance.'] if capital_degraded else []),
+                               (['Capital & news collection is degraded or unavailable; inspect its separate provenance.'] if capital_degraded else []) +
+                               ([f'{len(retained_macro)} macro observations retained with original dates after provider unavailability.'] if retained_macro else []) +
+                               (['Relationship catalog has partial coverage; inspect candidate and basket accounting.'] if relations_degraded else []),
                        asof_session=intelligence['asof_session'], model_asof=intelligence['basis']['model_asof'],
                        shock_model_asof=shocks['windows']['factor_common_end'],
                        source_dates=source_dates(candidate),
                        publication_changed=True, finished_at=datetime.now(timezone.utc).isoformat(timespec='seconds'),
                        intelligence_sha256=hashlib.sha256((candidate / 'intelligence.json').read_bytes()).hexdigest(),
-                       shocks_sha256=hashlib.sha256((candidate / 'shocks.json').read_bytes()).hexdigest())
+                       shocks_sha256=hashlib.sha256((candidate / 'shocks.json').read_bytes()).hexdigest(),
+                       relationships_sha256=hashlib.sha256((candidate / 'relationships.json').read_bytes()).hexdigest())
         write_json(candidate / 'refresh-status.json', receipt)
         write_bundle(candidate)
         promote(candidate, data_root, run_root / 'previous-data', workspace)
@@ -353,7 +413,7 @@ def refresh(data_root, work_root, cache_root, *, source_snapshot=None, offline=F
         return receipt
     except Exception as exc:
         # No provider exception string enters public status (may contain keys).
-        receipt.update(status='failed', error_type=type(exc).__name__,
+        receipt.update(status='failed', error_type=type(exc).__name__, diagnostic=next((v.get('diagnostic') for v in receipt['stages'].values() if v.get('diagnostic')), None),
                        reasons=['Refresh failed validation or collection; the previous data snapshot remains available. Inspect the private workflow logs.'],
                        publication_changed=False, finished_at=datetime.now(timezone.utc).isoformat(timespec='seconds'))
         receipt['source_dates'] = source_dates(data_root)
@@ -393,6 +453,7 @@ def mirror(data_root, work_root, url, workspace=None):
                        shock_model_asof=canonical.get('shock_model_asof'),
                        shocks_sha256=manifest['files']['shocks.json'],
                        intelligence_sha256=manifest['files']['intelligence.json'],
+                       relationships_sha256=manifest['files']['relationships.json'],
                        source_dates=canonical.get('source_dates', source_dates(candidate)),
                        coverage=coverage_guard(data_root, candidate), publication_changed=True,
                        stages=dict(download=dict(status='ok'), manifest=dict(status='ok'), verify=dict(status='ok')))

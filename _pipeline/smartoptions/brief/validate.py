@@ -5,8 +5,16 @@ from datetime import date
 from .common import CARDS, STATUSES, parsed
 
 
+class BriefValidationError(ValueError):
+    """Safe, bounded diagnostics; never include arbitrary provider text or URLs."""
+    def __init__(self, message):
+        self.code = 'BRIEF_' + message.split(':')[0].split(' asof=')[0].upper().replace(' ', '_').replace('>=', 'GE')[:64]
+        self.context = {}
+        super().__init__('Brief contract: ' + message)
+
+
 def require(condition,message):
-    if not condition:raise ValueError('Brief contract: '+message)
+    if not condition:raise BriefValidationError(message)
 
 
 def metric(m):

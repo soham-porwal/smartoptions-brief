@@ -45,6 +45,10 @@ def health(core,quotes,records,now,release=None):
     item=source('statements','Yahoo company statements and analyst estimates',min(stamps,key=parsed) if stamps else None,now,
                 f'{len(available)}/{len(tables)} tables available; 24-hour cache; financial reporting lags apply.')
     if len(available)<len(tables):item['status']='delayed' if available else 'missing'
+    retained=sum(v.get('status')=='retained' for v in available)
+    if retained:
+        item['note']+=f' {retained} tables retain prior observations after unavailable/partial source responses; original retrieval dates preserved.'
+        if item['status']=='fresh':item['status']='delayed'
     sources.append(item)
     sam=core.get('meta',{}).get('sam_source',{})
     samdate=str(sam.get('asof') or '')[:10]

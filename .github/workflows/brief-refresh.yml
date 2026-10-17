@@ -37,7 +37,8 @@ jobs:
         shell: python
         run: |
           import pathlib, sys
-          required = ['_pipeline/requirements-refresh.txt', '_pipeline/smartoptions/refresh.py', '_pipeline/config/brief.yaml']
+          required = ['_pipeline/requirements-refresh.txt', '_pipeline/smartoptions/refresh.py', '_pipeline/config/brief.yaml',
+                      '_pipeline/smartoptions/brief/relationships.py', '_pipeline/smartoptions/brief/release_safety.py']
           missing = [name for name in required if not pathlib.Path(name).is_file()]
           if missing:
               print('FAIL: refresh runtime not installed: ' + ', '.join(missing))

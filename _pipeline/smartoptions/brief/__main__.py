@@ -49,7 +49,11 @@ def build(out,cache,config,offline=False,watchlist=(),tickers=None,now=None):
         obj=company(r,records[r['t']],core['asof_session'],config['company'],medians,prices[r['t']])
         from .release_safety import guard_company
         guard_company(obj, r)
-        validate_company(obj)
+        try:
+            validate_company(obj)
+        except ValueError as exc:
+            exc.context = dict(ticker=r['t'], bytes=len(__import__('json').dumps(obj, ensure_ascii=False, separators=(',', ':')).encode()))
+            raise
         companies[r['t']]=obj
     signal_date=str(core.get('rel',{}).get('window') or '')[-10:]
     enriched=[dict(r,_signals=[s for s in core.get('signals',[]) if s.get('t')==r['t']],_signals_asof=signal_date) for r in selected]
@@ -89,7 +93,10 @@ def main():
         if not 1<=config['workers']<=8:raise ValueError('workers must be 1..8')
         if args.now and not parsed(args.now):raise ValueError('--now must be ISO')
         build(args.out,args.cache,config,args.offline,args.watchlist,args.tickers,parsed(args.now) if args.now else None)
-        return 0
+        if args.tickers:return 0   # partial diagnostic build: the catalog needs the full published histories
+        # Documented build path regenerates the Explore relationship catalog from the same core/px (keep-last-good on failure).
+        from .relationships import main as relationships_main
+        return relationships_main(['--data-root',str(args.out)])
     except Exception as exc:
         event('brief.build','publication','FAIL',f'{type(exc).__name__}: {exc}')
         print(f'Brief build failed: {type(exc).__name__}: {exc}',file=sys.stderr)

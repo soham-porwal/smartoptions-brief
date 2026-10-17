@@ -328,7 +328,19 @@ def opportunities(companies, rows, metadata, data_root):
     return sorted(found,key=lambda x: -x['associated_contribution_pct'])[:8]
 
 
-def build(data_root, stage_root, calendar=None, now=None, offline=False, log_dir=None):
+def retain_event_calendars(calendar, previous_events, cutoff):
+    warnings = []
+    for kind, study in (previous_events or {}).items():
+        previous = study.get('calendar', {}) if isinstance(study, dict) else {}
+        current = calendar.get(kind, {})
+        if not current.get('dates') and previous.get('dates') and previous.get('verified_at'):
+            calendar[kind] = dict(previous, dates=[d for d in previous['dates'] if d['date'] <= cutoff],
+                                  status='cached', reasons=['Calendar source unavailable; prior verified release dates retained'])
+            warnings.append(kind + ': retained prior verified calendar; original verification date preserved')
+    return calendar, warnings
+
+
+def build(data_root, stage_root, calendar=None, now=None, offline=False, log_dir=None, previous_events=None):
     data_root, stage_root = Path(data_root), Path(stage_root)
     now = now or datetime.now(timezone.utc); log_dir = Path(log_dir or ROOT/'logs/quant')
     core, macro, equities = [read(p) for p in [data_root/'core.json',stage_root/'macro.json',stage_root/'equities.json']]
@@ -358,8 +370,16 @@ def build(data_root, stage_root, calendar=None, now=None, offline=False, log_dir
     warnings = []
     if calendar is None:
         calendar, warnings = load_events(stage_root, log_dir/'sources', cutoff, offline)
+    # Official historical release dates do not expire when BLS is temporarily
+    # unavailable. Retain verified dates and their actual verification timestamp;
+    # recompute the study from current histories, never carry old fitted results.
+    calendar, retention_warnings = retain_event_calendars(calendar, previous_events, cutoff)
+    warnings.extend(retention_warnings)
     if not market or any(not v for v in factors.values()):
-        raise ValueError('Not available: SPY or required factor series is missing; previous artifact retained')
+        exc = ValueError('Not available: SPY or required factor series is missing; previous artifact retained')
+        exc.code = 'SHOCKS_REQUIRED_HISTORY_MISSING'
+        exc.context = dict(market_count=len(market), factor_counts={k:len(v) for k,v in factors.items()})
+        raise exc
     baskets, coverage = cap_weighted(rows, returns)
     sectors = []; sector_models = {}
     for sector, values in baskets.items():

@@ -39,7 +39,20 @@ def guard_core(core):
 def guard_company(obj, row):
     if not row.get('basis_warning'):
         return obj
-    obj.setdefault('basis_original', deepcopy({'cards': obj.get('cards'), 'technical': obj.get('technical')}))
+    original = deepcopy({'cards': obj.get('cards'), 'technical': obj.get('technical')})
+    # Preserve all observations, while factoring repeated provider metadata out of the
+    # audit copy. The normal guarded cards still obey the 12 KB delivery contract.
+    shared = {key: [] for key in ('source', 'source_url', 'note', 'period', 'asof', 'unit')}
+    for assessment in [*(original.get('cards') or {}).values(), original.get('technical')]:
+        for metric in (assessment or {}).get('metrics', []):
+            for key, values in shared.items():
+                if key in metric:
+                    value = metric.pop(key)
+                    if value not in values:
+                        values.append(value)
+                    metric[key + '_ref'] = values.index(value)
+    original['provenance'] = shared
+    obj.setdefault('basis_original', original)
     missing = dict(label='Corporate-action basis', value=None, unit='', period='Spin-off 2026-10-01', asof='2026-10-01', source='Corteva corporate release', source_url=ACTION_URL, note='Basis unverified after spin-off.')
     for card in obj.get('cards', {}).values():
         card.update(status='unavailable', line='Unavailable: post-spin-off basis unreconciled; pre-separation financials and targets require review.', metrics=[deepcopy(missing)])

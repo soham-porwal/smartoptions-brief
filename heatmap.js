@@ -102,6 +102,26 @@ function sectorStats(rows, quotes, period) {
   return [...m.values()].map(o => ({sec: o.sec, n: o.n, mcap: o.mcap, up: o.up, down: o.down, pct: o.w > 0 ? o.s / o.w : null}))
     .sort((a, b) => b.mcap - a.mcap);
 }
+/* Main brief contract: one explicit regular-close session per map. A newer
+   partial quote universe never gets mixed with the older close. */
+function sessionMap(rows, quotes, period, session) {
+  const members=rows.filter(r=>r.sp500_member!==false && isNum(r.mcap) && r.mcap>0);
+  const key=(PERIODS[period]||PERIODS['1D']).key;
+  const values=members.map(r=>{
+    const q=quotes?.[r.t], L=root.SmartOptionsLive;
+    const day=q && L?.sessionDate ? L.sessionDate(q.asof_utc||q.ts) : q && new Date(q.asof_utc||q.ts).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+    let regular=q?.market_hours===1;
+    if(q && q.market_hours==null){const parts={};new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'numeric',hour12:false}).formatToParts(new Date(q.asof_utc||q.ts)).forEach(x=>parts[x.type]=x.value);const minutes=(+parts.hour%24)*60+(+parts.minute);regular=minutes>=570&&minutes<=975;}
+    const usable=period==='1D' && q && q.current_usable!==false && day===session && isNum(q.chg_pct) && regular;
+    return {...r, value:usable?q.chg_pct:r.pxd===session && isNum(r[key])?r[key]:null};
+  });
+  const sectors=[...new Set(values.map(r=>r.sec))].map(sec=>{
+    const a=values.filter(r=>r.sec===sec), covered=a.filter(r=>isNum(r.value));
+    const cap=a.reduce((s,r)=>s+r.mcap,0), weight=covered.reduce((s,r)=>s+r.mcap,0);
+    return {sec,mcap:cap,n:a.length,covered:covered.length,coverage:weight/cap,pct:weight?covered.reduce((s,r)=>s+r.mcap*r.value,0)/weight:null};
+  });
+  return {session,period,values,sectors,covered:values.filter(r=>isNum(r.value)).length,members:members.length};
+}
 const fmtPct = p => isNum(p) ? (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p).toFixed(2) + '%' : 'Not available';
 const fmtCap = v => !isNum(v) ? 'Not available' : v >= 1e12 ? '$' + (v / 1e12).toFixed(2) + 'T' : v >= 1e9 ? '$' + (v / 1e9).toFixed(1) + 'B' : '$' + (v / 1e6).toFixed(0) + 'M';
 const fmtPx = v => isNum(v) ? '$' + v.toFixed(2) : 'Not available';
@@ -343,7 +363,7 @@ function fmtET(ts) {
 }
 function clip(s, px, cw) { const n = Math.floor(px / cw); return s.length <= n ? s : n > 3 ? s.slice(0, n - 1) + '…' : ''; }
 
-const API = {fmtET, PERIODS, PALETTES, squarify, layout, colorFor, changeOf, sectorStats, fmtPct, fmtCap, memberRows, mount};
+const API = {sessionMap, fmtET, PERIODS, PALETTES, squarify, layout, colorFor, changeOf, sectorStats, fmtPct, fmtCap, memberRows, mount};
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 root.SmartOptionsHeatmap = API;
 })(typeof window !== 'undefined' ? window : globalThis);

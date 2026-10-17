@@ -117,9 +117,10 @@ def company(row, records, session, cfg, sector_pe, px=None):
         stamp = (records.get(statement) or {}).get('retrieved_at')
         period_note = 'Yahoo provider reporting-period label; may differ from actual fiscal quarter-end date'
         detail = note or ('Statement reporting currency; no FX conversion' if unit == money_unit else '')
+        retention = (records.get(statement) or {}).get('retention_reason', '')
         return metric(label, value, unit, period or ('Provider quarter label ' + latest if latest else None), stamp,
                       url=url if statement != 'eps_revisions' else f'https://finance.yahoo.com/quote/{t}/analysis/',
-                      note='; '.join(x for x in (detail, period_note if statement.startswith('quarterly_') else '') if x))
+                      note='; '.join(x for x in (detail, period_note if statement.startswith('quarterly_') else '', retention) if x))
     def missing(reason):
         return unavailable(reason, session, url)
     def scored(key, weak, strong, higher=True):

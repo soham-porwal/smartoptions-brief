@@ -150,7 +150,7 @@
   function currentRow(row, quote) {
     if (!row) return row;
     const q = quote === undefined ? get(row.t) : quote;
-    if(q&&(q.current_usable===false||['missing','stale','blocked'].includes(feedSummary({[row.t]:q},[row.t],Date.now(),ST.worker.errors).items[0].state)))return Object.assign({},row,{px:null,d1:null,pe:null,pef:null,peg:null,mcap:null,up:null,pef_sec_rel:null,quote_asof:q.asof_utc||q.ts});
+    if(q&&(predatesRow(row,q)||q.current_usable===false||['missing','stale','blocked'].includes(feedSummary({[row.t]:q},[row.t],Date.now(),ST.worker.errors).items[0].state)))return Object.assign({},row,{px:null,d1:null,pe:null,pef:null,peg:null,mcap:null,up:null,pef_sec_rel:null,quote_asof:q.asof_utc||q.ts});
     if (!q || !isNum(q.price) || q.price <= 0) return row;
     const d = derive(row, q), k = isNum(row.px) && row.px > 0 ? q.price / row.px : null;
     return Object.assign({}, row, {px:d.price, d1:d.chg_pct, pe:d.pe, pef:d.pef,
@@ -166,7 +166,7 @@
     const avg = label => (ms.find(m => m.label === label) || {}).value;
     const a50=avg('SPY 50-session average'), a200=avg('SPY 200-session average');
     const state=feedSummary({SPY:q},['SPY'],nowMs==null?Date.now():nowMs,ST.worker.errors).items[0].state;
-    if(!q||!isNum(q.price)||q.price<=0||['missing','stale','blocked'].includes(state)){
+    if(!q||!isNum(q.price)||q.price<=0||predatesRow({pxd:brief.asof_session},q)||['missing','stale','blocked'].includes(state)){
       const b=JSON.parse(JSON.stringify(brief));b.macro ||= {};b.pulse ||= {};
       const line='SPY price comparison is unavailable.';
       b.macro.price_trend={status:'unavailable',line,metrics:ms.filter(m=>!/SPY close|previous-session change/.test(m.label||''))};b.pulse.headline=line;b.pulse.status='unavailable';
@@ -191,7 +191,7 @@
   }
   function currentContext(t, quotes, modelAsOf) {
     const qs=quotes&&(quotes.quotes||quotes)||{},q=qs[t],spy=qs.SPY;
-    if(!q||!isNum(q.price)||q.current_usable===false||['stale','missing','blocked'].includes(feedSummary(qs,[t],Date.now(),ST.worker.errors).items[0].state))return 'Current price comparison is unavailable.';
+    if(!q||!isNum(q.price)||predatesRow(coreRow(t),q)||q.current_usable===false||['stale','missing','blocked'].includes(feedSummary(qs,[t],Date.now(),ST.worker.errors).items[0].state))return 'Current price comparison is unavailable.';
     const change=isNum(q.chg_pct)?q.chg_pct:q.change_pct,market=spy&&(isNum(spy.chg_pct)?spy.chg_pct:spy.change_pct);
     const comparable=spy&&spy.current_usable!==false&&obsMs(spy)!=null&&obsMs(q)!=null&&quoteSession(obsMs(spy))===quoteSession(obsMs(q))&&!['stale','missing','blocked'].includes(feedSummary(qs,['SPY'],Date.now(),ST.worker.errors).items[0].state);
     let line=`${t} is $${fmtPx(q.price)}`;
@@ -246,7 +246,7 @@
     scope.querySelectorAll('[data-live]').forEach(el => { if (!ST.seen.has(el)) { ST.seen.add(el); ST.io.observe(el); } });
   }
   function onScreen() {
-    const order = ['company', 'index', 'research', 'visible', 'shortlist', 'watchlist', 'other'];
+    const order = ['company', 'explore', 'index', 'research', 'visible', 'shortlist', 'watchlist', 'other'];
     ST.owners.visible = visibleTickers();
     const all = [];
     if(doc){for(const [owner,selector] of Object.entries({dashboard:'.md',strategy:'.st',edge:'#pg-edge'})){const el=doc.querySelector(selector);if(!el||!el.getClientRects().length)ST.owners[owner]=[];}}
@@ -296,7 +296,7 @@
     const q = ST.quotes[String(t || '').toUpperCase()];
     if (!q) return null;
     const c = classify(q, now()),state=feedSummary({[t]:q},[t],now(),ST.worker.errors).items[0].state;
-    return Object.assign({}, q, {delivery_state:state,current_usable:!['stale','missing','blocked'].includes(state)}, {t: String(t).toUpperCase(), freshness_word: c.word, freshness_label: c.label, asof_label: etLabel(q.asof_utc || q.ts, now())});
+    return Object.assign({}, q, {delivery_state:state,current_usable:!predatesRow(coreRow(t),q)&&!['stale','missing','blocked'].includes(state)}, {t: String(t).toUpperCase(), freshness_word: c.word, freshness_label: c.label, asof_label: etLabel(q.asof_utc || q.ts, now())});
   }
   // quotes.json-shaped snapshot for older consumers (company view, intelligence, chat)
   function snapshot() {
@@ -390,6 +390,7 @@
   /* ------------------------------------------------------------ DOM binding
      <span data-live="AAPL" data-live-f="price|chg|pe|pef|range|hi|asof|fresh|since"></span> updates itself. */
   function coreRow(t) { const rows=coreRows(); if(ST.rowIndex?.rows!==rows){ST.rowIndex={rows,map:new Map(rows.map(r=>[r.t,r]))};} return ST.rowIndex.map.get(t)||null; }
+  function predatesRow(row,q){const ms=obsMs(q);return !!(row?.pxd&&ms!=null&&quoteSession(ms)<row.pxd);}
   const reduced = () => !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
   function fieldText(f, d, q, nowMs) {
     switch (f) {
@@ -415,7 +416,7 @@
       if(f==='watch')return;
       if(f==='fresh'||f==='asof'){el.hidden=true;return;}
       const state=feedSummary(ST.quotes,[t],nowMs,ST.worker.errors).items[0].state;
-      const unavailable=!['live','older','closed','delayed'].includes(state);
+      const unavailable=predatesRow(coreRow(t),q)||!['live','older','closed','delayed'].includes(state);
       const text=f==='fresh'?(state==='older'?'older quote':state==='blocked'?'source wait':state):(['price','pe','pef','chg','range','hi','since'].includes(f)&&unavailable)?(ST.worker.pending?.includes(t)?'Updating…':'Unavailable'):fieldText(f,d,q,nowMs);
       if(q)el.title='Last reported '+fmtPx(q.price)+' at '+(q.asof_utc||q.ts)+'; source checked '+(q.checked_at||q.retrieved_at||'unknown')+(unavailable?'; current value unavailable':'');
       if (f === 'fresh') { const c = classify(q, nowMs); el.dataset.fresh = c.word; el.title = q ? (q.provider || '') + ', trade ' + etLabel(q.asof_utc || q.ts, nowMs) + (q.checked_at||q.retrieved_at ? '; source checked ' + (q.checked_at||q.retrieved_at) : '') : 'No observation'; }
@@ -462,6 +463,6 @@
   function paintHealth() { if (root.CustomEvent && root.dispatchEvent) root.dispatchEvent(new root.CustomEvent('so:live-health', {detail: health()})); }
 
   return {start, setRows, refresh, configure, watch, subscribe, get, snapshot, health, coverage, paint, accept, loadFile, pollWorker, onScreen,
-    marketClock, classify, etLabel, merge, batches, decodeYahooMessage, yahooQuote, syncStream, stopStream, derive, currentRow, currentBrief, currentContext, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH, STREAM_MAX,
+    marketClock, classify, etLabel, merge, batches, decodeYahooMessage, yahooQuote, syncStream, stopStream, derive, currentRow, currentBrief, currentContext, predatesRow, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH, STREAM_MAX,
     _state: ST};
 });
