@@ -48,10 +48,17 @@ def guard_company(obj, row):
             for key, values in shared.items():
                 if key in metric:
                     value = metric.pop(key)
-                    if value not in values:
-                        values.append(value)
-                    metric[key + '_ref'] = values.index(value)
+                    # Notes repeat the same provider clauses ("...; Yahoo provider reporting-period label...").
+                    # Store each '; '-separated clause once; '; '.join(clauses[i] for i in note_ref) restores it exactly.
+                    parts = value.split('; ') if key == 'note' and isinstance(value, str) and value else [value]
+                    refs = []
+                    for part in parts:
+                        if part not in values:
+                            values.append(part)
+                        refs.append(values.index(part))
+                    metric[key + '_ref'] = refs[0] if len(refs) == 1 else refs
     original['provenance'] = shared
+    original['provenance_rule'] = 'note_ref may be a list: join those note clauses with "; "'
     obj.setdefault('basis_original', original)
     missing = dict(label='Corporate-action basis', value=None, unit='', period='Spin-off 2026-10-01', asof='2026-10-01', source='Corteva corporate release', source_url=ACTION_URL, note='Basis unverified after spin-off.')
     for card in obj.get('cards', {}).values():

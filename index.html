@@ -6,21 +6,24 @@
 <meta name="color-scheme" content="light dark">
 <title>SmartOptions Brief</title>
 <link rel="icon" href="favicon.ico">
-<link rel="stylesheet" href="main.css?v=client-20261017r12-nested">
+<link rel="stylesheet" href="main.css?v=client-20261017r13-final1">
 </head>
 <body>
 <header id="hdr">
-  <a class="brand" href="#/">SmartOptions Brief</a>
-  <nav id="nav"><a href="#/" data-v="brief">Market brief</a><a href="#/companies" data-v="companies">Companies</a><a href="#/macro" data-v="macro">Macro</a><a href="#/explore" data-v="explore">Explore</a></nav>
+  <a class="brand" href="#/">SmartOptions</a>
+  <nav id="nav" aria-label="Main"><a href="#/" data-v="brief">Today</a><a href="#/companies" data-v="companies">Companies</a><a href="#/macro" data-v="macro">Macro</a><a href="#/explore" data-v="explore">Compare</a></nav>
+  <div class="gsearch"><input id="gsearch" type="search" placeholder="Find a company" aria-label="Find a company" autocomplete="off" spellcheck="false" aria-controls="gs-hits"><ul id="gs-hits" class="gs-hits" role="listbox" hidden></ul></div>
+  <button type="button" id="theme" class="theme" aria-pressed="false">Dark</button>
 </header>
 <main id="view"><p class="dim">Loading…</p></main>
 <footer>
-  <p>Prices: Yahoo Finance stream, Finnhub and snapshot fallbacks, each with its source time. Statements and releases keep their periods; relationships are historical associations, not forecasts. <a href="backup.html" id="backup-link">Expanded dashboard (backup)</a></p>
+  <p>Prices: Yahoo Finance stream, Finnhub and snapshot fallbacks, each with its source time. Statements and releases keep their periods; relationships are historical associations, not forecasts. Research tool, not advice. <a href="backup.html" id="backup-link">Expanded edition: strategies, capital flows, saved dashboards and imports</a></p>
 </footer>
-<script src="vendor/lightweight-charts.standalone.production.js?v=client-20261017r12-nested"></script>
-<script src="live.js?v=client-20261017r12-nested"></script>
-<script src="workspace.js?v=client-20261017r12-nested"></script>
-<script src="heatmap.js?v=client-20261017r12-nested"></script>
-<script src="main.js?v=client-20261017r12-nested"></script>
+<script src="vendor/lightweight-charts.standalone.production.js?v=client-20261017r13-final1"></script>
+<script src="live.js?v=client-20261017r13-final1"></script>
+<script src="workspace.js?v=client-20261017r13-final1"></script>
+<script src="heatmap.js?v=client-20261017r13-final1"></script>
+<script src="watchlist.js?v=client-20261017r13-final1"></script>
+<script src="main.js?v=client-20261017r13-final1"></script>
 </body>
 </html>

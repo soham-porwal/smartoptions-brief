@@ -11,6 +11,7 @@ from smartoptions.log import event
 from .common import ROOT, load_json, parsed, utcnow, write_json
 from .company import company, sector_medians
 from .health import health
+from .changes import calendar_coverage, daily_changes
 from .market import build_risks, macro_assessment, positioning, pulse
 from .shortlist import shortlist
 from .statements import fetch_all
@@ -67,7 +68,8 @@ def build(out,cache,config,offline=False,watchlist=(),tickers=None,now=None):
     receipt=load_json(out/'release.json',{}) if (out/'release.json').exists() else None
     brief=dict(schema='brief.v1',asof_session=core['asof_session'],generated_at=now.isoformat(timespec='seconds'),
                health=health(core,quotes,records,now,receipt),pulse=pulse(macro),macro=macro,risks=risks,
-               positioning=position,shortlist=shortlist(enriched,companies,core['asof_session'],config['company']))
+               positioning=position,shortlist=shortlist(enriched,companies,core['asof_session'],config['company']),
+               daily_changes=daily_changes(core,rows,prices,membership),calendar_coverage=calendar_coverage(core,rows,now))
     validate_brief(brief)
     # Validate the entire batch before replacing any publication artifact.
     sizes={t:write_json(out/'brief'/'company'/f'{t}.json',obj) for t,obj in companies.items()}

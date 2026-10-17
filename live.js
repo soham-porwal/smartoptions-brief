@@ -24,7 +24,10 @@
 
   /* ------------------------------------------------------------ pure helpers */
   // New York regular session, weekdays 9:30-16:00. Exchange holidays are not modelled; old timestamps stay visible.
-  function marketClock(nowMs) {
+  // Memoized: Intl formatting dominated quote-burst cost on phones (measured, perf-browser.cjs).
+  const marketClockMemo = new Map();
+  function marketClock(nowMs) { const k = Math.floor(nowMs / 60000); if (marketClockMemo.has(k)) return marketClockMemo.get(k); if (marketClockMemo.size > 4000) marketClockMemo.clear(); const v = marketClockRaw(nowMs); marketClockMemo.set(k, v); return v; }
+  function marketClockRaw(nowMs) {
     const parts = {};
     try {
       new Intl.DateTimeFormat('en-US', {timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: 'numeric', hour12: false})
@@ -36,7 +39,10 @@
   }
   function obsMs(q) { const t = Date.parse(q && (q.asof_utc || q.ts) || ''); return isFinite(t) ? t : null; }
   // "as of 3:42 PM ET"; adds the date when the observation is not from today in New York
-  function etLabel(iso, nowMs) {
+  // Memoized: Intl formatting dominated quote-burst cost on phones (measured, perf-browser.cjs).
+  const etLabelMemo = new Map();
+  function etLabel(iso, nowMs) { const k = iso + '|' + Math.floor(nowMs / 60000); if (etLabelMemo.has(k)) return etLabelMemo.get(k); if (etLabelMemo.size > 4000) etLabelMemo.clear(); const v = etLabelRaw(iso, nowMs); etLabelMemo.set(k, v); return v; }
+  function etLabelRaw(iso, nowMs) {
     const t = Date.parse(iso || '');
     if (!isFinite(t)) return 'time not available';
     try {
@@ -80,7 +86,10 @@
     }
     return out;
   }
-  function quoteSession(ms) {
+  // Memoized: Intl formatting dominated quote-burst cost on phones (measured, perf-browser.cjs).
+  const quoteSessionMemo = new Map();
+  function quoteSession(ms) { const k = ms; if (quoteSessionMemo.has(k)) return quoteSessionMemo.get(k); if (quoteSessionMemo.size > 4000) quoteSessionMemo.clear(); const v = quoteSessionRaw(ms); quoteSessionMemo.set(k, v); return v; }
+  function quoteSessionRaw(ms) {
     const p = {};
     new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ms)).forEach(x => {p[x.type]=x.value;});
     return p.year+'-'+p.month+'-'+p.day;
@@ -111,7 +120,7 @@
     Object.entries(incoming || {}).forEach(([t, q]) => {
       if (!q || !isNum(q.price) || q.price <= 0) return;
       const cur = out[t], tn = obsMs(q), tc = obsMs(cur);
-      if (tn == null) return;
+      if (tn == null || tn > now() + 60000) return;   // a future-dated observation never enters the engine (any source)
       if(cur && tc===tn && cur.price===q.price){const nc=Date.parse(q.checked_at||q.retrieved_at||''),pc=Date.parse(cur.checked_at||cur.retrieved_at||'');if(!isFinite(nc)||(isFinite(pc)&&nc<=pc))return;}
       if (cur && tc != null && tc > tn) return;
       out[t] = Object.assign({}, q, {_src: source});

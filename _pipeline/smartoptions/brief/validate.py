@@ -1,5 +1,6 @@
 """Runtime contract verifier. Refuse malformed, non-finite or oversize publications."""
 import json
+import math
 from datetime import date
 
 from .common import CARDS, STATUSES, parsed
@@ -82,6 +83,11 @@ def validate_brief(b):
     for r in b['risks']:
         require(all(k in r for k in ('when_et','kind','title','why','tickers','watchlist','importance','metrics')),'risk keys')
         require(parsed(r['when_et']) is not None,'risk date')
+        if 'timing' in r:
+            require(r['timing'] in ('timed','date_only','bmo','amc'),'risk timing vocabulary')
+            # A date-only event is a calendar date, never an instant (no implied midnight).
+            if r['timing']!='timed':date.fromisoformat(r['when_et'])
+            else:require('T' in r['when_et'],'timed risk needs a time')
         require(r['kind'] in ('macro','earnings') and r['importance'] in (1,2,3),'risk vocab')
         require(len(r['why'].split())<=14,'risk why word count')
         for obj in r['metrics']:metric(obj)
@@ -95,4 +101,42 @@ def validate_brief(b):
         require(0<=s['score']<=100 and 2<=len(s['why'])<=3,'shortlist score/reasons')
         require(set(s['status'])==set(CARDS) and all(v in STATUSES for v in s['status'].values()),'shortlist statuses')
         for obj in s['why']+[s['counter']]:bullet(obj)
+    if 'daily_changes' in b:daily_changes(b['daily_changes'],b['asof_session'])
+    if 'calendar_coverage' in b:calendar_coverage(b['calendar_coverage'],b['asof_session'])
+    if 'risk_events' in m:require(m['risk_events'].get('status') in ('scheduled','none_major') and isinstance(m['risk_events'].get('major'),int),'risk_events')
+    if 'level' in pos['breadth']:require(pos['breadth']['level'] in ('broad','mixed','thin','unavailable'),'participation level vocabulary')
     require(len(json.dumps(b,ensure_ascii=False,separators=(',',':'),allow_nan=False).encode())<150000,'brief size >= 150KB')
+
+
+def change_item(x):
+    require(all(k in x for k in ('id','label','unit','current','prior','change','comparison','direction','status','reason','source','source_url')),'change keys')
+    require(x['status'] in ('ok','unavailable'),'change status')
+    if x['status']=='unavailable':
+        require(bool(x['reason']) and x['direction'] is None and x['change'] is None,'unavailable change needs reason and no direction')
+        return
+    cur,pri=x['current'],x['prior']
+    require(isinstance(cur,dict) and isinstance(pri,dict),'ok change needs current and prior')
+    for v in (cur['value'],pri['value'],x['change']):require(isinstance(v,(int,float)) and math.isfinite(v),'change values finite: '+x['id'])
+    require(date.fromisoformat(pri['date'])<date.fromisoformat(cur['date']),'prior date precedes current: '+x['id'])
+    require(abs(x['change']-(cur['value']-pri['value']))<1e-3,'change equals current minus prior: '+x['id'])
+    require(x['direction'] in ('up','down','flat'),'direction requires both values')
+    require(x['source_url'].startswith('https://'),'change source url')
+    if x['unit']=='pp' and x['id'].startswith('breadth'):require(isinstance(x.get('cohort'),dict) and x['cohort'].get('n',0)>0,'breadth change requires cohort')
+
+
+def daily_changes(d,session):
+    require(d.get('status') in ('ok','partial','unavailable'),'daily_changes status')
+    require(isinstance(d.get('items'),list),'daily_changes items')
+    for x in d['items']+list(d.get('macro') or []):change_item(x)
+    ok=sum(x['status']=='ok' for x in d['items'])
+    require((d['status']=='ok')==(ok==len(d['items']) and ok>0),'daily_changes status matches items')
+    require(d['status']!='unavailable' or bool(d.get('reason')),'unavailable daily_changes needs reason')
+    for x in d['items']:
+        if x['status']=='ok':require(x['current']['date']==session,'change current date is the brief session: '+x['id'])
+
+
+def calendar_coverage(c,session):
+    require(c.get('status') in ('ok','partial','unavailable','expired'),'calendar coverage status')
+    for s in c.get('sources') or []:
+        require(s.get('kind') in ('macro','earnings') and s.get('status') in ('ok','partial','unavailable','expired'),'coverage source vocab')
+        if s.get('range_end'):require(s['status']=='expired' or s['range_end']>=session,'coverage ending before the session must be expired')

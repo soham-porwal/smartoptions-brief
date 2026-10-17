@@ -1,53 +1,62 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261017-r12-nested",
+  "release_id": "brief-client-20261017-r13-decision-workflow",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-17T03:41:53.715939+00:00",
-  "source_commit": "c1f5167decd6c90e5f8b974272300b6bf23bf681",
+  "built_at": "2026-10-17T17:59:56.288553+00:00",
+  "source_commit": "9481887d46035da3824af79ff28d282c4e3e984b",
   "data_session": "2026-10-16",
   "tickers": 509,
   "current_constituents": 503,
   "core_sha256": "37f25c81157b8505a9266a9c844dbcc838ba77243416482eec2f60639a3db07b",
-  "default_view": "Compact Market brief, Companies, Macro and Explore, with nested sector/company/metric/economic-driver details; expanded tools at backup.html",
-  "chat": "not on main; retained in the expanded backup",
+  "default_view": "Today, Companies, Macro and Compare; one company dossier; expanded strategies and private tools at backup.html",
+  "chat": "Contextual popup on main; deterministic local answers and allowlisted actions with verified readback; optional shared rephrasing",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
   "price_feed": "Yahoo Finance stream for up to 100 prioritized active names; one connection. Finnhub shared within-budget 120-second fallback, then the timestamped shared snapshot. Full-index breadth uses one adequately covered dated session, not an unqualified all-index tick claim.",
   "verification": {
     "javascript_chat_worker": {
-      "passed": 415,
+      "passed": 424,
       "failed": 0,
-      "receipt": "compact-js-full.log"
+      "receipt": "parent-js-final2.log"
     },
     "python": {
-      "passed": 1027,
+      "passed": 1035,
       "failed": 0,
-      "receipt": "codex-python-release.log",
-      "basis": "Python runtime/tests and data match tested freeze; 36 browser-touching Python tests also passed after UI-only compact pass"
+      "receipt": "parent-pytest-clean-final.log",
+      "basis": "Full suite in isolated final implementation copy with a fresh scoped temporary directory"
     },
     "nested_browser": {
       "passed": 250,
-      "failed": 0
+      "failed": 0,
+      "receipt": "parent-nested-final.log"
     },
     "comparison_browser": {
       "passed": 181,
-      "failed": 0
+      "failed": 0,
+      "receipt": "parent-depth-final.log"
     },
-    "compact_browser": {
-      "passed": 96,
-      "failed": 0
+    "redesign_browser": {
+      "passed": 110,
+      "failed": 0,
+      "receipt": "parent-redesign-final2.log"
     },
-    "evidence_dir": "Data/Logs/brief-depth-20261016",
-    "scope": "Local full suites plus actual nested/compact interactions and independent normal-equation/bundle/mirror gates. Hosted parent verification recorded separately."
+    "performance_browser": {
+      "passed": 20,
+      "failed": 0,
+      "receipt": "out/opus-redesign/final2-perf-browser/perf-browser-receipt.json",
+      "basis": "390x844 CPU x4 / 150ms RTT / 1.6Mbps; injected quote bursts, not open-market cadence"
+    },
+    "evidence_dir": "Data/Logs/smartoptions-redesign-20261017",
+    "scope": "Full local suites, real-data brief regeneration and bundle gates; parent CUA task/contrast/state checks. Hosted proof recorded separately."
   },
   "screener_scores": "dated 2026-07-25 snapshot; separate from refreshed prices and fundamentals",
   "methods": "docs/BRIEF-METHODS.md",
   "notes": [
-    "Regular-close histories and relationship fits end 2026-10-16.",
-    "Retained economic/financial observations keep actual periods, retrieval dates and reasons; staged refresh is explicitly degraded/offline rehydration, not an all-live macro claim.",
-    "Six-factor shock model common end 2026-10-14; joint rate/oil research fits end 2026-10-16.",
-    "Price-dependent calculations use canonical accepted quotes. Real capture after extended trading ended observed zero new stream ticks; synthetic arithmetic evidence is separate.",
-    "Full-index map/breadth use coherent adequately covered dated sessions.",
-    "Parent publication commit is metadata-only relative to source_commit."
+    "Completed-session market data and relationship fits end 2026-10-16. Macro releases and statements retain their actual observation/reporting dates and explicit stale/unavailable states.",
+    "Full offline brief generation for 509 companies and keep-last-good failure behavior passed; maximum company payload 11170 bytes. Full coordinated offline refresh needs a missing same-session source snapshot and was not asserted.",
+    "One canonical accepted quote engine; regular-session provisional bars and extended-session lines are distinct. Closed-market review cannot establish actual open-market tick cadence.",
+    "Phone profile: about4.3seconds to the market reading; price-burst long-task blocking reduced from about25seconds to80milliseconds in the measured synthetic benchmark. This is one test profile, not real-user field data.",
+    "Calendar completeness is unknown without provider range receipts; last-listed dates are not coverage boundaries. No live options chain or own-history valuation is fabricated.",
+    "Parent publication metadata is above the tested implementation source_commit; asset hashes use exact canonical Git bytes."
   ],
   "backup": "backup.html",
   "quote_return_basis": "Daily changes use the previous regular-session close. Yahoo extended-session changes are retained separately; an unknown daily reference stays unavailable.",

@@ -104,14 +104,18 @@ function sectorStats(rows, quotes, period) {
 }
 /* Main brief contract: one explicit regular-close session per map. A newer
    partial quote universe never gets mixed with the older close. */
+// One formatter and a per-timestamp cache: per-row Intl construction dominated map repaints on phones (measured).
+const ET_FMT=typeof Intl!=='undefined'?new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'numeric',hour12:false}):null, ET_PARTS=new Map();
+const ET_DAYS=new Map();
+function etDay(stamp){stamp=String(stamp);let d=ET_DAYS.get(stamp);if(d===undefined){d=new Date(stamp).toLocaleDateString('en-CA',{timeZone:'America/New_York'});if(ET_DAYS.size>4000)ET_DAYS.clear();ET_DAYS.set(stamp,d);}return d;}
 function sessionMap(rows, quotes, period, session) {
   const members=rows.filter(r=>r.sp500_member!==false && isNum(r.mcap) && r.mcap>0);
   const key=(PERIODS[period]||PERIODS['1D']).key;
   const values=members.map(r=>{
     const q=quotes?.[r.t], L=root.SmartOptionsLive;
-    const day=q && L?.sessionDate ? L.sessionDate(q.asof_utc||q.ts) : q && new Date(q.asof_utc||q.ts).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+    const day=q && L?.sessionDate ? L.sessionDate(q.asof_utc||q.ts) : q && etDay(q.asof_utc||q.ts);
     let regular=q?.market_hours===1;
-    if(q && q.market_hours==null){const parts={};new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'numeric',hour12:false}).formatToParts(new Date(q.asof_utc||q.ts)).forEach(x=>parts[x.type]=x.value);const minutes=(+parts.hour%24)*60+(+parts.minute);regular=minutes>=570&&minutes<=975;}
+    if(q && q.market_hours==null){const stamp=String(q.asof_utc||q.ts);let parts=ET_PARTS.get(stamp);if(!parts){parts={};ET_FMT.formatToParts(new Date(stamp)).forEach(x=>parts[x.type]=x.value);if(ET_PARTS.size>4000)ET_PARTS.clear();ET_PARTS.set(stamp,parts);}const minutes=(+parts.hour%24)*60+(+parts.minute);regular=minutes>=570&&minutes<=975;}
     const usable=period==='1D' && q && q.current_usable!==false && day===session && isNum(q.chg_pct) && regular;
     return {...r, value:usable?q.chg_pct:r.pxd===session && isNum(r[key])?r[key]:null};
   });

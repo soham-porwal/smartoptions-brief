@@ -59,8 +59,10 @@ def build_risks(core, rows, now, watchlist=()):
     risks=[]
     for e in core.get('calendar',[]):
         when=parsed(e.get('scheduled_et'))
-        if when is None or not start<=when<=end:continue
-        risks.append(dict(when_et=e['scheduled_et'],kind='macro',title=e.get('title') or e.get('type','Release'),
+        # One horizon rule for macro and earnings: ET calendar dates today..today+7; a timed event earlier today has passed.
+        if when is None or not start.date()<=when.astimezone(et).date()<=end.date() or when<now:continue
+        if e.get('status')=='released':continue
+        risks.append(dict(when_et=e['scheduled_et'],kind='macro',timing='timed' if 'T' in str(e['scheduled_et']) else 'date_only',title=e.get('title') or e.get('type','Release'),
                           why=why.get(e.get('type'),'The release can change growth, inflation or policy expectations.'),tickers=[],watchlist=False,
                           importance=1 if e.get('type')=='EIA' else 3,
                           metrics=[metric('Scheduled release',e['scheduled_et'],'ET timestamp',e['scheduled_et'],core.get('gen',{}).get('macro'),
@@ -72,8 +74,10 @@ def build_risks(core, rows, now, watchlist=()):
         except ValueError:continue
         # Date-only earnings remain date-only; never fabricate midnight/BMO/AMC times.
         if not start.date()<=d<=end.date():continue
-        if d==start.date() and r.get('ert')=='BMO' and start.hour>=10:continue
-        risks.append(dict(when_et=er,kind='earnings',title=r['t']+' earnings',why='Results and guidance can reset earnings expectations and option prices.',
+        ert=r.get('ert') if r.get('ert') in ('BMO','AMC') else None   # anything else is treated as date-only
+        # Threshold choice (documented in BRIEF-METHODS): a same-day before-open report is dropped from 10:00 ET.
+        if d==start.date() and ert=='BMO' and start.hour>=10:continue
+        risks.append(dict(when_et=er,kind='earnings',timing={'BMO':'bmo','AMC':'amc'}.get(ert,'date_only'),title=r['t']+' earnings',why='Results and guidance can reset earnings expectations and option prices.',
                           tickers=[r['t']],watchlist=r['t'] in watchlist,importance=3 if r['t'] in watchlist else 2,
                           metrics=[metric('Expected earnings date',er,'ET date',er,r.get('rat'),r.get('ers') or 'Yahoo Finance',
                                           f"https://finance.yahoo.com/quote/{r['t']}/calendar/",'Provider estimate; '+(r.get('ert') or 'time not confirmed'))]))
@@ -117,6 +121,9 @@ def positioning(core,rows,prices,cfg,membership=None):
         met('New 252-session lows',newlo if highlow_n else None,'names',note=f'{highlow_n} histories available')]
     line=f"{share[50]:.2f}% ({sum(counts[50])} of {len(counts[50])} names) exceed their 50-session average." if share[50] is not None else 'Not available: matched price histories are missing'
     breadth=card(breadth_status,line,bm)
+    # status keeps the historical level rule (validator vocabulary); the presenter uses level words until a dated change exists.
+    from .changes import participation_level
+    breadth.update(participation_level(share[50],share[200]))
     caps=[r for r in selected if (number(r.get('mcap')) or 0)>0]
     capsum=sum(r['mcap'] for r in caps);top=sorted(caps,key=lambda r:r['mcap'],reverse=True)[:10]
     share10=round(sum(r['mcap'] for r in top)/capsum*100,2) if capsum else None
@@ -187,7 +194,7 @@ def macro_assessment(core,position,cfg,risks):
     v3=value(core,'vix3m');term=vix/v3 if vix is not None and v3 is not None and v3>0 and observation(core,'vix').get('date')==observation(core,'vix3m').get('date') else None
     n_major=sum(r['kind']=='macro' and r['importance']==3 for r in risks)
     stressed=(vix is not None and vix>=cfg['vix_stressed']) or (hy is not None and hy>=cfg['hy_stressed_bps'])
-    elevated=(vix is not None and vix>=cfg['vix_elevated']) or (hy is not None and hy>=cfg['hy_elevated_bps']) or (hych is not None and hych>=cfg['hy_change_elevated_bps']) or (term is not None and term>1) or n_major>0
+    elevated=(vix is not None and vix>=cfg['vix_elevated']) or (hy is not None and hy>=cfg['hy_elevated_bps']) or (hych is not None and hych>=cfg['hy_change_elevated_bps']) or (term is not None and term>1)
     risk_state='stressed' if stressed else 'elevated' if elevated or any(v is None for v in [vix,hy,term,hych]) else 'calm'
     rm=[obs_metric(observation(core,k)) for k in ['vix','hy_oas']]
     rm += [metric('VIX percentile',pct,'percentile','Available daily history ('+str(len(vixh))+' observations)',observation(core,'vix').get('date'), 'Cboe via retained macro data',observation(core,'vix').get('url','')),
@@ -210,9 +217,6 @@ def macro_assessment(core,position,cfg,risks):
     elif term is not None and term>1:
         risk_line=f'Near-term volatility exceeds three-month volatility by {(term-1)*100:.1f}%.'
         rm=[rm[3]]+rm[:3]+rm[4:]
-    elif n_major:
-        risk_line=f'{n_major} major macro releases fall within the next seven days.'
-        rm=[rm[5]]+rm[:5]
     else:
         risk_line='Volatility and credit inputs are calm.' if risk_state=='calm' else 'Not available: some risk observations are missing'
     risk=card(risk_state,risk_line,rm)
@@ -245,7 +249,12 @@ def macro_assessment(core,position,cfg,risks):
         details.append(dict(group=group,line=text,metrics=metrics or [metric('Coverage',None,'','Not available',session,note='No observations for this group')]))
     for key in ('growth','inflation','policy'):
         backdrop[key]['metrics']=next(d['metrics'] for d in details if d['group']==key)
-    return dict(price_trend=price,participation=position['breadth'],backdrop=backdrop,risk=risk,detail=details)
+    # Scheduled releases are an event condition, never observed stress (kept separate from risk.status).
+    n_events=sum(r['kind']=='macro' for r in risks)
+    risk_events=dict(status='scheduled' if n_major else 'none_major',major=n_major,releases=n_events,horizon_days=7,
+                     line=f'{n_major} major macro release{"s" if n_major!=1 else ""} in the next seven days.' if n_major else f'No major macro release listed in the next seven days; {n_events} other listed.',
+                     metrics=[rm[-1]])
+    return dict(price_trend=price,participation=position['breadth'],backdrop=backdrop,risk=risk,risk_events=risk_events,detail=details)
 
 
 def session_label(asof):

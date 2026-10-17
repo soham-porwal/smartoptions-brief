@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261017-r12-nested",
-  "built_at": "2026-10-17T03:41:53.715939+00:00",
-  "source_base": "c1f5167decd6c90e5f8b974272300b6bf23bf681",
+  "release_id": "brief-client-20261017-r13-decision-workflow",
+  "built_at": "2026-10-17T17:59:56.288553+00:00",
+  "source_base": "9481887d46035da3824af79ff28d282c4e3e984b",
   "ui_assets": {
     "about.js": {
       "sha256": "547fe112ab4c3c86ef33729f18b5f9c3c9f938a3dd1fd455e7ac6b2d42e0a0b5",
@@ -16,7 +16,7 @@
       "bytes": 56204
     },
     "backup.html": {
-      "sha256": "45f8643e99b02f9ed652b1f2cdd27978627a65b1f98ca9606d0351353ca26680",
+      "sha256": "8d026bea9ed922209877cac1206271b03cc268ede94fba661e4aaf519db4bf18",
       "bytes": 6381
     },
     "brief.css": {
@@ -26,6 +26,14 @@
     "brief.js": {
       "sha256": "1746b78199349a8c409b76a446b34d0bfa04509b7c6f52bb10b3877cce04d3f4",
       "bytes": 80182
+    },
+    "chat-popup.css": {
+      "sha256": "4e1618d9c6933a29420fcabe93f731cd2372e03512b36346b1029fd9a1fc7911",
+      "bytes": 8355
+    },
+    "chat-popup.js": {
+      "sha256": "e3b22078331cfac9536a3313c8f992ff434d57c6f5a116b8b7077ffc30e3de91",
+      "bytes": 24035
     },
     "chat/actions.js": {
       "sha256": "590c07c5b33cf3512ac496f9ee685cf1e075b18ce1ab981b3f1947cd0ba9a5b2",
@@ -74,14 +82,6 @@
     "chat/verify.js": {
       "sha256": "ce3bbfa08f1f223739b8930facb0646a8135ff0552c6ea5bfd309c29bc7fb520",
       "bytes": 6088
-    },
-    "chat-popup.css": {
-      "sha256": "4e1618d9c6933a29420fcabe93f731cd2372e03512b36346b1029fd9a1fc7911",
-      "bytes": 8355
-    },
-    "chat-popup.js": {
-      "sha256": "e3b22078331cfac9536a3313c8f992ff434d57c6f5a116b8b7077ffc30e3de91",
-      "bytes": 24035
     },
     "company.css": {
       "sha256": "c609d67c2473e2862b329188883536858d68d1fd4bfaf33bfb9b3a3077aea447",
@@ -148,16 +148,16 @@
       "bytes": 8545
     },
     "fvchart.js": {
-      "sha256": "4fa31c5d52a2bb81c225defa0efb533135324d52a664c171f0bb14bfe6221a69",
-      "bytes": 45828
+      "sha256": "9d1ebe7192f1a6b6c611c4f6f83771ba9714784e0f1a26b34503dad7e0887af4",
+      "bytes": 46639
     },
     "heatmap.css": {
       "sha256": "133080f05b23e178a32199ac5c3eff416d32fb79c3f70f621e7c14bd4efdb756",
       "bytes": 6716
     },
     "heatmap.js": {
-      "sha256": "613f80c40f8527a3c48f630c0f126a930f858e850460753bd0a13973f79f5cf2",
-      "bytes": 25612
+      "sha256": "a6758e4652c6bfb9027783a7d416f070017090ac1281be86d1a906d9f50f35b8",
+      "bytes": 26121
     },
     "impact.css": {
       "sha256": "5037786233789fd0f1b85554b51404d8e8731e5a80ad9e927453f231d4b5c0cc",
@@ -176,8 +176,8 @@
       "bytes": 22208
     },
     "index.html": {
-      "sha256": "2bb0afb3401a78d4320feb279d88663d87b1e5b1a9b94e9e0cdffb558ceaa9df",
-      "bytes": 1353
+      "sha256": "a5c173648828859d962f1506e2f87aa34c3cc1b97db95c46a25b14c06a4c0d8a",
+      "bytes": 1823
     },
     "intelligence.css": {
       "sha256": "adc81cb529dfa2a34c95bbcc0d09e64411552bc274a3c7c5a3a946c8f81ceeff",
@@ -196,20 +196,20 @@
       "bytes": 4572
     },
     "live.js": {
-      "sha256": "2ee0aa198aa6c5838b2f4f1a0855e2c8a451ada22bfe087b3d823252df3ca013",
-      "bytes": 37131
+      "sha256": "6e3186c95fb1b9ebfe2032f214167b5a40a8e892ba4fb602f8c04d15ac4b2a00",
+      "bytes": 38379
     },
     "macro.js": {
       "sha256": "abc62a0073f7e7a881ac0e2d7690049170b100ad6ee836ffbbecd6a7bc2d08c3",
       "bytes": 6484
     },
     "main.css": {
-      "sha256": "465bb28779efba53eb538d788f6b47ee117d1af7153abd0e2b265b00e317177c",
-      "bytes": 9777
+      "sha256": "272e8f6ef78d01f4e73409019cfe50911ad7e88cd59a970dd15ed5df3202a577",
+      "bytes": 17152
     },
     "main.js": {
-      "sha256": "0edc78e0ed70a6e128e7ab9fddcfa482cbe66881787180eb3329deebb8c2c125",
-      "bytes": 107414
+      "sha256": "57f9c858a390350b1b78f4646bf3a4e2ce55df71f6f3b15dc7578eca3cd9c770",
+      "bytes": 167458
     },
     "money-flow.css": {
       "sha256": "ddef742bb34f0216e5ecfbdcb9b3116ddbdc99abe8cfe13072fd7ad503c5e737",
@@ -242,10 +242,6 @@
     "patterns.js": {
       "sha256": "dfe7643b2b70ec08523f46ef578feb57c8aa0693cbb17875efb61499a7a5fa69",
       "bytes": 42958
-    },
-    "release.json": {
-      "sha256": "171b8dd878608b7a5af44d817cba0ffe356551a444ed76c99cdf6fc796b7ddbb",
-      "bytes": 3227
     },
     "shocks.css": {
       "sha256": "95f20f08ee93c25ca625520dd8e881ca8b1c074955f25f7d67f96f41890aa778",
@@ -283,60 +279,88 @@
       "sha256": "46fc69534ec098f095bbcd1d9a26d693d39a8b9eeff7343536765b3dd28c2bdf",
       "bytes": 163551
     },
+    "watchlist.js": {
+      "sha256": "7f05586324771ae571b51d5eedae9261a72e99a4e8c0436c805bc57b34a089b5",
+      "bytes": 2307
+    },
     "workspace.js": {
       "sha256": "0020f1263635ca0682589ad6079af66d8ba33b52d967624cab55e96faf7b20b4",
       "bytes": 21553
+    },
+    "release.json": {
+      "sha256": "aa8be241517a2dadcb5fa0c637a105228218991a09d5cdcfe2d8bcf5614ab84a",
+      "bytes": 4113
     }
   },
   "data_at_publication": {
+    "data/brief.json": {
+      "sha256": "40210eb84798402bc460c93eb9c9be7a79633eae32b11479867448d70dcff30b",
+      "bytes": 115834
+    },
+    "data/brief/company/AAPL.json": {
+      "sha256": "a24f2c594a6f5f61d3e51fccfd05e5987c52e5e7cd03470c2e39997d4c6e02ba",
+      "bytes": 10583
+    },
+    "data/brief/company/ABT.json": {
+      "sha256": "d9ce4b7e6c97bda35c183d003b37e4a28fa2638f1de38fcac17e482ce1dbc568",
+      "bytes": 10365
+    },
+    "data/brief/company/COP.json": {
+      "sha256": "aef5b971901ceb6e4d8225fcf91dc610b2fec30e53d85f0ba13fe943e6f6ed37",
+      "bytes": 10518
+    },
+    "data/brief/company/CTVA.json": {
+      "sha256": "c3ce81397afd513027118933e3b8edc42acaaae1d6dd336d865e98de95f61209",
+      "bytes": 10976
+    },
+    "data/brief/company/JPM.json": {
+      "sha256": "ed9a0e4a8d9700572d817a88978da746ce50dbc92c054dc8c775cc62c16f11f3",
+      "bytes": 8232
+    },
+    "data/brief/company/MSFT.json": {
+      "sha256": "5a7cef9f1d498c0b94241a7802560715a26d2211bc90c75f127fc0737a9d3f84",
+      "bytes": 10079
+    },
     "data/core.json": {
       "sha256": "37f25c81157b8505a9266a9c844dbcc838ba77243416482eec2f60639a3db07b",
       "bytes": 1708655
-    },
-    "data/brief.json": {
-      "sha256": "5c88c47e827655ce0fc2e6ad2699a199d98d509866e1aa0387463dd0c5eaee99",
-      "bytes": 103896
     },
     "data/intelligence.json": {
       "sha256": "b7e7b156a5c5425317558d1eea250db47daaa93590299c750623c6e453a8b119",
       "bytes": 4851506
     },
-    "data/shocks.json": {
-      "sha256": "ba101459a7d4350b5f8e6222810d0e64656b0754ac856ddd6d6ff07d3fa84b95",
-      "bytes": 2713934
-    },
     "data/money-flow.json": {
       "sha256": "ced1079581c4ec5252cb4206b422daf61c6c9e237d6d304b165149893b842a85",
       "bytes": 32717
-    },
-    "data/relationships.json": {
-      "sha256": "78367b61107af254ce9acdbf0cb76a0eac9bdb45d9fc37cdad2e10c41b3af09b",
-      "bytes": 143398
-    },
-    "data/refresh-status.json": {
-      "sha256": "dad43ad1a5d2ca250d7ebf284a90db3c240a82d92decfa0a36eddaef7560d85f",
-      "bytes": 13495
-    },
-    "data/brief/company/CTVA.json": {
-      "sha256": "b92817d3b217d0c7d363512af612d38e3304373cdfabf7cf05536b2defb9292d",
-      "bytes": 11436
-    },
-    "data/px/SPY.json": {
-      "sha256": "823e3716f23dc8b2dc5defde2cc5fd339289f4c38b43e30dc4ee100d53ae54ff",
-      "bytes": 13530
     },
     "data/px/AAPL.json": {
       "sha256": "a7ac51431e28ef8b4851bf664fe51c7e2ff37a24986d0e8b66d431be8bfb32bc",
       "bytes": 20942
     },
+    "data/px/SPY.json": {
+      "sha256": "823e3716f23dc8b2dc5defde2cc5fd339289f4c38b43e30dc4ee100d53ae54ff",
+      "bytes": 13530
+    },
+    "data/refresh-status.json": {
+      "sha256": "dad43ad1a5d2ca250d7ebf284a90db3c240a82d92decfa0a36eddaef7560d85f",
+      "bytes": 13495
+    },
+    "data/relationships.json": {
+      "sha256": "78367b61107af254ce9acdbf0cb76a0eac9bdb45d9fc37cdad2e10c41b3af09b",
+      "bytes": 143398
+    },
+    "data/shocks.json": {
+      "sha256": "ba101459a7d4350b5f8e6222810d0e64656b0754ac856ddd6d6ff07d3fa84b95",
+      "bytes": 2713934
+    },
     "data/snapshot.zip": {
-      "sha256": "a579f6dec945bf8f2d7ea436e37e54a3aa956f346b6b60fc3d8e9d2d2c77fdbd",
-      "bytes": 5302114
+      "sha256": "5ede88e7fb2fba0a5a5e9b72ea49696e8162b078d7cf71de00db1ca336a08a9e",
+      "bytes": 5323287
     }
   },
   "dynamic_files": {
     "data/quotes.json": "Scheduled shared observations; excluded from static hash gate, compare per-symbol observations across hosts and never regress source times."
   },
-  "note": "UI and coordinated data exact at publication; models/releases retain their true dates. source_base excludes the metadata-only release commit.",
-  "publication_encoding": "Exact Git canonical blobs (LF text); binary payloads unchanged. Working-checkout CRLF is not the served representation."
+  "note": "Exact immutable UI and publication payload hashes; quotes remain independently scheduled and must not regress during UI publication.",
+  "publication_encoding": "Canonical Git blob bytes (GitHub Pages), not Windows worktree CRLF bytes"
 }

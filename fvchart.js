@@ -206,7 +206,9 @@ async function mount(el, ticker, opts) {
   if (!LW) { el.innerHTML = '<p class="fv-err" role="alert">Chart not available: the chart library did not load.</p>'; return {destroy() {}}; }
   let px, spy = null, cr, quotes = null;
   try {
-    [px, cr, quotes] = await Promise.all([getJSON(`data/px/${encodeURIComponent(t)}.json`), coreRow(t), getJSON('data/quotes.json').catch(() => null)]);
+    // A host page that already holds core rows, price history and the canonical quote snapshot passes them in,
+    // so opening a company never re-downloads ~2 MB on a phone.
+    [px, cr, quotes] = await Promise.all([opts.px ? Promise.resolve(opts.px) : getJSON(`data/px/${encodeURIComponent(t)}.json`), opts.core ? Promise.resolve({core: opts.core, row: (opts.core.rows || []).find(r => r.t === t) || null}) : coreRow(t), opts.quotes ? Promise.resolve(opts.quotes) : getJSON('data/quotes.json').catch(() => null)]);
   } catch (e) {
     el.innerHTML = `<p class="fv-err" role="alert">Chart not available for ${esc(t)}: no price history in this build (${esc(e && e.message || e)}).</p>`;
     return {destroy() { el.innerHTML = ''; }};
@@ -257,7 +259,7 @@ async function mount(el, ticker, opts) {
     const fr = freshness(q,quotes);
     if(q && q.status === 'ok' && isNum(q.price) && q.price > 0 && fr.word !== 'missing') quoteLine = priceSeries.createPriceLine({price:q.price,color:COL.last,lineWidth:1,lineStyle:0,axisLabelVisible:true,title:narrow()?'':fr.word==='live'?'Last':'Last quote'});
     const note=el.querySelector('.fv-quote-note');
-    if(note) note.textContent=q && q.status==='ok' ? `Last quote $${f2(q.price)}, ${etDate(q.asof_utc || q.ts)} (${fr.word})${liveState ? '; today’s bar is provisional, built from quotes' : ''}. Indicators use daily closes.` : 'Quote not available. Candles and indicators use daily closes.';
+    if(note) note.textContent=q && q.status==='ok' ? `Last quote $${f2(q.price)}, ${etDate(q.asof_utc || q.ts)} (${fr.word})${liveState ? '; today’s bar is provisional, built from quotes' : ''}. Indicators use daily closes.` : q && isNum(q.price) && q.price > 0 && (q.asof_utc || q.ts) ? `Last retained quote $${f2(q.price)}, ${etDate(q.asof_utc || q.ts)} (${esc(q.status || 'not current')}): not a current price, so no live line or provisional bar is drawn. Candles and indicators use daily closes.` : 'No quote available. Candles and indicators use daily closes.';
   }
 
   function build(anim) {
@@ -443,6 +445,7 @@ async function mount(el, ticker, opts) {
       if(nb&&(!liveState||liveState.bar[4]!==nb.bar[4]||liveState.bar[0]!==nb.bar[0])){liveState=nb;if(prefs.tf==='D'&&priceSeries&&C.hasOHLC){try{const b=nb.bar;priceSeries.update({time:b[0],open:b[1],high:b[2],low:b[3],close:b[4]});}catch(err){console.warn('[brief chart] live bar update needs a rebuild',err&&err.message);build(false);}}else if(prefs.tf!=='D')build(false);}
       updateQuoteLine();return true;
     },
+    updateTheme() { const ink=(getComputedStyle(el).getPropertyValue('--b-ink-3')||'').trim()||'#5d6673'; charts.forEach(c=>c.applyOptions({layout:{textColor:ink}})); },
     destroy() { alive=false;if (ro) ro.disconnect(); charts.forEach(c => c.remove()); charts = []; el.innerHTML = ''; el.classList.remove('so-fv'); },
   };
 }
