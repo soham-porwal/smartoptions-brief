@@ -1,4 +1,4 @@
-"""Sam's own screener outputs (samsej/sp500-screener data/checkpoints) as the set-B source.
+"""the reference own screener outputs (samsej/sp500-screener data/checkpoints) as the set-B source.
 
 If env SAM_CHECKPOINT_DIR points at his data/checkpoints and OptionsScreener.csv is there, rows come from his
 latest run (with file/mtime/run-date provenance) instead of the frozen 2026-07-25 published page. Otherwise

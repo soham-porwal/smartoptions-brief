@@ -1,4 +1,4 @@
-"""Read-only source-code/snapshot audit. Does not run Sam's pipeline or change his repo.
+"""Read-only source-code/snapshot audit. Does not run the reference pipeline or change his repo.
 
 python -m smartoptions.audit_sam_v --source <read-only clone> --date 2026-10-15
 Uses pure scoring functions from git show origin/main, never checks out files.
@@ -29,7 +29,7 @@ def git(source, *args):
 
 
 def scoring_config(text):
-    """Parse only Sam's flat numeric screener/scoring sections, no YAML dependency."""
+    """Parse only the reference flat numeric screener/scoring sections, no YAML dependency."""
     result, section = {}, None
     for line in text.splitlines():
         clean = line.split("#", 1)[0].rstrip()
@@ -107,7 +107,7 @@ def run(source: Path, day: str):
         explain = snapshot["explain"].get(ticker) or snapshot["explain"].get(ticker.replace("-", "."))
         displayed = core_rows[ticker]["sam"]
         computed = opportunity(namespaces["scorer"], config, explain)
-        # Sam's scorer rounds annual return and IV to 2 decimals in checkpoint
+        # the reference scorer rounds annual return and IV to 2 decimals in checkpoint
         # output, AFTER scoring. Bounds follow exactly that lost input precision.
         bounds = [opportunity(namespaces["scorer"], config, explain, a, i)
                   for a, i in itertools.product((-0.005, 0, 0.005), repeat=2)]
@@ -146,17 +146,17 @@ def run(source: Path, day: str):
         "method": "Exact source-snapshot-to-build/app equality; Sam origin/main pure scoring functions on EXPLAIN inputs. Sam rounds base score before composite. AR and IV input uncertainty follows scorer's 2-decimal CSV output. Tier checks are conditional on published score/flags, not a full input recomputation. No production Sam run; no provider calls."}
     write_json(ROOT / "docs/audit-v-sam-evidence.json", result)
     lines = [MARKER.strip(), "", f"Source commit: `{commit}` (`origin/main`, read-only clone). Completed UTC: {result['completed_at']}.", "",
-        f"All {roundtrips} snapshot tickers checked for Opportunity, Quality tier, Trend, Risk, flags and full EXPLAIN preservation against both dated build data and app detail JSON. Exact differences are listed below. The 10-ticker formula check executes Sam's pure scoring helpers from that source commit; no dependency added and no source checkout modified.", "",
+        f"All {roundtrips} snapshot tickers checked for Opportunity, Quality tier, Trend, Risk, flags and full EXPLAIN preservation against both dated build data and app detail JSON. Exact differences are listed below. The 10-ticker formula check executes the reference pure scoring helpers from that source commit; no dependency added and no source checkout modified.", "",
         "| Ticker | Shown Opportunity | Sam formula from published inputs | Input-rounding interval | Verdict | Quality tier check | Risk tier given published flags |", "|---|---:|---:|---|---|---|---|"]
     for row in checks:
         lines.append(f"| {row['ticker']} | {row['shown_opportunity']} | {row['recomputed_opportunity']} | {row['rounding_bounds']} | {row['opportunity_verdict']} | {row['shown_quality']} / {row['quality_tier_from_published_score']} | {row['shown_risk']} / {row['risk_tier_given_published_flags']} |")
-    lines += ["", "**Not fully verifiable:** QualityScore requires original OperatingMarginPct and TrailingPE, which the snapshot does not retain. TrendScore requires SMA positions/distances, also absent. Full risk-flag recomputation requires historical SMA and beta inputs. There are no historical checkpoint CSVs in either inspected local source clone. Do not substitute current fundamentals or assume absent snapshot inputs were absent in the original pipeline. REQUEST: Sam's dated CompanyQuality/RiskTrend/Technicals/PricePass/OptionsCandidates checkpoints (or original input cache) to finish exact 10-ticker Quality/Trend/flags recomputation.", "",
-        "Opportunity values are recomputed from published annual-return, IV, distance and delta inputs. Annual return and IV were rounded to 2 decimals after scoring by Sam; the interval varies each by ±0.005 and includes Sam's intermediate base-score rounding. WITHIN_ROUNDED_INPUT_BOUNDS certifies compatibility with retained precision, not exact recovery of original full-precision inputs.", "", "### Every observed baseline difference", ""]
+    lines += ["", "**Not fully verifiable:** QualityScore requires original OperatingMarginPct and TrailingPE, which the snapshot does not retain. TrendScore requires SMA positions/distances, also absent. Full risk-flag recomputation requires historical SMA and beta inputs. There are no historical checkpoint CSVs in either inspected local source clone. Do not substitute current fundamentals or assume absent snapshot inputs were absent in the original pipeline. REQUEST: the reference dated CompanyQuality/RiskTrend/Technicals/PricePass/OptionsCandidates checkpoints (or original input cache) to finish exact 10-ticker Quality/Trend/flags recomputation.", "",
+        "Opportunity values are recomputed from published annual-return, IV, distance and delta inputs. Annual return and IV were rounded to 2 decimals after scoring by Sam; the interval varies each by ±0.005 and includes the reference intermediate base-score rounding. WITHIN_ROUNDED_INPUT_BOUNDS certifies compatibility with retained precision, not exact recovery of original full-precision inputs.", "", "### Every observed baseline difference", ""]
     lines += ["- " + d for d in differences] or ["- No preserved-column or EXPLAIN differences detected."]
     lines += ["", "### Definition alignment and ownership", "",
         "`docs/score-definitions.json` describes origin/main (checked-out master predates CompositeScore). Its Opportunity weights/thresholds, quality weights/tiers and missing-input defaults, Trend weights, Risk tier precedence/flags, and market regime five-signal weights agree with the inspected source. Our audit uses the config read from origin/main, not a newly chosen threshold.", "",
-        "The earlier audit found omitted intermediate base-score rounding and RiskMult 1.0 for AVOID in our decomposition. The root/export owner supplied corrections; this rerun checks each sampled app component's derived value and risk multiplier against Sam's source helpers. See the machine evidence and difference list for the current result. Preserved Opportunity values remain copied verbatim. Agreement at retained precision does not recover the unrounded original input cache.", "",
-        "Our macro regime, factor associations, attribution, VRP and cycle/pattern models are V2 methods, not Sam's scores. Sam's regime uses VIX/A-D/NewHL/UpVol/TRIN weights 40/25/15/10/10 with neutral missing-input scores. Our earlier 3-input proxy renormalizes 40/25/15 by 0.80 and uses different data/universe; it cannot be called an exact reproduction. Sam's RSI is Wilder-smoothed, SMA50/SMA200 and relative strength are based on his historical candles. Current Yahoo inputs cannot verify his July snapshot's technical values.", "",
+        "The earlier audit found omitted intermediate base-score rounding and RiskMult 1.0 for AVOID in our decomposition. The root/export owner supplied corrections; this rerun checks each sampled app component's derived value and risk multiplier against the reference source helpers. See the machine evidence and difference list for the current result. Preserved Opportunity values remain copied verbatim. Agreement at retained precision does not recover the unrounded original input cache.", "",
+        "Our macro regime, factor associations, attribution, VRP and cycle/pattern models are V2 methods, not the reference scores. the reference regime uses VIX/A-D/NewHL/UpVol/TRIN weights 40/25/15/10/10 with neutral missing-input scores. Our earlier 3-input proxy renormalizes 40/25/15 by 0.80 and uses different data/universe; it cannot be called an exact reproduction. the reference RSI is Wilder-smoothed, SMA50/SMA200 and relative strength are based on his historical candles. Current Yahoo inputs cannot verify his July snapshot's technical values.", "",
         "Machine evidence: `docs/audit-v-sam-evidence.json` (source hashes, snapshot/app hashes, all 10 rows). Pure-function source reads log under `audit.baseline`. No external publication or Sam pipeline was run."]
     audit = ROOT / "docs/AUDIT-2026-10-15.md"
     existing = audit.read_text(encoding="utf-8").split(MARKER, 1)[0]

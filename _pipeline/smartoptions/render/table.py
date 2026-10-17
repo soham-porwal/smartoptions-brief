@@ -32,11 +32,11 @@ def sam_get(sam: Any, field: str) -> Any:
     return None
 
 
-CORP_ACTION_RATIO = 0.5  # lane E flag: current price differs from Sam's snapshot price by more than 50%
+CORP_ACTION_RATIO = 0.5  # lane E flag: current price differs from the historical snapshot price by more than 50%
 
 
 def corp_check(tk: dict) -> str:
-    """Chip when price now vs Sam's snapshot price differs > 50% (possible split / spin-off; not verified)."""
+    """Chip when price now vs the historical snapshot price differs > 50% (possible split / spin-off; not verified)."""
     sam = tk.get("sam") if isinstance(tk.get("sam"), dict) else {}
     now, then = to_num(tk.get("price")), to_num(sam.get("price"))
     if now is None or then is None or then <= 0 or abs(now / then - 1) <= CORP_ACTION_RATIO:
@@ -278,7 +278,7 @@ def table(data: dict, reasons: dict) -> str:
         else:
             cells.append(_td("fund", na(_reason(tk, "analyst")), None))
         sam = tk.get("sam")
-        sreason = f"not in Sam's universe (set B) — no {SAM_LABEL} value" if "B" not in sets else f"not present in {SAM_LABEL}"
+        sreason = f"not in the historical universe (set B) — no {SAM_LABEL} value" if "B" not in sets else f"not present in {SAM_LABEL}"
         for fld, isnum in (("opp", True), ("quality", False), ("trend", True), ("risk", False), ("flags", False)):
             v = sam_get(sam, fld)
             if v is None:
@@ -310,7 +310,7 @@ def table(data: dict, reasons: dict) -> str:
     body = "".join(h for _, h in rows)
     toggles = "".join(f'<label class="tg"><input type="checkbox" data-g="{g}" checked> {esc(lbl)}</label>' for g, lbl in GROUP_LABELS)
     quick = [("all", "All"), ("up", "Movers up"), ("down", "Movers down"), ("uvol", "Unusual volume"),
-             ("topopp", f"Sam's top {TOP_OPP_N} Opportunity"), ("earn7", "Earnings ≤ 7d"), ("rate", "High rate sensitivity")]
+             ("topopp", f"Top historical {TOP_OPP_N} Opportunity"), ("earn7", "Earnings ≤ 7d"), ("rate", "High rate sensitivity")]
     qb = "".join(f'<button type="button" class="qf{" on" if k == "all" else ""}" data-qf="{k}">{esc(l)}</button>' for k, l in quick)
     n_a = sum(1 for tk in tickers.values() if "A" in ((tk or {}).get("sets") or []))
     n_b = sum(1 for tk in tickers.values() if "B" in ((tk or {}).get("sets") or []))
@@ -349,19 +349,19 @@ def _prov(p: Any) -> str:
 
 
 def _explain(v: Any, depth: int = 0) -> str:
-    """Sam's EXPLAIN rendered verbatim: keys and strings as published, nested structure kept."""
+    """the reference EXPLAIN rendered verbatim: keys and strings as published, nested structure kept."""
     if depth > 6:
         return esc(str(v))
     if isinstance(v, dict):
         if set(v) <= {"val", "desc"} or set(v) <= {"flag", "desc"}:
             head = v.get("val", v.get("flag"))
-            hv = esc(head) if head not in (None, "") else na("blank in Sam's snapshot")
+            hv = esc(head) if head not in (None, "") else na("blank in the historical snapshot")
             return f'<span class="xv">{hv}</span> <span class="xd">{esc(v.get("desc"))}</span>'
         return "<dl class='x'>" + "".join(f"<dt>{esc(k)}</dt><dd>{_explain(x, depth + 1)}</dd>" for k, x in v.items()) + "</dl>"
     if isinstance(v, list):
         return "<ul class='x'>" + "".join(f"<li>{_explain(x, depth + 1)}</li>" for x in v) + "</ul>"
     if v in (None, ""):
-        return na("blank in Sam's snapshot")
+        return na("blank in the historical snapshot")
     return esc(v)
 
 
@@ -472,7 +472,7 @@ def drawers(data: dict, reasons: dict) -> str:
                     f'<table class="mini">{simple}</table>'
                     + (f'<h4>EXPLAIN (verbatim)</h4><div class="explain">{_explain(ex)}</div>' if ex else f'<p>{na()} No EXPLAIN entry for {esc(t)} in the snapshot.</p>'))
         else:
-            samh = f'<p class="muted">Not in Sam\'s published universe (set B), so no {SAM_LABEL} values.</p>'
+            samh = f'<p class="muted">Not in the retained universe (set B), so no {SAM_LABEL} values.</p>'
         out.append(f"""<template id="dr-{esc(t)}"><div class="dr-h"><h2>{esc(t)} <span class="set set-{sets.replace('+', '')}">{esc(sets)}</span></h2>
 <div class="muted">{esc(tk.get("name") or "")} · {esc(tk.get("sector") or "sector unknown")}</div></div>
 <h3>Market and fundamentals</h3><table class="mini fields"><tr><th>field</th><th>value</th><th>status</th><th>provenance</th></tr>{fields}</table>

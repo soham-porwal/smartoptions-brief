@@ -84,8 +84,8 @@ def methodology(data: dict, reasons: dict) -> str:
 <li>Monthly and quarterly values show their observation period.</li>
 <li>Stage timestamps: {", ".join(f"{esc(k)} {esc(v) if v else 'unavailable'}" for k, v in gen.items())}.</li></ul></article>
 <article class="pb"><h3>Movers (set A) and universe (set B)</h3><p>{mv}</p>
-<p>Set B is Sam's published screener universe. {SAM_LABEL} columns are read-only, as of {esc(sam_asof(eq))}.
-"Sam's top {TOP_OPP_N} Opportunity" filter = the {TOP_OPP_N} highest published Opportunity scores in this table.
+<p>Set B is the retained screener universe. {SAM_LABEL} columns are read-only, as of {esc(sam_asof(eq))}.
+"Top historical {TOP_OPP_N} Opportunity" filter = the {TOP_OPP_N} highest published Opportunity scores in this table.
 "High rate sensitivity" filter = |t| &gt; 2 on the 10-year yield factor.</p>
 <p>Ticker detail "linked" events: a macro release whose usual channel ({esc(', '.join(f'{k}: {FACTORS.get(v, (v,))[0]}' for k, v in C.EVENT_FACTOR.items()))}) matches a factor the stock shows |t| &gt; 2 on. This mapping is a reading aid, not a measured event response.</p></article>
 <article class="pb"><h3>Macro sensitivity regression</h3>{reg}{trend}</article>
@@ -111,7 +111,7 @@ def build_page(data: dict[str, Any], reasons: dict[str, str], rendered_at: datet
         block("ins", "Macro × stocks", insights(data, reasons) + (also_watching(data) if data.get("macro") else ""),
               f"click a cell to filter the table{' · ' + esc(win) if win else ''} · association, not causation"),
         block("macro", "Macro", macro(data, reasons), "latest print · hover for source"),
-        block("table", "Movers + universe", table(data, reasons), "A = today's movers · B = Sam's universe"),
+        block("table", "Movers + universe", table(data, reasons), "A = today's movers · B = the historical universe"),
         '<details class="pbw" id="playbook"><summary><h2>Conditional playbook</h2><span class="muted">education, not advice</span></summary>'
         + playbook() + "</details>",
         '<details class="pbw" id="method"><summary><h2>Methodology, sources, limits</h2></summary>'

@@ -4,7 +4,7 @@ Reads only stage outputs (macro, calendar, equities, relations, crosscheck, raw/
 never fetches network, never recomputes a stage's numbers. What it does compute is listed in
 EXPORT_METHODS and written into core.json so the page can cite it:
   - 3M sparkline / 1Y chart bars are copied from raw/prices.csv.gz (bars after asof_session dropped).
-  - Sam's four Opportunity components are re-derived from his own EXPLAIN raw values with his
+  - the reference four Opportunity components are re-derived from his own EXPLAIN raw values with his
     documented formulas (docs/score-definitions.json) and shown ONLY when they reproduce his
     published composite to two decimals from retained inputs; otherwise only raw values are shown.
   - Signals: one-line rows built from relations.json coefficients/t-stats and macro history.
@@ -34,7 +34,7 @@ EXPORT_METHODS = {
     "spark_3m": "Last 63 sessions of Adj Close from raw/prices.csv.gz (Yahoo via yfinance).",
     "chart": "Last 260 sessions of unadjusted OHLC + volume from raw/prices.csv.gz; bars after the as-of session are dropped (partial day).",
     "scenario": "Scenario impact % = sum over factors of (regression coefficient x your shock). Coefficients from relations.json (OLS, 252 sessions). Historical association, not a forecast.",
-    "sam_components": "Sam's Opportunity components from retained EXPLAIN inputs: round base score to 2 decimals, multiply by QualityMult and RiskMult; AVOID is hard-excluded (RiskMult 0). Component scores shown only when the result matches the published score to 2 decimals. Retained inputs can have less precision than the original run; published scores are always copied unchanged.",
+    "sam_components": "Historical opportunity components from retained EXPLAIN inputs: round base score to 2 decimals, multiply by QualityMult and RiskMult; AVOID is hard-excluded (RiskMult 0). Component scores shown only when the result matches the published score to 2 decimals. Retained inputs can have less precision than the original run; published scores are always copied unchanged.",
     "signals": "Factor rows: 20-session change of the factor from macro history; tickers = largest |coef| with |t| >= 2. Mover rows: relations.json attribution (explained vs stock-specific).",
     "residuals_multi_horizon": "1d, 5d, and 20d idiosyncratic residuals (%) = cumulative stock return minus sum(252d OLS beta x factor move) over shared sessions.",
     "tactical_beta_60d": "60-session rolling OLS factor sensitivities alongside 252-session structural betas; beta_shift = 60d minus 252d coefficient.",
@@ -42,7 +42,7 @@ EXPORT_METHODS = {
     "sector_rel_valuation": "pef_sec_rel = ticker forward P/E divided by GICS sector median forward P/E across the universe.",
     "rv20_ivrv": "rv20 = 20-session annualized realized volatility (%) from log Adj Close returns (sample std * sqrt(252) * 100). ivrv = ATM IV / rv20.",
     "last_earnings_ler": "Most recent prior earnings date (ler): Yahoo get_earnings_dates last_date when present, else prior-quarter cycle (-91d from upcoming Yahoo earnings date anchored to nearest high-volume session) or largest gap x volume session in the prior 90 days.",
-    "sam_drift": "Drift since the retained 2026-07-25 Sam snapshot: px_drift_pct = (px / sam.px - 1) * 100, pef_drift = pef - sam.fpe.",
+    "sam_drift": "Drift since the retained 2026-07-25 historical snapshot: px_drift_pct = (px / sam.px - 1) * 100, pef_drift = pef - sam.fpe.",
 }
 
 
@@ -57,9 +57,20 @@ def r(x, nd=4):
     return x
 
 
+def public_copy(obj):
+    """Keep legacy cache explanations generic without altering keys or measured values."""
+    if isinstance(obj, dict):
+        return {k: public_copy(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [public_copy(v) for v in obj]
+    if isinstance(obj, str):
+        return obj.replace("Sam's screener", "historical screener").replace("Sam's ", "historical ").replace("Sam ", "Historical ")
+    return obj
+
+
 def write_compact(path: Path, obj) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
-    s = json.dumps(obj, separators=(",", ":"), allow_nan=False, ensure_ascii=False)
+    s = json.dumps(public_copy(obj), separators=(",", ":"), allow_nan=False, ensure_ascii=False)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(s, encoding="utf-8")
     tmp.replace(path)
@@ -360,7 +371,7 @@ def build(date_s: str | None = None, out_dir: Path | None = None, input_dir: Pat
         row = {
             "t": t, "n": x.get("name"), "sec": x.get("sector"), "ind": x.get("industry"), "sets": x.get("sets"),
             "sp500_member": x.get("sp500_member"),
-            "sam_status": x.get("sam_status") or ("available" if sam else "not in Sam's screener"),
+            "sam_status": x.get("sam_status") or ("available" if sam else "not in historical screener"),
             "px": px_val, "pxd": x.get("price_date"), "d1": r(x.get("chg_1d_pct"), 3),
             "d5": r(x.get("chg_5d_pct"), 3), "m1": r(x.get("chg_1m_pct"), 3), "vr": r(x.get("vol_ratio_20d"), 2),
             "lo": r(rng.get("low"), 2), "hi": r(rng.get("high"), 2), "pct": r(rng.get("pctile"), 1),

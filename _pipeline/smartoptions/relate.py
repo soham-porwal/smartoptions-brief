@@ -139,7 +139,7 @@ def _lerp(x, x0, x1, y0, y1):
 
 
 def score_vix(v: float | None) -> int:
-    """Sam's piecewise VIX score, copied from sp500-screener origin/main market_regime.py:84-114 (CSP-calibrated)."""
+    """the reference piecewise VIX score, copied from sp500-screener origin/main market_regime.py:84-114 (CSP-calibrated)."""
     if v is None:
         return 50
     for lo, hi, a, b in ((12, 16, 30, 60), (16, 20, 60, 100), (20, 25, 100, 80), (25, 30, 80, 45)):
@@ -172,7 +172,7 @@ def tier(score: int) -> str:
 
 
 def regime(macro: dict, eq: dict) -> dict:
-    """Sam's CSP regime (VIX .40, A/D .25, NewHi/Lo .15, UpVol .10, TRIN .10) reproduced with free data.
+    """the reference CSP regime (VIX .40, A/D .25, NewHi/Lo .15, UpVol .10, TRIN .10) reproduced with free data.
     UpVol and TRIN need per-stock up/down volume we do not pull, so the three available weights are
     renormalized (/0.80) and the gap is stated on the page."""
     vix_o = _find(macro, "vix")

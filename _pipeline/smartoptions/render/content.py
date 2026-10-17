@@ -78,7 +78,7 @@ PLAYBOOK_INTRO = ("General exposure guidance for education. It is not a recommen
 
 LIMITATIONS = [
     "Consensus forecasts and surprise values are not shown: no licensed consensus source is connected.",
-    "SmartOptions scores (Opportunity, Quality, TrendScore, Risk, Flags, EXPLAIN) are copied read-only from Sam's "
+    "SmartOptions scores (Opportunity, Quality, TrendScore, Risk, Flags, EXPLAIN) are copied read-only from the retained "
     "published snapshot and are not recomputed; their formulas are not available to this build.",
     "Macro sensitivities are historical associations from daily-return regressions over the stated window. They are "
     "not causal, can change, and say nothing about a single day.",

@@ -101,7 +101,7 @@ def header(data: dict, reasons: dict, rendered_at: datetime) -> str:
  <div class="titlebar">
   <div><h1>SmartOptions Daily <span class="sep">·</span> Macro × Fundamentals</h1>
    <div class="meta">session <b>{asof_html}</b> · built {ts_html(rendered_at)}</div></div>
-  <div class="tools"><a href="https://samsej.github.io/sp500-screener-dashboard/" target="_blank" rel="noopener noreferrer">Sam's screener</a>
+  <div class="tools"><a href="https://samsej.github.io/sp500-screener-dashboard/" target="_blank" rel="noopener noreferrer">historical screener</a>
    <button type="button" id="theme" class="btn" aria-label="Toggle light or dark theme">Theme</button></div>
  </div>
  <div class="hfoot">{detail}<span class="disc">Research only · not advice · associations, not causation</span></div>
@@ -195,7 +195,7 @@ def evidence_item(e: dict) -> str:
 
 
 def context_strip(rel: dict) -> str:
-    """Sam's market regime + options-seller context computed by the relations stage (descriptive only)."""
+    """the reference market regime + options-seller context computed by the relations stage (descriptive only)."""
     cards = []
     rg = rel.get("regime")
     if isinstance(rg, dict) and to_num(rg.get("score")) is not None:
@@ -204,7 +204,7 @@ def context_strip(rel: dict) -> str:
             if isinstance(cv, dict):
                 sc = cv.get("score")
                 bits.append(f"{k}: {sig(sc, 3) if to_num(sc) is not None else 'n/a'} (w {sig(cv.get('weight'), 2) or '?'})")
-        cards.append(f'<div class="mc" title="{esc(rg.get("method"))}"><div class="mc-h"><span class="mc-l">Market regime (Sam&#39;s method, partial inputs)</span></div>'
+        cards.append(f'<div class="mc" title="{esc(rg.get("method"))}"><div class="mc-h"><span class="mc-l">Market regime (historical method, partial inputs)</span></div>'
                      f'<div class="mc-v"><span class="big n">{val(rg.get("score"))}</span> <span class="unit">{esc(rg.get("tier"))}</span></div>'
                      f'<div class="mc-s">{sparkline(rg.get("history_partial"))}</div>'
                      f'<div class="note">{esc("; ".join(bits))}</div><div class="note">{esc(rg.get("history_note") or "")}</div></div>')

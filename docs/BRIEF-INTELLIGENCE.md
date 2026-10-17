@@ -91,7 +91,7 @@ snapshot dates; schedule or dispatch the client after a successful canonical dep
 
 Run `python scripts/install_refresh_pipeline.py --destination <existing-pages-checkout>`
 after integrating all lanes. The installer only copies `.py` runtime files, `config/brief.yaml`,
-the packaged read-only Sam snapshot, two About documentation files and
+the packaged read-only historical snapshot, two About documentation files and
 `requirements-refresh.txt` under `_pipeline/`, plus `brief-refresh.yml`. It creates private
 work/cache ignore rules. It does not modify the existing publisher/quote workflow, commit,
 push or delete. The orchestrator must add `_pipeline` and the new workflow to the publisher's

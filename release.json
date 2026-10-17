@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261017-r13-decision-workflow",
+  "release_id": "brief-client-20261017-r13-decision-workflow-product1",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-17T17:59:56.288553+00:00",
-  "source_commit": "9481887d46035da3824af79ff28d282c4e3e984b",
+  "built_at": "2026-10-17T18:26:43.214555+00:00",
+  "source_commit": "22d84e9431f0bbeec514ad9cbae4fa09e16c893b",
   "data_session": "2026-10-16",
   "tickers": 509,
   "current_constituents": 503,
@@ -21,7 +21,7 @@
     "python": {
       "passed": 1035,
       "failed": 0,
-      "receipt": "parent-pytest-clean-final.log",
+      "receipt": "parent-neutral-pytest-final.log",
       "basis": "Full suite in isolated final implementation copy with a fresh scoped temporary directory"
     },
     "nested_browser": {
@@ -56,6 +56,7 @@
     "One canonical accepted quote engine; regular-session provisional bars and extended-session lines are distinct. Closed-market review cannot establish actual open-market tick cadence.",
     "Phone profile: about4.3seconds to the market reading; price-burst long-task blocking reduced from about25seconds to80milliseconds in the measured synthetic benchmark. This is one test profile, not real-user field data.",
     "Calendar completeness is unknown without provider range receipts; last-listed dates are not coverage boundaries. No live options chain or own-history valuation is fabricated.",
+    "Product descriptions, source health, historical scores and generated cache explanations use generic historical screener labels; legacy schema keys and numerical values are retained.",
     "Parent publication metadata is above the tested implementation source_commit; asset hashes use exact canonical Git bytes."
   ],
   "backup": "backup.html",

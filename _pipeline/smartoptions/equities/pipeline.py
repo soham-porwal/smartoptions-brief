@@ -68,7 +68,7 @@ def build(out_dir: Path, refresh: bool = False, limit: int | None = None, extra:
     today = now.date()
     raw_dir = out_dir / "raw"
 
-    # --- 1. Sam's outputs (set B), checkpoints when configured; unchanged snapshot fallback.
+    # --- 1. the reference outputs (set B), checkpoints when configured; unchanged snapshot fallback.
     snap = sam_checkpoints.load_or_snapshot(today=today)
     sam_source = snap.get("source", "published_snapshot")
     sam_label = "SmartOptions checkpoints" if sam_source == "checkpoints" else sam.SNAPSHOT_LABEL
@@ -118,7 +118,7 @@ def build(out_dir: Path, refresh: bool = False, limit: int | None = None, extra:
     movers = rank_movers(chg, vol, mcap=_market_cap_fn())
     a_syms = sorted(set(movers["up"]) | set(movers["down"]) | set(movers["unusual_volume"]))
     # Movers are a view of the index, never the retention filter. Keep legacy
-    # Sam-only names too so widening membership does not remove existing rows.
+    # snapshot-only names too so widening membership does not remove existing rows.
     universe_syms = sorted(set(pool) | set(a_syms) | set(b_syms) | set(extra))
 
     # --- 4. fundamentals
@@ -138,7 +138,7 @@ def build(out_dir: Path, refresh: bool = False, limit: int | None = None, extra:
         pstat = "missing" if not p else ("ok" if p["price_date"] == asof_s and price_retrieved else "stale")
         t = {
             "name": name, "sector": sector, "sets": sets, "sp500_member": s in pool,
-            "sam_status": "available" if srow else "not in Sam's screener",
+            "sam_status": "available" if srow else "not in historical screener",
             "price": price, "price_date": p["price_date"] if p else None,
             "chg_1d_pct": p["chg_1d_pct"] if p else None, "chg_5d_pct": p["chg_5d_pct"] if p else None,
             "chg_1m_pct": p["chg_1m_pct"] if p else None, "vol_ratio_20d": p["vol_ratio_20d"] if p else None,
@@ -175,8 +175,8 @@ def build(out_dir: Path, refresh: bool = False, limit: int | None = None, extra:
                "sam": snap.get("status", "stale") if srow else "missing", "atm_iv": "missing", **fstat}
         pv["sam"] = {"provider": sam_label, "source": sam_source, "date": snap.get("asof"),
                      "retrieved_at": snap.get("retrieved_at"), "files": snap.get("provenance", {}),
-                     "reason": snap.get("reason") if srow else "not in Sam's screener"}
-        pv["atm_iv"] = {"provider": "Yahoo Finance via yfinance", "reason": "not fetched: ATM IV only for movers (A) and the 30 highest Sam Opportunity Scores"}
+                     "reason": snap.get("reason") if srow else "not in historical screener"}
+        pv["atm_iv"] = {"provider": "Yahoo Finance via yfinance", "reason": "not fetched: ATM IV only for movers (A) and the 30 highest historical opportunity Scores"}
         t["provenance"], t["status"] = pv, sts
         tickers[s] = t
 
@@ -235,7 +235,7 @@ def build(out_dir: Path, refresh: bool = False, limit: int | None = None, extra:
         "universe_source": f"{cons['source']} ({cons['count']} constituents); {sam_label} {snap['asof']} ({rep['rows']} rows)",
         "benchmarks": benchmarks, "tickers": tickers, "movers": movers_out, "returns": rets,
         "meta": {
-            "sets": {"A": "top S&P 500 movers (up/down/unusual volume)", "B": f"Sam's {sam_source} universe"},
+            "sets": {"A": "top S&P 500 movers (up/down/unusual volume)", "B": f"the reference {sam_source} universe"},
             "counts": {"tickers": nuniq, "A": sum("A" in t["sets"] for t in tickers.values()),
                        "B": sum("B" in t["sets"] for t in tickers.values()), "constituents": cons["count"],
                        "retained_constituents": len(set(pool) & set(tickers))},

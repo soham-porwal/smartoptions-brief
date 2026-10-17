@@ -1,4 +1,4 @@
-"""Parse Sam's published screener snapshot (index.html): 19-column table + EXPLAIN JSON.
+"""Parse the retained screener snapshot (index.html): 19-column table + EXPLAIN JSON.
 
 Read-only: values are stored as published, never recomputed. Missing markers become None.
 """

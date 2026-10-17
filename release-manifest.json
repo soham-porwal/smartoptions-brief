@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261017-r13-decision-workflow",
-  "built_at": "2026-10-17T17:59:56.288553+00:00",
-  "source_base": "9481887d46035da3824af79ff28d282c4e3e984b",
+  "release_id": "brief-client-20261017-r13-decision-workflow-product1",
+  "built_at": "2026-10-17T18:26:43.214555+00:00",
+  "source_base": "22d84e9431f0bbeec514ad9cbae4fa09e16c893b",
   "ui_assets": {
     "about.js": {
       "sha256": "547fe112ab4c3c86ef33729f18b5f9c3c9f938a3dd1fd455e7ac6b2d42e0a0b5",
@@ -288,14 +288,14 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "aa8be241517a2dadcb5fa0c637a105228218991a09d5cdcfe2d8bcf5614ab84a",
-      "bytes": 4113
+      "sha256": "b2b0c8efcfef55d3f5929cc6bff6b2c33060282f10b18c67ae83f8ea33571e9f",
+      "bytes": 4313
     }
   },
   "data_at_publication": {
     "data/brief.json": {
-      "sha256": "40210eb84798402bc460c93eb9c9be7a79633eae32b11479867448d70dcff30b",
-      "bytes": 115834
+      "sha256": "e9d65e438ccc3b780a204b8f1506af36523716ae4b3ded697d038df4637e1e3f",
+      "bytes": 115856
     },
     "data/brief/company/AAPL.json": {
       "sha256": "a24f2c594a6f5f61d3e51fccfd05e5987c52e5e7cd03470c2e39997d4c6e02ba",
@@ -322,8 +322,8 @@
       "bytes": 10079
     },
     "data/core.json": {
-      "sha256": "37f25c81157b8505a9266a9c844dbcc838ba77243416482eec2f60639a3db07b",
-      "bytes": 1708655
+      "sha256": "6d998fde81f5fec224d7338762305d5468725ffc02031faf622cca3948a65326",
+      "bytes": 1709494
     },
     "data/intelligence.json": {
       "sha256": "b7e7b156a5c5425317558d1eea250db47daaa93590299c750623c6e453a8b119",
@@ -334,8 +334,8 @@
       "bytes": 32717
     },
     "data/px/AAPL.json": {
-      "sha256": "a7ac51431e28ef8b4851bf664fe51c7e2ff37a24986d0e8b66d431be8bfb32bc",
-      "bytes": 20942
+      "sha256": "5e259d7fa50f7ed6a6f68fdaca8d2a5ad7a6230307fc8a11932bb1cc1533266c",
+      "bytes": 20949
     },
     "data/px/SPY.json": {
       "sha256": "823e3716f23dc8b2dc5defde2cc5fd339289f4c38b43e30dc4ee100d53ae54ff",
@@ -354,8 +354,8 @@
       "bytes": 2713934
     },
     "data/snapshot.zip": {
-      "sha256": "5ede88e7fb2fba0a5a5e9b72ea49696e8162b078d7cf71de00db1ca336a08a9e",
-      "bytes": 5323287
+      "sha256": "b821719a1c062347a6915eefead06e2dd205be9e8ab91ef32afca3b50a7397d7",
+      "bytes": 5321222
     }
   },
   "dynamic_files": {

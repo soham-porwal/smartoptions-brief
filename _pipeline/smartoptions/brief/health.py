@@ -53,11 +53,11 @@ def health(core,quotes,records,now,release=None):
     sam=core.get('meta',{}).get('sam_source',{})
     samdate=str(sam.get('asof') or '')[:10]
     stamp=parsed(samdate)
-    # Sam's retained snapshot is explicitly dated in Pacific time.
+    # The retained snapshot is explicitly dated in Pacific time.
     age_days=max(0,(now.astimezone(ZoneInfo('America/Los_Angeles')).date()-stamp.date()).days) if stamp else None
-    screener=dict(label="Sam's screener scores",asof=samdate or None,age_days=age_days,status='stale' if stamp else 'missing',
-                  note=f"Scores from Sam's screener, last updated {stamp.strftime('%b')} {stamp.day}. Our own signals use observations dated {core.get('asof_session')}." if stamp else "Not available: Sam's screener date is missing.")
-    sources.append(source('sam','Sam screener snapshot',samdate or None,now,screener['note'],max_hours=24))
+    screener=dict(label="historical screener scores",asof=samdate or None,age_days=age_days,status='stale' if stamp else 'missing',
+                  note=f"Scores from historical screener, last updated {stamp.strftime('%b')} {stamp.day}. Our own signals use observations dated {core.get('asof_session')}." if stamp else "Not available: historical screener date is missing.")
+    sources.append(source('sam','Historical screener snapshot',samdate or None,now,screener['note'],max_hours=24))
     if stamp:sources[-1]['status']='stale'
     if release:
         sources.append(source('release','Published build receipt',release.get('published_at') or release.get('generated_at') or release.get('built_at'),now,'Optional publication receipt; not quote freshness.'))

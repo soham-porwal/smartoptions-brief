@@ -9,7 +9,7 @@ from typing import Any
 
 from .fmt import MINUS, esc, na, sig, signed, to_num, val, val_decimals
 
-# Sam's tier cut-offs, from docs/score-definitions.json "Market regime card" (market_regime.py): AVOID <30,
+# the reference tier cut-offs, from docs/score-definitions.json "Market regime card" (market_regime.py): AVOID <30,
 # DEFENSIVE <50, NORMAL <70, FAVORABLE <85, OPTIMAL 85+.
 TIERS = [(0, "AVOID"), (30, "DEFENSIVE"), (50, "NORMAL"), (70, "FAVORABLE"), (85, "OPTIMAL")]
 COMP = [("vix", "VIX"), ("ad", "A/D"), ("newhl", "New H/L"), ("upvol", "Up vol"), ("trin", "TRIN")]
@@ -20,7 +20,7 @@ SCORE_DEFS = Path(__file__).resolve().parents[2] / "docs" / "score-definitions.j
 
 
 def score_defs() -> dict[str, str]:
-    """Sam's own column definitions (lane S, read from his code). Read-only; empty if the file is absent."""
+    """the reference own column definitions (lane S, read from his code). Read-only; empty if the file is absent."""
     try:
         raw = json.loads(SCORE_DEFS.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -114,7 +114,7 @@ def regime_hero(rel: dict | None, reason: str | None = None) -> str:
     scale = "".join(f'<span style="left:{c}%">{c}</span>' for c, _ in TIERS[1:])
     hist = rg.get("history_partial")
     hn = len(_pts(hist))
-    tip = f"{rg.get('method') or ''} Tiers (Sam's code): AVOID <30, DEFENSIVE <50, NORMAL <70, FAVORABLE <85, OPTIMAL 85+."
+    tip = f"{rg.get('method') or ''} Tiers (reference rules): AVOID <30, DEFENSIVE <50, NORMAL <70, FAVORABLE <85, OPTIMAL 85+."
     return f"""<section class="hero" id="regime">
  <div class="hero-l"><div class="eyebrow">SmartOptions regime {info(tip)}</div>
   <div class="hero-v"><span class="hero-n n">{val(score)}</span><span class="tier t-{esc(tier.lower())}">{esc(tier)}</span></div>

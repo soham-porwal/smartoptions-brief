@@ -16,7 +16,7 @@ DATA evidence: `logs/data/`. Overnight handoff: `Data/Logs/brief-overnight-20261
 | Company statements | Quarterly/annual filings; daily cache refresh | Latest filed SEC 10-Q/10-K period, not today's date | Missing data stays unavailable; SEC verification failures fail the audit |
 | Brief, company workspaces, intelligence | Deterministic daily build | Snapshot and model periods checked independently | Atomic last-good preservation; failed/degraded refresh receipt |
 | Money flow and news | SEC 13F and dated news; daily collector | Latest 13F quarter after 45-day filing window; original publication/filing dates shown | Context stays dated; degraded collector is visible |
-| Sam screener scores | Retained original snapshot | Original July 25 date and stale label | Never restamped as a current score |
+| Historical screener scores | Retained original snapshot | Original July 25 date and stale label | Never restamped as a current score |
 
 The quote producer uses at least 1.22 seconds between Finnhub starts, with no burst: fewer than 50 starts per rolling minute. The Worker shares eight starts per rolling minute and 8,000 per UTC day across both sites. Client scheduled jobs mirror canonical data, preventing a second 510-name sweep on the same key. See `LIVE-DATA.md` for the browser JSON/error contract.
 
@@ -48,13 +48,13 @@ The second local run also logged Yahoo DNS failures (`query2.finance.yahoo.com`)
 
 ## Install another Pages edition
 
-Run these from the source checkout with the existing venv Python. DATA did not touch Sam's repositories.
+Run these from the source checkout with the existing venv Python. DATA did not touch the reference repositories.
 
 ```powershell
 $runtime = 'D:/soham/myeverything/Code/smartoptions/v2/.venv/Scripts/python.exe'
 # Preview: remove --dry-run only when the conductor installs the runtime.
 & $runtime scripts/install_refresh_pipeline.py --destination D:/soham/myeverything/Code/smartoptions-brief-pages --repo-slug soham-porwal/smartoptions-brief --dry-run
-# Sam: verify the existing delivery checkout and branch before installation.
+# Client: verify the existing delivery checkout and branch before installation.
 & $runtime scripts/install_refresh_pipeline.py --destination D:/soham/myeverything/Code/smartoptions/delivery-pages --repo-slug samsej/sp500-screener-dashboard --dry-run
 & $runtime scripts/install_refresh_pipeline.py --destination D:/soham/myeverything/Code/smartoptions/delivery-pages --repo-slug samsej/sp500-screener-dashboard
 ```

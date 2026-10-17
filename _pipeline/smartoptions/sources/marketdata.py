@@ -1,4 +1,4 @@
-"""Optional MarketData.app option chains (puts + calls with delta/IV), mirroring Sam's marketdata_client.py.
+"""Optional MarketData.app option chains (puts + calls with delta/IV), mirroring the reference marketdata_client.py.
 
 Same as his client: env var MARKETDATA_API_TOKEN (his env.py), base URL https://api.marketdata.app/v1, endpoint
 /options/chain/{TICKER}/ with from/to = today + target_dte -/+ 15 days (his options_fetcher.py), Bearer header,
@@ -154,7 +154,7 @@ def fetch_chains(tickers: list[str], cfg: dict, token: str | None, today: date |
     params = chain_params(today, cfg)
     doc = {"generated_at": utc_now(), "provider": "MarketData.app", "base_url": BASE_URL,
            "endpoint": "/options/chain/{ticker}/", "params": params,
-           "method": "One chain call per ticker, expirations within target_dte +/-15 days (Sam's options_fetcher window); "
+           "method": "One chain call per ticker, expirations within target_dte +/-15 days (the reference options_fetcher window); "
                      "puts and calls; values as returned by MarketData (iv is a decimal, delta signed).",
            "max_api_calls_per_run": int(api.get("max_api_calls_per_run", 60)), "api_calls_used": 0,
            "status": "missing", "reason": None, "tickers": {}}

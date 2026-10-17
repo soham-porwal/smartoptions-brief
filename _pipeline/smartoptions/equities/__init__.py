@@ -1,1 +1,1 @@
-"""Lane E: equities stage (movers, fundamentals, Sam's snapshot)."""
+"""Lane E: equities stage (movers, fundamentals, the historical snapshot)."""
