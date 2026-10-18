@@ -19,7 +19,14 @@
     const wl=root.SmartOptionsWatchlist;
     return {brief:currentBrief,core,quotes:canonical?.quotes||{},quotesMeta:canonical,universe:rows,covered:new Set(Object.keys(core)),watch:wl?wl.get():[],company:{},now:new Date(),page:{ticker:(root.location?.hash.match(/^#\/company\/([^/]+)/)||[])[1]},get};
   }
+  function personalQuestion(question){
+    return /\b(my|our)\b.{0,80}\b(positions?|holdings?|portfolio|book|notes?|research note|review|checkpoint|shares?|cost|basis|exposure|worth|quantit(?:y|ies))\b|\b(i|we)\s+(own|hold|have|bought|paid|purchased|am\s+long|are\s+long)\b|\b(i['’]m|i am|we['’]re|we are)\s+(holding|long|buying|selling)\b|\bwhat\s+did\s+(i|we)\s+pay\b|\b(private|personal)\s+(note|position|review)|\b(my|our)\s+(?:[0-9,.]+\s+)?[A-Z]{1,6}\b|\b[0-9][0-9,.]*\s*(shares?|units?|lots?)\b|\b(cost(?: basis)?|basis|paid|average cost|avg cost|purchase price)\s*(of|was|is|:|=|at)?\s*\$?[0-9]/i.test(question) || /\b[0-9][0-9,.]*\s+[A-Z]{1,6}\s+(at|@)\s*\$?[0-9]/.test(question);
+  }
   async function answer(question,direct,signal,plannerConfig){
+    // Fence personal questions before context, remote planning and automatic rephrasing.
+    if(!direct && personalQuestion(question)) {
+      return {result:{intent:'private',title:'Private local review',lines:[{text:'Positions, research notes and review checkpoints stay in this browser. Open For you or Your positions to review them locally.',refs:[]}],facts:[],na:null,followups:[],noPolish:true},ctx:null,route:null};
+    }
     if(!direct&&root.SmartOptionsMyDashboard){
       const d=await root.SmartOptionsMyDashboard.command(question,plannerConfig);
       if(d.handled){const receipt=d.receipt;return {result:{intent:'dashboard',title:'My Dash',lines:[{text:receipt.text,refs:[]}],facts:[],na:null,action:{kind:'dashboard'},receipt,followups:[]},ctx:null,route:null};}
@@ -43,5 +50,5 @@
     if(result.na)record('WARN','answer',result.intent+': '+result.na);
     return {result,ctx,route};
   }
-  return {answer,context,record,events};
+  return {answer,context,record,events,personalQuestion};
 });

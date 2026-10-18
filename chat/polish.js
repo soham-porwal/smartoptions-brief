@@ -14,7 +14,7 @@
   }
   async function rewrite(answer, cfg, signal) {
     const V = root.SmartOptionsVerify || require('./verify.js');
-    if (!answer.facts.length || answer.action || answer.na) return {ok:false, reason:'No measured facts to simplify.'};
+    if (answer.noPolish || !answer.facts.length || answer.action || answer.na) return {ok:false, reason:'No measured public facts to simplify.'};
     const body = prompt(answer.facts), shared = !!cfg.url;
     if (!shared && !cfg.apiKey) return {ok:false, reason:'Optional rephrasing is not configured.'};
     if (shared && !/^https:\/\//.test(cfg.url)) throw new Error('Rephrasing relay must use HTTPS.');

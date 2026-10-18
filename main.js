@@ -99,6 +99,7 @@
     const h = String(hash || '').replace(/^#/, '');
     let m;
     if (!h || h === '/' || h === '/brief') return {view: 'brief'};
+    if (h === '/positions') return {view:'positions'};
     if (/^\/explore(\?|$)/.test(h)) return {view: 'explore', hash: '#' + h};
     if ((m = h.match(/^\/sector\/(.+)$/))) { try { return {view:'sector', sector:decodeURIComponent(m[1])}; } catch(e) { return {view:'brief', invalid:true}; } }
     if ((m = h.match(/^\/learn\/(.+)$/))) { try { return {view:'learn', label:decodeURIComponent(m[1])}; } catch(e) { return {view:'brief',invalid:true}; } }
@@ -197,7 +198,8 @@
   const etDate = ms => new Date(ms).toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
   const etHour = ms => +new Date(ms).toLocaleString('en-US', {timeZone: 'America/New_York', hour: 'numeric', hour12: false}) % 24;
   function addDays(iso, n) { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
-  const shortDate = iso => { const d = new Date(String(iso).slice(0, 10) + 'T12:00:00Z'); return isFinite(d) ? d.toLocaleDateString('en-US', {timeZone: 'UTC', month: 'short', day: 'numeric'}) : String(iso || ''); };
+  const shortDates=new Map(),shortDateFormat=new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'});
+  const shortDate = iso => {const key=String(iso||'');if(shortDates.has(key))return shortDates.get(key);const d=new Date(String(iso).slice(0,10)+'T12:00:00Z'),value=isFinite(d)?shortDateFormat.format(d):key;shortDates.set(key,value);if(shortDates.size>512)shortDates.delete(shortDates.keys().next().value);return value;};
   const cap1 = s => s ? s[0].toUpperCase() + s.slice(1) : s;
   const changeItem = (b, id) => ((b && b.daily_changes && b.daily_changes.items) || []).find(x => x.id === id) || null;
   const findMetric = (ms, re) => (ms || []).find(m => re.test(m.label)) || null;
@@ -326,7 +328,7 @@
   const doc = root.document; if (!doc) return;
 
   /* ------------------------------------------------------------ page */
-  const ASSET_V = 'client-20261017r13-final1';
+  const ASSET_V = 'client-20261018r14-investor';
   const Live = root.SmartOptionsLive;
   const S = root.__soMainState = {core: null, brief: null, rel: null, rowMap: new Map(), slots: [], view: null, chart: null, company: {}, onQuote: null};
   const $ = s => doc.querySelector(s);
@@ -378,7 +380,7 @@
   function saveFrame() {
     if (!frameId || !$('#view').firstChild) return;
     const frame = {nodes:[...$('#view').childNodes], state:{}, y:root.scrollY, focus:doc.activeElement,
-      watch:Object.fromEntries(['explore','company','research','index'].map(k=>[k,[...(Live._state.owners[k]||[])]]))};
+      watch:Object.fromEntries(['explore','company','research','index','investor'].map(k=>[k,[...(Live._state.owners[k]||[])]]))};
     Object.keys(S).filter(k=>!persistentKeys.has(k)).forEach(k=>{frame.state[k]=S[k];});
     frames.delete(frameId);frames.set(frameId,frame);
     frame.nodes.forEach(n=>n.remove());
@@ -396,6 +398,7 @@
   }
   function render() {
     closeSheet();
+    if(S.view==='brief')S.personal?.suspend();
     const previous=frameId;
     saveFrame();
     frameId=root.history.state?.soFrame || 'depth-'+frameEpoch+'-'+(++frameSerial);
@@ -407,19 +410,28 @@
       if(S.horizon)UI.horizon=S.horizon;   // the restored view's visible horizon is the selected one
       $('#view').replaceChildren(...cached.nodes);setView(S.view==='company'?'companies':S.view);
       S.fv?.updateTheme?.();
-      Object.entries(cached.watch).forEach(([owner,names])=>Live.watch(owner,names));
+      const personalFocus=cached.focus?.closest?.('[data-personal-t]')?.dataset.personalT,personalHref=cached.focus?.getAttribute?.('href'),personalControl=cached.focus?.dataset?.personal;
+      if(S.view==='brief')S.personal?.refresh();
+      Object.entries(cached.watch).forEach(([owner,names])=>{if(owner!=='investor'||S.view!=='brief')Live.watch(owner,names);});
       if(S.view==='explore')updateExploreQuotes();
       Live.paint(doc,null);paintSlots();
-      requestAnimationFrame(()=>{root.dispatchEvent(new Event('resize'));cached.focus?.focus?.({preventScroll:true});root.scrollTo(0,cached.y);});
+      requestAnimationFrame(()=>{root.dispatchEvent(new Event('resize'));let focus=cached.focus;
+        if(!focus?.isConnected&&personalFocus)focus=[...doc.querySelectorAll('[data-personal-t]')].find(n=>n.dataset.personalT===personalFocus)?.querySelectorAll('a');
+        if(focus&&typeof focus.focus!=='function')focus=[...focus].find(n=>n.getAttribute('href')===personalHref);
+        if(!focus?.isConnected&&personalControl)focus=[...doc.querySelectorAll('[data-personal]')].find(n=>n.dataset.personal===personalControl);
+        if(!focus?.isConnected&&cached.focus?.id)focus=doc.getElementById(cached.focus.id);
+        focus?.focus?.({preventScroll:true});root.scrollTo(0,cached.y);});
       return;
     }
     const r = route(root.location.hash);
     S.slots = []; S.onQuote = null; S.exToken = (S.exToken || 0) + 1; S.exChart=null;S.exRc=null;S.chart=null;S.exSeries=[];S.jointChart=null;S.jointBand=[];S.coTab=null;S.co=null;S.fv=null;S.drv=null;S.coDraw=null;S.horizon=UI.horizon;S.lastEvents={};
+    if (r.view !== 'brief') Live.watch('investor', []);
     if (r.view !== 'explore') Live.watch('explore', []);
     S.view = r.view; setView(r.view === 'company' ? 'companies' : r.view);
     const main = $('#view');
     try {
       if (r.view === 'company') { main.innerHTML = '<p class="dim">Loading…</p>'; renderCompany(r.t, main); }
+      else if (r.view === 'positions') root.SmartOptionsInvestor.mountPositions(main, investorArgs(), S.positionTicker || '');
       else if (r.view === 'companies') renderCompanies(main);
       else if (r.view === 'macro') renderMacro(main);
       else if (r.view === 'explore') renderExplore(main, r.hash);
@@ -533,6 +545,7 @@
     const conc = pos.concentration || {}, gap = changeItem(b, 'eq_cap_gap_5d');
     main.innerHTML = `
       ${legacy ? `<p class="note">That view is part of the expanded dashboard. <a href="backup.html${esc(legacy)}">Open it in the expanded edition</a>.</p>` : ''}
+      <section id="for-you" class="for-you" aria-label="For you"></section>
       <div class="today">
         <section class="read" aria-labelledby="read-h"><p class="eyebrow">Market reading · completed session ${esc(shortDate(b.asof_session))}</p>
           <h1 id="read-h" class="headline">${esc(read.headline)}</h1>
@@ -559,7 +572,10 @@
         <div class="insights">${insightCard(concentrationInsight(S.core.rel && S.core.rel.vol_breadth))}${S.rel ? insightCard(leadershipInsight(S.rel)) + insightCard(macroInsight(S.rel, S.core)) : ''}</div>
         ${f ? `<p>${esc(f.lead)}. <a class="go" href="${esc(factorHref(f))}">Related sectors and evidence →</a> <a href="#/macro">Macro detail</a></p>` : ''}
         <p class="dim">${slot('live-conc', liveConcSlot)}</p>${relNote}</section>`;
+    S.personal=root.SmartOptionsInvestor.mountToday($('#for-you'),investorArgs());
+    S.onQuote=changed=>S.personal?.quotes(changed);
   }
+  function investorArgs() {return {core:S.core,brief:S.brief,live:Live,watch:WL(),compare:companyHref,events:()=>horizonEvents(S.horizon||7),days:()=>S.horizon||7};}
   /* ------------------------------------------------------------ saved companies (shared store) */
   let wlStore = null;
   function WL() {
@@ -575,6 +591,7 @@
   function toggleStar(t) {
     const W2 = WL(); if (W2.has(t)) W2.remove(t); else W2.add(t);
     doc.querySelectorAll(`[data-star="${t}"]`).forEach(b => { b.outerHTML = starBtn(t); });
+    if(S.view==='brief')S.personal?.refresh();
     return W2.has(t);
   }
 
@@ -835,12 +852,12 @@
   }
   /* ------------------------------------------------------------ Companies: research table over the full retained universe */
   const COLS = {
-    pe: ['P/E', r => { const c = Live.currentRow(r); return c && isNum(c.pe) ? c.pe.toFixed(1) : '—'; }, r => (Live.currentRow(r) || {}).pe],
+    pe: ['P/E', (r,current=Live.currentRow) => { const c = current(r); return c && isNum(c.pe) ? c.pe.toFixed(1) : '—'; }, (r,current=Live.currentRow) => (current(r) || {}).pe],
     peg: ['PEG', r => isNum(r.peg) ? r.peg.toFixed(2) : '—', r => r.peg],
-    range: ['52-wk position', r => { const x = rangePos(Live.currentRow(r), r); return x ? Math.round(x.pos) + '%' : '—'; }, r => (rangePos(Live.currentRow(r), r) || {}).pos],
+    range: ['52-wk position', (r,current=Live.currentRow) => { const x = rangePos(current(r), r); return x ? Math.round(x.pos) + '%' : '—'; }, (r,current=Live.currentRow) => (rangePos(current(r), r) || {}).pos],
     er: ['Next earnings', r => r.er ? shortDate(r.er) + (r.ert ? ' ' + r.ert : '') : '—', r => r.er || '9999'],
-    analyst: ['Analysts', r => r.rating ? esc(r.rating) + (isNum(r.up) ? ' · ' + pct(r.up, 0) + ' to target' : '') : '—', r => r.up],
-    pef: ['Fwd P/E', r => { const c = Live.currentRow(r); return c && isNum(c.pef) ? c.pef.toFixed(1) : '—'; }, r => (Live.currentRow(r) || {}).pef],
+    analyst: ['Provider opinion', r => r.rating ? esc(opinion(r.rating)) + (isNum(r.up) ? ' · ' + pct(r.up, 0) + ' to target' : '') : '—', r => r.up],
+    pef: ['Fwd P/E', (r,current=Live.currentRow) => { const c = current(r); return c && isNum(c.pef) ? c.pef.toFixed(1) : '—'; }, (r,current=Live.currentRow) => (current(r) || {}).pef],
     m1: ['1M', r => pct(r.m1, 1), r => r.m1],
     mcap: ['Mkt value', r => '$' + big(r.mcap), r => r.mcap],
     legacy: ['Jul 25 score', r => r.sam && isNum(r.sam.opp) ? r.sam.opp.toFixed(0) : '—', r => r.sam && r.sam.opp]
@@ -861,26 +878,31 @@
         <label>Sort <select id="co-sort"><option value="mcap">Market value</option><option value="name">Name</option><option value="d1">Day change</option><option value="pe">P/E</option><option value="peg">PEG</option><option value="er">Next earnings</option><option value="up">Analyst upside</option></select></label></div>
       <details class="cols"><summary>Columns</summary><div class="ex-ctl">${Object.entries(COLS).map(([k, c]) => `<label><input type="checkbox" data-col="${k}"${S.co.cols.includes(k) ? ' checked' : ''}> ${esc(c[0])}</label>`).join('')}</div><p class="dim small">The Jul 25 score is the historical SmartOptions snapshot (2026-07-25), shown only when chosen; it is not current evidence.</p></details>
       <p id="co-count" class="dim" aria-live="polite"></p>
-      <div class="tablewrap"><table class="list research-table"><thead id="co-head"></thead><tbody id="rows"></tbody></table></div>
+      <div class="tablewrap"><table class="list research-table"><colgroup id="co-widths"></colgroup><thead id="co-head"></thead><tbody id="rows"></tbody></table></div>
       <div class="pager"><button type="button" data-page="-1">Previous</button><button type="button" data-page="1">Next</button></div>
       <p class="dim small">${members} S&amp;P 500 members and ${legacy} retained former or non-index names (labelled). Prices follow the live quote engine for names on screen; other fields keep their dates.</p></section>`;
     $('#find').value = S.co.text; $('#co-sort').value = S.co.sort; $('#co-sector').value = S.co.sector;
     const draw = () => {
       const s = S.co.text.trim().toUpperCase(), saved = new Set(WL().get());
+      const currentRows=new Map(),current=r=>{if(!currentRows.has(r.t))currentRows.set(r.t,Live.currentRow(r));return currentRows.get(r.t);};
       let hits = S.co.mode === 'shortlist' ? short.map(x => row(x.t)).filter(Boolean) : S.co.mode === 'saved' ? [...saved].map(row).filter(Boolean) : S.core.rows.slice();
       if (s) hits = hits.filter(r => r.t.startsWith(s.replace('.', '-')) || String(r.n).toUpperCase().includes(s));
       if (S.co.sector) hits = hits.filter(r => r.sec === S.co.sector);
-      const key = {mcap: r => -(r.mcap || 0), name: r => r.n, d1: r => -((Live.currentRow(r) || r).d1 ?? -1e9), pe: r => COLS.pe[2](r) ?? 1e9, peg: r => r.peg ?? 1e9, er: r => r.er || '9999', up: r => -(r.up ?? -1e9)}[S.co.sort];
-      if (S.co.mode !== 'shortlist' || S.co.sort !== 'mcap') hits.sort((a, b) => { const x = key(a), y = key(b); return typeof x === 'string' ? x.localeCompare(y) : x - y; });
+      const key = {mcap: r => -(r.mcap || 0), name: r => r.n, d1: r => -((current(r) || r).d1 ?? -1e9), pe: r => COLS.pe[2](r,current) ?? 1e9, peg: r => r.peg ?? 1e9, er: r => r.er || '9999', up: r => -(r.up ?? -1e9)}[S.co.sort];
+      if (S.co.mode !== 'shortlist' || S.co.sort !== 'mcap') {const keys=new Map(hits.map(r=>[r.t,key(r)]));hits.sort((a, b) => { const x=keys.get(a.t),y=keys.get(b.t);return typeof x === 'string' ? x.localeCompare(y) : x-y; });}
       const per = 50, pages = Math.max(1, Math.ceil(hits.length / per)); S.co.page = Math.min(Math.max(0, S.co.page), pages - 1);
       const view = hits.slice(S.co.page * per, S.co.page * per + per);
       Live.watch('company', view.slice(0, 24).map(r => r.t));
+      const widths={pe:64,peg:64,range:108,er:124,analyst:164,pef:96,m1:80,mcap:100,legacy:112};
+      const columns=[200,88,76,...(S.co.mode==='shortlist'?[280]:[]),...S.co.cols.map(k=>widths[k]),88];
+      $('#co-widths').innerHTML=columns.map(w=>`<col style="width:${w}px">`).join('');
+      main.querySelector('.research-table').style.width=columns.reduce((s,w)=>s+w,0)+'px';
       $('#co-count').textContent = hits.length ? `Showing ${S.co.page * per + 1}–${S.co.page * per + view.length} of ${hits.length}` + (S.co.mode === 'all' && !s && !S.co.sector ? ' retained companies' : '') : '';
       $('#co-head').innerHTML = `<tr><th>Company</th><th class="n">Price</th><th class="n">Day</th>${S.co.mode === 'shortlist' ? '<th>Why look · objection</th>' : ''}${S.co.cols.map(k => `<th class="n">${esc(COLS[k][0])}</th>`).join('')}<th><span class="sr">Save</span></th></tr>`;
       $('#rows').innerHTML = view.map(r => { const sx = shortSet.get(r.t);
         return `<tr><td><a href="#/company/${esc(r.t)}"><b>${esc(r.t)}</b> ${esc(r.n)}</a><div class="dim small">${esc(r.sec)}${r.sp500_member === false ? ' · not in current S&amp;P list' : ''}</div></td>
         <td class="n">${liveSpan(r.t, 'price')}</td><td class="n chg">${liveSpan(r.t, 'chg')}</td>${S.co.mode === 'shortlist' ? `<td class="small">${esc(sx && sx.why[0] ? sx.why[0].text : '')}<div class="dim">${esc(sx ? sx.counter.text : '')}</div></td>` : ''}
-        ${S.co.cols.map(k => `<td class="n">${COLS[k][1](r)}</td>`).join('')}<td>${starBtn(r.t)}</td></tr>`; }).join('')
+        ${S.co.cols.map(k => `<td class="n" data-column="${k}">${COLS[k][1](r,current)}</td>`).join('')}<td>${starBtn(r.t)}</td></tr>`; }).join('')
         || `<tr><td class="dim" colspan="9">${S.co.mode === 'saved' ? (st.ok ? 'No saved companies yet. Use ☆ Save on any company.' : 'Saved companies could not be read; see the note above.') : 'No match.'}</td></tr>`;
       main.querySelector('[data-page="-1"]').disabled = S.co.page === 0; main.querySelector('[data-page="1"]').disabled = S.co.page >= pages - 1;
       Live.paint(doc, null);
@@ -923,6 +945,7 @@
       if (route(root.location.hash).t !== t) { try { S.fv.destroy(); } catch (e) {} S.fv = null; }
     } catch (e) { el.innerHTML = `<p class="note" role="alert">Chart unavailable: ${esc(e.message)}. The price and evidence above are unaffected.</p>`; console.warn('[brief] chart', e); }
   }
+  function opinion(s){return String(s||'Unavailable').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());}
   function keyMetrics(t, r) {
     return () => {
       const cur = Live.currentRow(r) || {}, rp = rangePos(cur, r), rows = [];
@@ -931,7 +954,7 @@
       rows.push(['PEG', isNum(r.peg) ? r.peg.toFixed(2) : 'n/a', r.pegm || 'provider ratio']);
       rows.push(['52-week range', rp ? `${px(rp.lo)} – ${px(rp.hi)} (${Math.round(rp.pos)}%)` : 'n/a', 'retained daily range and current price']);
       rows.push(['Next earnings', r.er ? `${shortDate(r.er)} ${r.ert ? '(' + r.ert + ')' : '(time not confirmed)'}` : 'not supplied', (r.ers || 'provider') + (r.rat ? ', retrieved ' + r.rat.slice(0, 10) : '')]);
-      rows.push(['Analyst consensus', r.rating ? `${r.rating}${isNum(r.tgt) ? ', target ' + px(r.tgt) : ''}${isNum(r.nan) ? ', ' + r.nan + ' analysts' : ''}` : 'not supplied', 'provider opinion; not estimate revisions']);
+      rows.push(['Analyst consensus', r.rating ? `${opinion(r.rating)}${isNum(r.tgt) ? ', target ' + px(r.tgt) : ''}${isNum(r.nan) ? ', ' + r.nan + ' analysts' : ''}` : 'not supplied', 'provider opinion; not estimate revisions']);
       rows.push(['Market value', isNum(cur.mcap) ? '$' + big(cur.mcap) : 'n/a', 'price × shares']);
       return `<table class="kv">${rows.map(([a, b2, c]) => `<tr><td>${esc(a)}</td><td class="n">${esc(b2)}</td><td class="dim small">${esc(c)}</td></tr>`).join('')}</table>`;
     };
@@ -996,7 +1019,7 @@
     const short = (S.brief.shortlist || []).find(x => x.t === t), cs = caseFor(c, short, r);
     S.coTab = S.coTab || route(root.location.hash).tab || 'overview';
     main.innerHTML = `
-      <section class="co" data-t="${esc(t)}"><div class="co-head"><h1>${esc(r.n)} <span class="co-t">${esc(t)}</span></h1>${starBtn(t)}</div>
+      <section class="co" data-t="${esc(t)}"><div class="co-head"><h1>${esc(r.n)} <span class="co-t">${esc(t)}</span></h1>${starBtn(t)}<a class="position-link" href="#/positions" data-position-t="${esc(t)}">Add/edit position</a></div>
         <p class="dim"><a href="#/sector/${encodeURIComponent(r.sec)}">${esc(r.sec)}</a>${r.ind ? ' · ' + esc(r.ind) : ''}${r.sp500_member === false ? ' · not in the current S&amp;P 500 list' : ''}</p>
         <div class="quote"><span class="big">${liveSpan(t, 'price')}</span> <span class="chg">${liveSpan(t, 'chg')}</span> ${slot('session', () => sessionNote(t))}</div>
         <p class="dim small">${slot('ctx', () => esc(Live.currentContext(t, Live.snapshot())))}</p>
@@ -1005,6 +1028,7 @@
           <p><span class="lbl obj">Objection</span> ${esc(cs.objection.text)} ${cs.objection.card ? evBtn({kind: 'card', t, id: cs.objection.card}) : ''}</p>
           ${cs.coverage.length ? `<p class="dim small"><span class="lbl">Coverage</span> ${esc(listJoin(cs.coverage))} unavailable; incomplete coverage is not an all-clear.</p>` : ''}
           <p class="dim small"><span class="lbl">Next event</span> ${esc(cs.event)}</p></div></section>
+      <section id="your-note" class="your-note"></section>
       <div class="co-tabs" role="tablist" aria-label="Company sections">${TABS.map(([k, l]) => `<button type="button" role="tab" id="tab-${k}" data-tab="${k}" aria-controls="panel-${k}" aria-selected="${S.coTab === k}" tabindex="${S.coTab === k ? 0 : -1}">${l}</button>`).join('')}</div>
       <section class="co-panel" role="tabpanel" id="panel-overview" data-panel="overview" aria-labelledby="tab-overview"><div class="ov-grid"><div class="ov-chart"><div id="fv" class="fv-host"></div></div>
         <div class="ov-side"><h3>Key figures</h3>${slot('kv', keyMetrics(t, r))}<p><a class="go" href="${esc(companyHref(t, r.sec))}">Compare ${esc(t)} with SPY and ${esc(r.sec)} →</a></p><p class="dim small">${slot('tech-sum', techShort(t, c && c.technical))}</p></div></div></section>
@@ -1012,6 +1036,7 @@
       <section class="co-panel" role="tabpanel" id="panel-drivers" data-panel="drivers" aria-labelledby="tab-drivers">${driversHtml(t, r, c)}</section>
       <section class="co-panel" role="tabpanel" id="panel-events" data-panel="events" aria-labelledby="tab-events"><div id="co-events">${eventsHtml(t, c)}</div></section>
       <section class="co-panel" role="tabpanel" id="panel-options" data-panel="options" aria-labelledby="tab-options">${optionsHtml(t, r, c)}</section>`;
+    root.SmartOptionsInvestor.mountNote($('#your-note'),t);
     selectTab(S.coTab);
     const tl = main.querySelector('.co-tabs');
     tl.addEventListener('click', e => { const b = e.target.closest('[role=tab]'); if (b) selectTab(b.dataset.tab, true); });
@@ -1481,13 +1506,14 @@
     const id=S.ex.state.s[0]?.id, m=S.rel?.joint?.find(m=>m.y===id), el=$('#ex-joint');
     if(!el)return;
     S.jointModel=m;S.jointValues ||= [0,0];
-    if(!m?.available){el.innerHTML=`<details class="joint"><summary>Economic what-if</summary><p>${esc(m?.reason||'No joint model for this asset in the fixed 64-candidate research budget. Choose SPY, AAPL, MSFT, NVDA, AMZN, JPM, XOM or a supported sector basket.')} Historical overlays remain available through chart controls.</p></details>`;return;}
+    if(!m?.available){el.innerHTML=`<details class="joint"><summary>Economic what-if</summary><p>${esc(m?.reason||'No joint model for this asset in the fixed 64-candidate research budget. Choose SPY, AAPL, MSFT, NVDA, AMZN, JPM, XOM or a supported sector basket.')} Historical overlays remain available through chart controls.</p></details>`;if(root.__soPersonalWhatif){root.__soPersonalWhatif=false;el.querySelector('details').open=true;el.tabIndex=-1;el.scrollIntoView({block:'start'});el.focus({preventScroll:true});}return;}
     el.innerHTML=`<section class="joint"><h3>Two economic moves, together ${learnLink('Scenario','What does this mean?')}</h3><p class="dim">Hypothetical one-day changes associated with ${esc(metaOf(id)?.label||id)}; ${m.n} common days, ${esc(m.fit_start)}–${esc(m.fit_end)}. Joint fit, holding the other driver fixed. It describes history, not a forecast.</p><div class="joint-inputs"><label>10-year Treasury move ${learnLink('Basis points','bp')}<input id="joint-rate" type="number" step="any" inputmode="decimal" value="${S.jointValues[0]}" data-joint="0"></label><label>WTI oil move (%)<input id="joint-oil" type="number" step="any" inputmode="decimal" value="${S.jointValues[1]}" data-joint="1"></label></div><div class="ex-ctl"><label><input type="checkbox" id="joint-on"${S.jointEnabled?' checked':''}> Show hypothetical marker & mean band</label><button type="button" data-joint-overlays>Add rate & oil history</button><button type="button" data-joint-reset>Clear what-if</button></div><p id="joint-out" role="status"></p><details><summary>Method, bounds & counterargument</summary><p>Asset daily percent change = ${f3(m.coefficients[0])} + ${f3(m.coefficients[1])} × rate move (bp) + ${f3(m.coefficients[2])} × oil move (%). Each driver is bounded to its central 90% sample: rate ${m.bounds[0].map(f3).join(' to ')} bp; oil ${m.bounds[1].map(f3).join(' to ')}%. Joint leverage must be ≤9/n. Condition number ${f3(m.condition)}; residual daily standard deviation ${f3(Math.sqrt(m.residual_variance))}%. ${esc(m.method)}.</p><p>Counterargument: these two variables leave other market and company events unexplained; revised macro histories, different close times and changing relationships can break the association. The chart uses the last observed chart price as an anchor, not a target date or fabricated price bar.</p><p>${learnLink('Confidence interval','Average uncertainty vs individual-day variation')} · ${learnLink('Beta','Joint slopes')} · Catalog built ${esc(S.rel.generated_at)}; total fixed search ≤${S.rel.candidate_search.max} candidates.</p></details></section>`;
     el.querySelectorAll('[data-joint]').forEach(inp=>inp.oninput=()=>{S.jointValues[+inp.dataset.joint]=inp.value===''?null:Number(inp.value);updateJoint();});
     $('#joint-on').onchange=e=>{S.jointEnabled=e.target.checked;updateJoint();};
     el.querySelector('[data-joint-reset]').onclick=()=>{S.jointEnabled=false;S.jointValues=[0,0];$('#joint-on').checked=false;$('#joint-rate').value='0';$('#joint-oil').value='0';updateJoint();};
     el.querySelector('[data-joint-overlays]').onclick=()=>exSet(s=>{for(const id of m.drivers)if(!s.s.some(x=>x.id===id)&&s.s.length<W.MAX_SERIES)s.s.push({id});s.m='z';});
     updateJoint();
+    if(root.__soPersonalWhatif){root.__soPersonalWhatif=false;el.scrollIntoView({block:'start'});$('#joint-rate')?.focus({preventScroll:true});}
   }
   function scenarioDisplay(raw) {
     const md=S.exModel,s=md.cut[0], mode=md.mode, values=s.h.map(p=>p[1]);
@@ -1522,7 +1548,15 @@
   /* ------------------------------------------------------------ boot */
   let pending = null;
   let changedSince = new Set();
-  function onQuotes(ev) { (ev && ev.changed || []).forEach(t => changedSince.add(t)); if (pending) return; pending = setTimeout(() => { pending = null; const ch = changedSince; changedSince = new Set(); paintSlots(); if (S.onQuote) S.onQuote(ch); }, 120); }
+  function onQuotes(ev) { (ev && ev.changed || []).forEach(t => changedSince.add(t)); if (pending) return; pending = setTimeout(() => {
+    pending = null;const ch=changedSince;changedSince=new Set();
+    // A new market-relative sentence can wrap above the reader's research panel.
+    // Retain that panel's viewport position while still displaying the new evidence.
+    const panel=S.view==='company'&&root.scrollY>0?doc.querySelector('.co-panel:not([hidden])'):null;
+    const before=panel?.getBoundingClientRect().top,anchored=before!=null&&before<root.innerHeight;
+    paintSlots();if(S.onQuote)S.onQuote(ch);
+    if(anchored&&panel.isConnected){const delta=panel.getBoundingClientRect().top-before;if(Math.abs(delta)>.5)root.scrollBy(0,delta);}
+  },120); }
   async function boot() {
     try {
       const [core, brief] = await Promise.all([json('data/core.json'), json('data/brief.json')]);
@@ -1539,15 +1573,18 @@
     WL();
     root.SmartOptionsAPI = Object.assign(root.SmartOptionsAPI || {}, {brief_action: mainAction});
     doc.addEventListener('click', e => {
+      const pt=e.target.closest('[data-position-t]');if(pt)S.positionTicker=pt.dataset.positionT;
       const ev = e.target.closest('[data-ev]'); if (ev) { e.preventDefault(); try { openSheet(JSON.parse(ev.dataset.ev), ev); } catch (err) { console.error('[brief] evidence id', err); } return; }
       const st = e.target.closest('[data-star]'); if (st) { toggleStar(st.dataset.star); if (S.coDraw && S.co && S.co.mode === 'saved') S.coDraw(); return; }
       const hz = e.target.closest('[data-horizon]');
       if (hz) { UI.horizon = S.horizon = +hz.dataset.horizon;
-        if (S.view === 'brief' && $('#ahead')) $('#ahead').innerHTML = aheadHtml();
+        if (S.view === 'brief' && $('#ahead')) {$('#ahead').innerHTML = aheadHtml();S.personal?.refresh();}
         else if (S.view === 'company' && $('#co-events')) { const t = route(root.location.hash).t; $('#co-events').innerHTML = eventsHtml(t, S.company[t]); }
         else if (S.view === 'macro') renderMacro($('#view'));
         const again = doc.querySelector(`[data-horizon="${S.horizon}"]`); if (again) again.focus({preventScroll: true}); }
     });
+    root.addEventListener('so:investor',()=>{if(S.view==='brief')S.personal?.refresh();});
+    root.addEventListener('storage',e=>{if(e.key==='so_watchlist_v1'&&S.view==='brief')S.personal?.refresh();});
     initSearch(); initTheme();
     root.addEventListener('hashchange', render);
     render();

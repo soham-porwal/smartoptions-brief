@@ -30,7 +30,7 @@
   const signed = (v, n = 2) => finite(v) ? (v > 0 ? '+' : '') + fmt(v, n) : '—';
   const cls = v => !finite(v) || v === 0 ? '' : v > 0 ? 'ov-positive' : 'ov-negative';
   const safeURL = u => /^https?:\/\//i.test(u || '') ? esc(u) : '#';
-  let api, page, sort = {key:'opp', dir:-1}, query = '', lastData, status = '', ovScope = 'watch', prevBookBackup = null;
+  let api, page, sort = {key:'opp', dir:-1}, query = '', lastData, status = '', ovScope = 'watch', demoActive = false;
   const DEMO_BOOK = [
     {t: 'NVDA', qty: 200, cost: 118.50},
     {t: 'MSFT', qty: 150, cost: 412.00},
@@ -41,20 +41,24 @@
   ];
   function renderBookStress(d, local, byTicker) {
     const book = local && local.book ? local.book : null;
-    const keys = book ? Object.keys(book).filter(t => byTicker.has(t)) : [];
+    const keys = book ? Object.keys(book).filter(t => book[t]?.qty!==0) : [];
     if (!keys.length) return '';
-    if(keys.some(t=>!finite(book[t].qty)||book[t].qty<0||!finite(byTicker.get(t).px))) return '<p class="ov-warning">Portfolio value and P&amp;L unavailable: a holding has missing quantity or price. Add the measured input; no position is assumed.</p>';
+    const unavailable=keys.filter(t=>!finite(book[t]?.qty)||book[t].qty<0||(book[t].currency&&book[t].currency!=='USD')||!byTicker.has(t)||!finite(byTicker.get(t).px)||byTicker.get(t).px<=0);
+    if(unavailable.length)return `<p class="ov-warning">Entered equity value and P&amp;L unavailable: a holding has unsupported currency/name, missing quantity or price. Excluded: ${unavailable.map(esc).join(', ')}. ${keys.length-unavailable.length}/${keys.length} active entries have usable quantity and price. No unmeasured holding is zero.</p>`;
     let totVal = 0, totCost = 0, hasCost = false;
     const pos = keys.map(t => {
       const r = byTicker.get(t), b = book[t] || {};
       const qty = finite(b.qty) && b.qty >= 0 ? b.qty : null;
       const val = finite(r.px) ? qty * r.px : 0;
-      const cost = finite(b.cost) && b.cost >= 0 ? qty * b.cost : null;
+      const cost = b.costMeaning==='perShare' && finite(b.cost) && b.cost >= 0 ? qty * b.cost : null;
       totVal += val;
       if (cost != null) { totCost += cost; hasCost = true; }
       return {t, r, qty, costPerShare: b.cost, val, cost, pnl: cost != null ? val - cost : null, pnlPct: cost != null && cost > 0 ? (val / cost - 1) * 100 : null};
     }).sort((a, b) => b.val - a.val);
     if (totVal <= 0) return '';
+    const missingModels=pos.filter(p=>!p.r.rel||p.r.rel.n<120||!['spy','us10y_bps','dxy','wti','vix'].every(f=>finite(p.r.rel.c?.[f])));
+    if(missingModels.length)return `<p class="ov-warning">Entered equity value $${fmt(totVal,2)}. Factor stress unavailable: missing eligible coefficients for ${missingModels.map(p=>esc(p.t)).join(', ')}. Missing models are not zero exposure; no subset is renormalized.</p>`;
+    if(typeof api.scenarioImpact!=='function'||!finite(totVal))return '<p class="ov-warning">Factor stress unavailable: calculation inputs or engine unavailable. No zero impact is assumed.</p>';
     const wBetas = {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0};
     let scenDollar = 0;
     const activeShock = api.S && api.S().shock ? api.S().shock : {};
@@ -69,7 +73,8 @@
       }
       if (p.r.rel && api.scenarioImpact) {
         const impPct = api.scenarioImpact(c, stressShock);
-        if (finite(impPct)) scenDollar += p.val * (impPct / 100);
+        if (!finite(impPct)||!finite(p.val*(impPct/100)))return '<p class="ov-warning">Factor stress unavailable: nonfinite calculation. No zero impact is assumed.</p>';
+        scenDollar += p.val * (impPct / 100);
       }
     }
     const scenPct = (scenDollar / totVal) * 100;
@@ -94,13 +99,13 @@
         <span title="Portfolio value-weighted VIX sensitivity (% per +1pt VIX)"><b>β VIX:</b> ${signed(wBetas.vix, 2)}%</span>
         <span title="${esc(shockLabel)}"><b>${esc(shockLabel)}:</b> <b class="${cls(scenPct)}">${scenDollar >= 0 ? '+' : ''}$${fmt(scenDollar, 0)} (${signed(scenPct, 2)}%)</b></span>
       </div>
-      ${alerts.length ? `<div style="margin-top:6px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><b>Book Action / Hedge Alerts:</b> ${alerts.map(p => {
+      ${alerts.length ? `<div style="margin-top:6px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><b>Book research prompts:</b> ${alerts.map(p => {
         const reasons = [];
         if (finite(p.r.ern) && p.r.ern >= 0 && p.r.ern <= 14) reasons.push(`earn ${p.r.ern}d`);
-        if (finite(p.r.res20d) && p.r.res20d <= -3) reasons.push(`20d α ${signed(p.r.res20d, 1)}%`);
+        if (finite(p.r.res20d) && p.r.res20d <= -3) reasons.push(`20d unexplained ${signed(p.r.res20d, 1)}%`);
         if (finite(p.r.ivrv_eff) && p.r.ivrv_eff >= 1.2) reasons.push(`IV/RV ${fmt(p.r.ivrv_eff, 2)}x`);
         const contracts = Math.floor(p.qty / 100);
-        return `<span style="padding:2px 6px;background:#162029;border-radius:4px">${esc(p.t)} (${p.qty} sh · ${reasons.join(', ')}) <button type="button" data-book-hedge="${esc(p.t)}" style="margin-left:4px;cursor:pointer">Hedge / Collar (${contracts}c) →</button></span>`;
+        return `<span style="padding:2px 6px;background:#162029;border-radius:4px">${esc(p.t)} (${p.qty} sh · ${reasons.join(', ')}) <button type="button" data-book-hedge="${esc(p.t)}" style="margin-left:4px;cursor:pointer">Explore options (${contracts} contracts) →</button></span>`;
       }).join('')}</div>` : ''}
     </section>`;
   }
@@ -138,7 +143,7 @@
   }
   function analyst(r) {
     if (!r.rating && !finite(r.up)) return '<span title="Analyst rating and target unavailable from provider">—</span>';
-    return `<details class="ov-analyst-why"><summary class="ov-analyst" title="${tooltip(r,'analyst','target USD; upside %')} · target ${fmt(r.tgt)} · ${fmt(r.nan,0)} analysts"><b>${esc((r.rating || 'unrated').replace(/_/g,' '))}</b><span class="${cls(r.up)}">${signed(r.up,1)}${finite(r.up)?'%':''}</span></summary><div class="ov-analyst-inputs">${esc(r.t)} · Yahoo Finance provider rating: ${esc(r.rating || 'unavailable')} (shown verbatim; no dashboard rating threshold). Target ${fmt(r.tgt)} USD · price ${fmt(r.px)} USD · ${fmt(r.nan,0)} analysts. Upside = (target / price − 1) × 100 = ${signed(r.up,1)}%. Price as of ${esc(r.pxd || 'unavailable')} · fundamentals retrieved ${esc(r.rat || 'unavailable')}. <a href="https://finance.yahoo.com/quote/${encodeURIComponent(r.t)}/analysis/" target="_blank" rel="noopener">Source</a></div></details>`;
+    return `<details class="ov-analyst-why"><summary class="ov-analyst" title="${tooltip(r,'analyst','target USD; upside %')} · target ${fmt(r.tgt)} · ${fmt(r.nan,0)} analysts"><b>${esc((r.rating || 'unrated').replace(/_/g,' '))}</b><span class="${cls(r.up)}">${signed(r.up,1)}${finite(r.up)?'%':''}</span></summary><div class="ov-analyst-inputs">${esc(r.t)} · Yahoo Finance provider rating: ${esc((r.rating || 'unavailable').replace(/_/g,' '))} (provider opinion; no dashboard rating threshold). Target ${fmt(r.tgt)} USD · price ${fmt(r.px)} USD · ${fmt(r.nan,0)} analysts. Upside = (target / price − 1) × 100 = ${signed(r.up,1)}%. Price as of ${esc(r.pxd || 'unavailable')} · fundamentals retrieved ${esc(r.rat || 'unavailable')}. <a href="https://finance.yahoo.com/quote/${encodeURIComponent(r.t)}/analysis/" target="_blank" rel="noopener">Source</a></div></details>`;
   }
   function spark(history) {
     const v = (history || []).map(p => Array.isArray(p) ? p[1] : p).filter(finite);
@@ -172,7 +177,10 @@
     const d=api.D(), list=root.SmartOptionsWatchlist.get(), byTicker=new Map(d.rows.map(r=>[r.t,root.SmartOptionsLive?.currentRow?root.SmartOptionsLive.currentRow(r):r]));
     const today = $('#ov-today');
     if (today) today.innerHTML = root.SO2_flow ? root.SO2_flow.taskRow(d, false) : '<p>Market assessment loading. You can explore the watchlist below.</p>';
-    const local=root.SmartOptionsImport && root.SmartOptionsImport.getData();
+    const actual=root.SmartOptionsImport && root.SmartOptionsImport.getData();
+    if(demoActive) {try{if(root.localStorage.getItem('so_import_v1')!==null||root.localStorage.getItem('so_local_imports_v1')!==null||actual?.book||root.SmartOptionsImport?.status()?.warning)demoActive=false;}catch(e){demoActive=false;status='Sample closed because local storage could not be checked. Your data is unchanged.';}if(!demoActive&&$('#ov-demo-book'))$('#ov-demo-book').textContent='Show sample book';}
+    const local=demoActive?{...actual,book:Object.fromEntries(DEMO_BOOK.map(x=>[x.t,{qty:x.qty,cost:x.cost}]))}:actual;
+    const localStatus=$('#ov-local-status');if(localStatus)localStatus.textContent=root.SmartOptionsImport?.status()?.warning||'Your imports stay in this browser';
     const bookBox = $('#ov-book-stress');
     if (bookBox) bookBox.innerHTML = renderBookStress(d, local, byTicker);
     const metrics=local&&local.metrics, extras=metrics ? metrics.columns.slice(0,4) : [];
@@ -182,7 +190,7 @@
     page.querySelectorAll('[data-ov-scope]').forEach(b => b.classList.toggle('on', b.dataset.ovScope === ovScope));
     const value=r=>sort.key==='opp' ? r.sam&&r.sam.opp : sort.key.startsWith('local:') ? metrics&&metrics.rows[r.t]&&metrics.rows[r.t][sort.key.slice(6)] : r[sort.key];
     rows.sort((a,b)=>{const av=value(a),bv=value(b);if(av==null)return bv==null?a.t.localeCompare(b.t):1;if(bv==null)return -1;return (typeof av==='string'?av.localeCompare(bv):av-bv)*sort.dir||a.t.localeCompare(b.t);});
-    const columns=[['t','Company'],['px','Price'],['d1','Day %'],['res20d','20d α %'],['pe','P/E · TTM'],['pef','P/E · Fwd'],['pef_sec_rel','vs Sec'],['peg','PEG'],['pct','52-week low → high'],['er','Next earnings'],['up','Analyst · target upside'],...extras.map(c=>['local:'+c,c+' · local'])];
+    const columns=[['t','Company'],['px','Price'],['d1','Day %'],['res20d','20d unexplained %'],['pe','P/E · TTM'],['pef','P/E · Fwd'],['pef_sec_rel','vs Sec'],['peg','PEG'],['pct','52-week low → high'],['er','Next earnings'],['up','Analyst · target upside'],...extras.map(c=>['local:'+c,c+' · local'])];
     $('#ov-thead').innerHTML='<tr><th class="ov-pin-head" title="Unpin from watchlist">★</th>'+columns.map(([k,l])=>`<th aria-sort="${sort.key===k?(sort.dir===1?'ascending':'descending'):'none'}"><button data-sort="${esc(k)}">${esc(l)} ${sort.key===k?(sort.dir===1?'↑':'↓'):''}</button></th>`).join('')+'</tr>';
     $('#ov-tbody').innerHTML=rows.map(r=>{
       const book=local&&local.book&&local.book[r.t];
@@ -218,7 +226,7 @@
     const tab=document.createElement('button');tab.id='ov-tab';tab.textContent='Overview';tab.dataset.tab='overview';{const fl=$('#fl-tab');if(fl)fl.after(tab);else $('#tabs').prepend(tab);}
     const analyst=$('#tabs [data-tab="markets"]');if(analyst) analyst.textContent='Analyst';
     page=document.createElement('main');page.id='pg-overview';page.hidden=true;
-    page.innerHTML=`<section class="ov-watch"><div class="ov-toolbar"><div><h1>Watchlist <span id="ov-count"></span></h1><p>Price & fundamentals · Pin the companies you want to follow. Select a ticker to explore; pin your own names.</p></div><div class="ov-tools"><button id="ov-edge-desk" type="button" style="background:rgba(229,173,76,.18);border-color:#e5ad4c;color:#ffd885;font-weight:700" title="Open the lean Options income + Edge & Alpha Finder + Macro Stress Desk">Options and risk tools</button><div class="ov-scope-bar" role="group" aria-label="Universe scope" style="display:inline-flex;gap:4px"><button type="button" data-ov-scope="watch" class="on">Watchlist</button><button type="button" data-ov-scope="book">My Book</button><button type="button" data-ov-scope="movers">Movers</button><button type="button" data-ov-scope="all">Covered S&amp;P universe</button></div><input id="ov-search" type="search" aria-label="Filter watchlist" placeholder="Filter ticker / sector"><form id="ov-add"><input id="ov-symbol" aria-label="Ticker to pin" list="ov-datalist" placeholder="Pin ticker" maxlength="15"><datalist id="ov-datalist"></datalist><button type="submit" title="Pin ticker to watchlist">+</button></form><button id="ov-demo-book" type="button" title="Load or undo a 6-stock sample portfolio with share counts and cost basis">Load Demo Book</button><button id="ov-add-data">Add data</button></div></div><div id="ov-book-stress"></div><div id="ov-warning" role="status"></div><div class="ov-table-scroll"><table id="ov-table"><thead id="ov-thead"></thead><tbody id="ov-tbody"></tbody></table><div id="ov-empty" hidden>No matching watchlist symbols. Pin a ticker or add a file.</div></div></section><section class="ov-macro-section"><div class="ov-section-label">Macro context <span>Observation periods shown · source details on hover · changes are not trading signals</span></div><div id="ov-macro"></div></section><footer class="ov-foot">Educational analysis · Source dates in field details <span id="ov-local-status">Your imports stay in this browser</span></footer>`;
+    page.innerHTML=`<section class="ov-watch"><div class="ov-toolbar"><div><h1>Watchlist <span id="ov-count"></span></h1><p>Price & fundamentals · Pin the companies you want to follow. Select a ticker to explore; pin your own names.</p></div><div class="ov-tools"><button id="ov-edge-desk" type="button" style="background:rgba(229,173,76,.18);border-color:#e5ad4c;color:#ffd885;font-weight:700" title="Open the lean Options income + Edge & Alpha Finder + Macro Stress Desk">Options and risk tools</button><div class="ov-scope-bar" role="group" aria-label="Universe scope" style="display:inline-flex;gap:4px"><button type="button" data-ov-scope="watch" class="on">Watchlist</button><button type="button" data-ov-scope="book">My Book</button><button type="button" data-ov-scope="movers">Movers</button><button type="button" data-ov-scope="all">Covered S&amp;P universe</button></div><input id="ov-search" type="search" aria-label="Filter watchlist" placeholder="Filter ticker / sector"><form id="ov-add"><input id="ov-symbol" aria-label="Ticker to pin" list="ov-datalist" placeholder="Pin ticker" maxlength="15"><datalist id="ov-datalist"></datalist><button type="submit" title="Pin ticker to watchlist">+</button></form><button id="ov-demo-book" type="button" title="Show an unsaved sample only when no local data exists">Show sample book</button><button id="ov-add-data">Add data</button></div></div><div id="ov-book-stress"></div><div id="ov-warning" role="status"></div><div class="ov-table-scroll"><table id="ov-table"><thead id="ov-thead"></thead><tbody id="ov-tbody"></tbody></table><div id="ov-empty" hidden>No matching watchlist symbols. Pin a ticker or add a file.</div></div></section><section class="ov-macro-section"><div class="ov-section-label">Macro context <span>Observation periods shown · source details on hover · changes are not trading signals</span></div><div id="ov-macro"></div></section><footer class="ov-foot">Educational analysis · Source dates in field details <span id="ov-local-status">Your imports stay in this browser</span></footer>`;
     $('#pg-markets').before(page);
     page.insertAdjacentHTML('afterbegin', '<div id="ov-today"></div>');
     // Keep body class / page in step with whichever tab is on (Flow and app.js switch tabs without telling us).
@@ -242,27 +250,13 @@
     const demoBtn = $('#ov-demo-book');
     if (demoBtn) demoBtn.addEventListener('click', () => {
       try {
-        const raw = localStorage.getItem('so_import_v1');
-        const cur = raw ? JSON.parse(raw) : {book: {}, metrics: null, series: []};
-        if (prevBookBackup !== null) {
-          cur.book = prevBookBackup;
-          prevBookBackup = null;
-          localStorage.setItem('so_import_v1', JSON.stringify(cur));
-          demoBtn.textContent = 'Load Demo Book';
-          if (ovScope === 'book' && !Object.keys(cur.book || {}).length) ovScope = 'watch';
-          notice('Restored previous My Book state.');
-        } else {
-          prevBookBackup = cur.book || {};
-          cur.book = {};
-          for (const item of DEMO_BOOK) cur.book[item.t] = {qty: item.qty, cost: item.cost};
-          localStorage.setItem('so_import_v1', JSON.stringify(cur));
-          root.SmartOptionsWatchlist.add(DEMO_BOOK.map(x => x.t));
-          demoBtn.textContent = 'Undo Demo Book';
-          notice('Loaded 6-position sample book (NVDA, MSFT, AAPL, JPM, XOM, LLY) with portfolio factor betas & stress test.');
+        if (demoActive) {demoActive=false;demoBtn.textContent='Show sample book';notice('Sample closed. Your local data was unchanged.');}
+        else {
+          if (localStorage.getItem('so_import_v1')!==null || localStorage.getItem('so_local_imports_v1')!==null || root.SmartOptionsImport?.getData()?.book || root.SmartOptionsImport?.status()?.warning) {notice('Sample unavailable while existing local data is present. Your book is unchanged.');return;}
+          demoActive=true;ovScope='book';demoBtn.textContent='Close sample book';notice('Sample quantities only, in memory. Nothing saved or added to your watchlist.');
         }
-        root.dispatchEvent(new CustomEvent('so:import'));
         render();
-      } catch (err) { notice('Could not load demo book: ' + err.message); }
+      } catch (err) { notice('Sample unavailable: local storage could not be checked. Your data is unchanged.'); }
     });
     root.addEventListener('so:import',render);
     root.addEventListener('so:quotes-update',()=>{if(!page.hidden)render();});

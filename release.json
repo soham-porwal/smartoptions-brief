@@ -1,63 +1,44 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261017-r13-decision-workflow-product1",
+  "release_id": "brief-client-20261018-r14-investor",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-17T18:26:43.214555+00:00",
-  "source_commit": "22d84e9431f0bbeec514ad9cbae4fa09e16c893b",
+  "built_at": "2026-10-18T03:34:52.072134+00:00",
+  "source_commit": "599d93b03a074d4f29f10ea9c2e8ecb072b01235",
   "data_session": "2026-10-16",
   "tickers": 509,
   "current_constituents": 503,
   "core_sha256": "37f25c81157b8505a9266a9c844dbcc838ba77243416482eec2f60639a3db07b",
-  "default_view": "Today, Companies, Macro and Compare; one company dossier; expanded strategies and private tools at backup.html",
-  "chat": "Contextual popup on main; deterministic local answers and allowlisted actions with verified readback; optional shared rephrasing",
+  "default_view": "Today with private For you; Companies, Macro and Compare; optional local positions and company research notes; expanded tools retained",
+  "chat": "Public deterministic dashboard answers and verified actions; personal state excluded from remote planning/rephrasing",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
   "price_feed": "Yahoo Finance stream for up to 100 prioritized active names; one connection. Finnhub shared within-budget 120-second fallback, then the timestamped shared snapshot. Full-index breadth uses one adequately covered dated session, not an unqualified all-index tick claim.",
   "verification": {
-    "javascript_chat_worker": {
-      "passed": 424,
-      "failed": 0,
-      "receipt": "parent-js-final2.log"
-    },
+    "javascript": 454,
+    "investor_browser": 189,
+    "redesign_browser": 110,
+    "nested_browser": 250,
+    "depth_browser": 181,
+    "action_targets": 133,
+    "quote_anchor_browser": 20,
+    "performance_gates": 17,
     "python": {
       "passed": 1035,
-      "failed": 0,
-      "receipt": "parent-neutral-pytest-final.log",
-      "basis": "Full suite in isolated final implementation copy with a fresh scoped temporary directory"
+      "exact_commit": "e4893d752d43790d9a8b2ea991228c47a4e80eab",
+      "scope": "Python, root tests and public data unchanged; final JavaScript covered by current suites"
     },
-    "nested_browser": {
-      "passed": 250,
-      "failed": 0,
-      "receipt": "parent-nested-final.log"
-    },
-    "comparison_browser": {
-      "passed": 181,
-      "failed": 0,
-      "receipt": "parent-depth-final.log"
-    },
-    "redesign_browser": {
-      "passed": 110,
-      "failed": 0,
-      "receipt": "parent-redesign-final2.log"
-    },
-    "performance_browser": {
-      "passed": 20,
-      "failed": 0,
-      "receipt": "out/opus-redesign/final2-perf-browser/perf-browser-receipt.json",
-      "basis": "390x844 CPU x4 / 150ms RTT / 1.6Mbps; injected quote bursts, not open-market cadence"
-    },
-    "evidence_dir": "Data/Logs/smartoptions-redesign-20261017",
-    "scope": "Full local suites, real-data brief regeneration and bundle gates; parent CUA task/contrast/state checks. Hosted proof recorded separately."
+    "receipts": "Data/Logs/smartoptions-investor-pass-20261017/SOL-CHECKS.json",
+    "parent_checks": "PARENT-INDEPENDENT-CHECK.json and PARENT-VISUAL-REVIEW.md",
+    "limits": "Controlled automated phone/desktop contexts and screenshot review; manual CUA, physical devices, live provider availability and open-market cadence unobserved. Private state stays in this browser/origin without cloud sync. Prior-close dates absent in current real quotes, so dollar change is withheld."
   },
   "screener_scores": "dated 2026-07-25 snapshot; separate from refreshed prices and fundamentals",
   "methods": "docs/BRIEF-METHODS.md",
   "notes": [
-    "Completed-session market data and relationship fits end 2026-10-16. Macro releases and statements retain their actual observation/reporting dates and explicit stale/unavailable states.",
-    "Full offline brief generation for 509 companies and keep-last-good failure behavior passed; maximum company payload 11170 bytes. Full coordinated offline refresh needs a missing same-session source snapshot and was not asserted.",
-    "One canonical accepted quote engine; regular-session provisional bars and extended-session lines are distinct. Closed-market review cannot establish actual open-market tick cadence.",
-    "Phone profile: about4.3seconds to the market reading; price-burst long-task blocking reduced from about25seconds to80milliseconds in the measured synthetic benchmark. This is one test profile, not real-user field data.",
-    "Calendar completeness is unknown without provider range receipts; last-listed dates are not coverage boundaries. No live options chain or own-history valuation is fabricated.",
-    "Product descriptions, source health, historical scores and generated cache explanations use generic historical screener labels; legacy schema keys and numerical values are retained.",
-    "Parent publication metadata is above the tested implementation source_commit; asset hashes use exact canonical Git bytes."
+    "Generic customizable investor product. Saved companies do not imply ownership or equal weights. Positions are optional supported long USD equities and remain browser/origin-local.",
+    "No cloud or phone synchronization of private positions, notes or review checkpoints. No broker-reconciled balance, transaction accounting, portfolio forecast or personal remote-chat service.",
+    "Canonical source timestamps, coverage, dated attribution and historical model limitations remain explicit. Session dollar totals require dated prior regular-close bases and coherent sessions; missing data is never treated as zero.",
+    "Controlled phone/desktop and injected quote measurements are recorded separately from open-market cadence, real-device keyboard and client comprehension, which remain unobserved.",
+    "Current public data observations retain their original periods; publishing this interface does not restamp quotes, statements or model fits as fresh.",
+    "Parent metadata commit is above tested source identity. Exact UI/public payload hashes use canonical Git blob bytes; dynamic quote refresh remains independent."
   ],
   "backup": "backup.html",
   "quote_return_basis": "Daily changes use the previous regular-session close. Yahoo extended-session changes are retained separately; an unknown daily reference stays unavailable.",

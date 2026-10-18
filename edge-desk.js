@@ -262,9 +262,10 @@
     return merged;
   }
 
-  let ST = null;
+  let ST = null, storageWarning='';
+  function warnStorage(code){storageWarning=code;try{localStorage.setItem('so_edge_diagnostic_v1',JSON.stringify({status:'WARN',code,at:new Date().toISOString()}));}catch(e){console.warn('[edge] WARN storage diagnostic unavailable');}if(page){let n=page.querySelector('.ed-storage-warning');if(!n){n=document.createElement('p');n.className='ed-storage-warning';n.setAttribute('role','status');page.prepend(n);}n.textContent=code;}}
   function saveState() {
-    try { localStorage.setItem(KEY, JSON.stringify(ST)); } catch (e) {}
+    try {const raw=JSON.stringify(ST);localStorage.setItem(KEY,raw);if(localStorage.getItem(KEY)!==raw)throw Error('readback');}catch(e){warnStorage('Device save failed; edits last in this tab only.');}
   }
 
   /* Sync Edge Desk holdings into SmartOptionsImport My Book so Overview / Strategies / Flow stay 100% connected */
@@ -275,17 +276,13 @@
       const book = {...(cur.book || {})};
       ST.hold.forEach(h => {
         if (h.t && h.shares > 0) {
-          book[h.t] = {qty: h.shares, cost: finite(h.basis) ? h.basis : null};
+          book[h.t] = {...(book[h.t]||{}),qty:h.shares,cost:finite(h.basis)?h.basis:null,costMeaning:book[h.t]?.costMeaning==='perShare'&&book[h.t]?.cost===h.basis?'perShare':null};
         }
       });
-      localStorage.setItem('so_import_v1', JSON.stringify({
-        book,
-        metrics: cur.metrics || null,
-        series: cur.series || [],
-        updatedAt: new Date().toISOString()
-      }));
+      const receipt=root.SmartOptionsImport.putData({...cur,book,updatedAt:new Date().toISOString()});
+      if(!receipt.ok){warnStorage('Book save failed or another tab changed it. Reload latest local data before saving.');return;}
       root.dispatchEvent(new CustomEvent('so:import'));
-    } catch (e) {}
+    } catch (e) {warnStorage('Book save failed; original imports retained.');}
   }
 
   function pullFromMyBook(d) {
@@ -297,20 +294,18 @@
     const nextHold = [];
     for (const [sym, pos] of Object.entries(book)) {
       const r = byTicker.get(sym);
-      if (!r) continue;
       const existing = ST.hold.find(h => h.t === sym);
       nextHold.push({
         t: sym,
         shares: finite(pos.qty) && pos.qty >= 0 ? pos.qty : null,
-        basis: finite(pos.cost) && pos.cost >= 0 ? pos.cost : null,
+        basis: pos.costMeaning==='perShare'&&finite(pos.cost) && pos.cost >= 0 ? pos.cost : null,
         price: existing && existing.customPx ? existing.price : (root.SmartOptionsLive?.get(sym)?.current_usable!==false?root.SmartOptionsLive?.get(sym)?.price:null) ?? null,
-        iv: existing && existing.customIv ? existing.iv : (finite(r.iv) ? r.iv : (finite(r.rv20) ? r.rv20 : 30)),
+        iv: existing && existing.customIv ? existing.iv : (finite(r?.iv) ? r.iv : (finite(r?.rv20) ? r.rv20 : 30)),
         earn: (r && r.er) || ''
       });
     }
     if (nextHold.length) {
       ST.hold = nextHold;
-      saveState();
     }
   }
 
@@ -787,12 +782,17 @@
     const sObj = api.S ? api.S() : {shock: {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0}};
     const shock = sObj.shock || {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0};
     const byTicker = new Map((d.rows || []).map(r => [r.t, r]));
-    if(ST.hold.some(h=>!finite(h.shares)||!finite(h.price)))return `<p class="ed-mode-note">Current portfolio value, P&amp;L and stress unavailable: a holding has no measured quantity or usable current quote. Last observations remain separate.</p>`;
-    const totalVal = pv() || 1;
+    const holdings=ST.hold.filter(h=>h.shares!==0);
+    const uncovered=holdings.filter(h=>!finite(h.shares)||h.shares<0||!finite(h.price)||h.price<=0);
+    if(uncovered.length)return `<p class="ed-mode-note">Entered equity value, P&amp;L and stress unavailable: missing/unsupported quantity or usable USD quote for ${uncovered.map(h=>esc(h.t)).join(', ')}. ${holdings.length-uncovered.length}/${holdings.length} entries have usable inputs. Missing values are not zero.</p>`;
+    const missing=holdings.filter(h=>h.shares>0).filter(h=>{const r=byTicker.get(h.t),c=ST.useTactical60?r?.rel?.c60:r?.rel?.c;return !r?.rel||r.rel.n<120||!FACTORS.every(f=>finite(c?.[f]));});
+    if(missing.length)return `<p class="ed-mode-note">Factor stress unavailable: missing eligible coefficients for ${missing.map(h=>esc(h.t)).join(', ')}. Missing models are not zero exposure; no subset is renormalized. Historical company comparisons remain available.</p>`;
+    const totalVal = pv();
+    if(!(totalVal>0))return '<p class="ed-mode-note">No positive entered equity values; stress unavailable.</p>';
 
     let totPnl = 0, totShockDollar = 0;
     const wBeta = {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0};
-    const posRows = ST.hold.map((h, ci) => {
+    const posRows = holdings.map((h, ci) => {
       const r = byTicker.get(h.t);
       const val = (+h.shares || 0) * (+h.price || 0);
       const wt = val / totalVal;
@@ -841,16 +841,16 @@
 
         <div class="ed-capsum">
           <div class="ed-cs"><span>Portfolio Market Value</span><b class="ed-num">${fmtMoney(totalVal)}</b></div>
-          <div class="ed-cs"><span>Unrealized P&L</span><b class="ed-num" style="color:${totPnl >= 0 ? 'var(--ed-good)' : 'var(--ed-bad)'}">${fmtMoney(ST.hold.every(h=>finite(h.basis)&&finite(h.shares))?totPnl:null)}</b></div>
+          <div class="ed-cs"><span>Unrealized P&L</span><b class="ed-num" style="color:${totPnl >= 0 ? 'var(--ed-good)' : 'var(--ed-bad)'}">${fmtMoney(holdings.every(h=>finite(h.basis)&&finite(h.shares))?totPnl:null)}</b></div>
           <div class="ed-cs"><span>Net Shock Impact ($)</span><b class="ed-num" style="color:${totShockDollar >= 0 ? 'var(--ed-good)' : 'var(--ed-bad)'}">${fmtMoney(totShockDollar)}</b></div>
           <div class="ed-cs"><span>Net Shock Impact (%)</span><b class="ed-num" style="color:${totShockPct >= 0 ? 'var(--ed-good)' : 'var(--ed-bad)'}">${fmtSignedPct(totShockPct, 2)}</b></div>
           <p class="ed-cs-note">Value-Weighted Portfolio Betas: β_SPY <b>${wBeta.spy.toFixed(2)}%</b> · β_10Y (+10bp) <b>${(wBeta.us10y_bps * 10).toFixed(2)}%</b> · β_VIX (+1pt) <b>${wBeta.vix.toFixed(2)}%</b> · β_WTI (+1%) <b>${wBeta.wti.toFixed(2)}%</b> · β_DXY (+1%) <b>${wBeta.dxy.toFixed(2)}%</b></p>
         </div>
 
         <div class="ed-vc">
-          <div class="ed-vc-kick">Position-Level Shock Attribution & 1-Click Option Hedge Sizing</div>
-          <h3 class="ed-vc-title">Holdings Ranked by Macro Shock Vulnerability</h3>
-          <p class="ed-vc-dek">Shows each position’s exact dollar & percentage impact under your active factor shock, plus contract sizing (⌊shares / 100⌋) for collars or protective puts.</p>
+          <div class="ed-vc-kick">Historical factor scenario and optional contract arithmetic</div>
+          <h3 class="ed-vc-title">Holdings under a hypothetical macro move</h3>
+          <p class="ed-vc-dek">Shows each position’s fitted hypothetical dollar and percentage association under your active factor shock, plus contract sizing (⌊shares / 100⌋) for collars or protective puts.</p>
           <div class="ed-vc-list">
             ${posRows.map((p, idx) => {
               const wPct = Math.min(70, Math.max(3, Math.abs(p.scPct) * 8));
@@ -868,7 +868,7 @@
                     <b class="ed-vc-v ed-num" style="left:calc(${wPct.toFixed(1)}% + 6px)">Position Value ${fmtMoney(p.val)} · Unrlz P&L ${fmtMoney(p.pnl)}</b>
                   </span>
                   <span class="ed-vc-s ed-num">
-                    <span>Hedge Sizing: <b>${p.lots} contract${p.lots === 1 ? '' : 's'}</b> (${p.lots * 100} sh covered) · 20d Alpha: ${p.r ? fmtSignedPct(p.r.res20d) : '—'}</span>
+                    <span>Share-lot arithmetic: <b>${p.lots} contract${p.lots === 1 ? '' : 's'}</b> (${p.lots * 100} sh covered) · 20d unexplained: ${p.r ? fmtSignedPct(p.r.res20d) : '—'}</span>
                     <span style="display:flex;gap:6px">
                       <button class="ed-btn" style="padding:2px 8px;font-size:11px" data-pocket-open-from-stress="${esc(p.h.t)}">Size Collar / Call in Pocket</button>
                       <button class="ed-btn solid" style="padding:2px 8px;font-size:11px" data-open-strat="${esc(p.h.t)}">Open Strategy Payoff ↗</button>
@@ -970,6 +970,7 @@
     else mainContent = renderPocketPillar(d);
 
     page.innerHTML = `
+      ${storageWarning?`<p class="ed-storage-warning" role="status">${esc(storageWarning)}</p>`:''}
       <div class="ed-top">
         <div class="ed-banner">
           <div class="ed-banner-hd">
