@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261018-r17-live-recovery",
+  "release_id": "brief-client-20261018-r18-live-recovery",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-18T16:19:51.725289+00:00",
-  "source_commit": "4f4bc194206f5aabdf3a60ee172e2421f7f00a3e",
+  "built_at": "2026-10-18T16:37:16.033012+00:00",
+  "source_commit": "ef05e0d4f61c447d3e0840c15e2a038f237c9182",
   "data_session": "2026-10-16",
   "tickers": 509,
   "current_constituents": 503,
@@ -12,7 +12,7 @@
   "chat": "Deterministic public facts and verified actions; private positions/notes/checkpoints excluded from remote planning and rephrasing",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
   "price_feed": "Yahoo Finance stream for up to 100 prioritized active names; one connection. Finnhub shared within-budget 120-second fallback, then the timestamped shared snapshot. Full-index breadth uses one adequately covered dated session, not an unqualified all-index tick claim.",
-  "verification": "1072 full Python pass at9a8367f isolated copy; final4f4bc19 changes only recovery fixture/source documentation, independently reconstructing all506 prior available analyst assessments with exact values and original dates (oracle02). Unchanged471JS/33news/305Today/45paths/11quote-stress retained. Actual hosted390/1440 browser checks pass each site;8protectedPNG hashes unchanged. No physical-device/open-market test.",
+  "verification": "Final isolated full suite1072pass/1 Chrome local CSS ERR_NO_BUFFER_SPACE transport failure; isolated popup390/1440 retry2PASS.42targeted recovery/statement/refresh PASS. Independent exact506analyst assessment and3resilience-card reconstruction; original dates preserved. Unchanged471JS/33news/305Today/45paths/11quote stress retained. Prior1072fullPython clean at9a8367f.8protectedPNGs unchanged.",
   "screener_scores": "dated 2026-07-25 snapshot; separate from refreshed prices and fundamentals",
   "methods": "docs/BRIEF-METHODS.md",
   "notes": [
@@ -25,7 +25,7 @@
     "One-session breadth is derived from retained shared-session histories, with a common cohort and explicit exclusions. Five-session and monthly comparisons keep their own periods.",
     "Saved names do not imply holdings. Entered shares, costs, notes and review checkpoints remain browser/origin-local without cloud/device sync or broker reconciliation.",
     "Final controlled phone/desktop and injected-quote evidence is recorded separately from manual CUA, physical devices, client comprehension, actual provider availability and open-market cadence.",
-    "Dated analyst recovery restores only missing cached input tables with original acquisition dates; healthy data is not overwritten. Hosted refresh outcomes are independently verified.",
+    "Dated analyst recovery restores missing cached input tables and fields with original acquisition dates; healthy data is not overwritten. Hosted refresh outcomes are independently verified.",
     "Parent metadata commit is above tested source identity. Immutable UI/public hashes use exact canonical Git blob bytes; independently refreshed quotes must not regress."
   ],
   "backup": "backup.html",

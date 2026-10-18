@@ -393,8 +393,8 @@ def refresh(data_root, work_root, cache_root, *, source_snapshot=None, offline=F
         from smartoptions.relate import build as relate_build
         from smartoptions.export import build as export_build
         if not offline:
-            from smartoptions.brief.statements import recover_analyst_observations
-            receipt['stages']['statement_recovery'] = recover_analyst_observations(
+            from smartoptions.brief.statements import recover_statement_observations
+            receipt['stages']['statement_recovery'] = recover_statement_observations(
                 cache_root, ROOT / 'fixtures/analyst-statements-20261018.json')
         from smartoptions.brief.__main__ import build as brief_build
         def capital_stage():

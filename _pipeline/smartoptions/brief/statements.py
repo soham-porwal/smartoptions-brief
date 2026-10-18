@@ -17,10 +17,10 @@ _lock = threading.Lock()
 _next_request = 0.0
 
 
-def recover_analyst_observations(cache_dir, seed_path):
+def recover_statement_observations(cache_dir, seed_path):
     """Restore missing CI cache entries from dated, already accepted observations.
 
-    Healthy cache entries are never replaced. This is a last-good input recovery,
+    Existing observed values are never replaced. This is a last-good input recovery,
     not a new acquisition: source periods and retrieval clocks stay unchanged.
     """
     seed_path = Path(seed_path)
@@ -34,18 +34,29 @@ def recover_analyst_observations(cache_dir, seed_path):
         raise ValueError('Invalid statement recovery input')
     # Validate every path and record before any write. Never accept arbitrary cache files.
     for name, rec in records.items():
-        if (not re.fullmatch(r'[A-Z0-9.\^-]{1,16}\.(eps_revisions|earnings_estimate)\.json', name)
+        allowed = '|'.join(STATEMENTS)
+        if (not re.fullmatch(r'[A-Z0-9.\^-]{1,16}\.(' + allowed + r')\.json', name)
                 or not isinstance(rec, dict) or not isinstance(rec.get('data'), dict)
-                or not rec['data'] or not parsed(rec.get('retrieved_at'))):
-            raise ValueError('Invalid dated analyst recovery record')
+                or not rec['data'] or not all(isinstance(fields, dict) for fields in rec['data'].values())
+                or not parsed(rec.get('retrieved_at'))):
+            raise ValueError('Invalid dated statement recovery record')
     restored = 0
     for name, rec in records.items():
         path = Path(cache_dir) / name
         current = load_json(path, {}) if path.exists() else {}
-        if current.get('data'):
+        merged = {period: dict(fields) for period, fields in (current.get('data') or {}).items()}
+        added = 0
+        for period, fields in rec['data'].items():
+            for field, value in fields.items():
+                if value is not None and merged.setdefault(period, {}).get(field) is None:
+                    merged[period][field] = value
+                    added += 1
+        if not added:
             continue
-        write_json(path, dict(data=rec['data'], retrieved_at=rec['retrieved_at'], status='retained',
-                             error=None, retention_reason='Restored prior accepted analyst observation after missing CI cache; original periods and acquisition date retained'))
+        dates = [x for x in [current.get('retrieved_at'), rec['retrieved_at']] if parsed(x)]
+        original = min(dates, key=parsed)
+        write_json(path, dict(current, data=merged, retrieved_at=original, status='retained',
+                             retention_reason='Restored missing prior accepted statement fields; original periods and oldest acquisition date retained'))
         restored += 1
     event('brief.statements.recovery', 'dated analyst inputs', 'WARN' if restored else 'OK',
           'Original acquisition dates preserved; healthy cache not replaced', restored)

@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261018-r17-live-recovery",
-  "built_at": "2026-10-18T16:19:51.725289+00:00",
-  "source_base": "4f4bc194206f5aabdf3a60ee172e2421f7f00a3e",
+  "release_id": "brief-client-20261018-r18-live-recovery",
+  "built_at": "2026-10-18T16:37:16.033012+00:00",
+  "source_base": "ef05e0d4f61c447d3e0840c15e2a038f237c9182",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -300,8 +300,8 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "cf2c014cefcc2d162e3ab21f1090c20d1a83132b92e742b3764f3d003e348357",
-      "bytes": 4445
+      "sha256": "291d61d640ff6ac101a7dfcffc566590d65d6f5562ce1be299d874b53aa43712",
+      "bytes": 4430
     }
   },
   "data_at_publication": {
