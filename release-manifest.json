@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261018-r23-clear-responsive",
-  "built_at": "2026-10-18T20:14:55.629609+00:00",
-  "source_base": "f2100123331a7520ecc136aa074d949ec8cfd25f",
+  "release_id": "brief-client-20261018-r24-clear-responsive",
+  "built_at": "2026-10-18T20:38:35.077685+00:00",
+  "source_base": "c39b2df832c5894c96faf69264a664c421460253",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -32,7 +32,7 @@
       "bytes": 8355
     },
     "chat-popup.js": {
-      "sha256": "0425f604349f78495ff55d3e09863b6c74e8b4fc7fa8d4a82a8ce540a9ed8323",
+      "sha256": "89d566a2ee53d41ce150a594bf2a8a23228d2db4bd8ac741a2ff1c48cd7b7fe1",
       "bytes": 24035
     },
     "chat/actions.js": {
@@ -176,7 +176,7 @@
       "bytes": 11704
     },
     "index.html": {
-      "sha256": "4e3e451ee79508f75a1523682a2377349996e339547ec863e52ad464cd7c0851",
+      "sha256": "6773957a28f27dde41eeb574ef615c30c6381b37ba09d7d7a61975a624a3371c",
       "bytes": 2127
     },
     "intelligence.css": {
@@ -212,12 +212,12 @@
       "bytes": 6484
     },
     "main.css": {
-      "sha256": "afe6e7089dbff6e91e99a4c37bf54c6716e177c057cbf6d73ba9c3728c62419d",
-      "bytes": 30851
+      "sha256": "a933f3505e99e44e1a99e15c7954e7bb570d37f8a00c80d4ac708f3b844c88a3",
+      "bytes": 31614
     },
     "main.js": {
-      "sha256": "3c89643e23aaca8677b54b2966fa5954ae3ffcfe4f4f72ca5e353439e5de5f1a",
-      "bytes": 217980
+      "sha256": "678dc978b8df5b1a503c0309557689a02ad73af741c123d1a14ab8128073dbdb",
+      "bytes": 218130
     },
     "money-flow.css": {
       "sha256": "ddef742bb34f0216e5ecfbdcb9b3116ddbdc99abe8cfe13072fd7ad503c5e737",
@@ -300,8 +300,8 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "7c67cf9dee7af91ef887f01490032ef64a046eb4f44c48c5d5f8373a547deca0",
-      "bytes": 5660
+      "sha256": "b3ab3dae0f6d42dcb80af9e4f5a23324ffe813f231b5ea8608277eb33637c578",
+      "bytes": 6162
     }
   },
   "data_at_publication": {

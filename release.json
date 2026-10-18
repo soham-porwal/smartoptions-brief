@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261018-r23-clear-responsive",
+  "release_id": "brief-client-20261018-r24-clear-responsive",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-18T20:14:55.629609+00:00",
-  "source_commit": "f2100123331a7520ecc136aa074d949ec8cfd25f",
+  "built_at": "2026-10-18T20:38:35.077685+00:00",
+  "source_commit": "c39b2df832c5894c96faf69264a664c421460253",
   "data_session": "2026-10-16",
   "tickers": 509,
   "current_constituents": 503,
@@ -12,7 +12,7 @@
   "chat": "Deterministic public facts and verified actions; private positions/notes/checkpoints excluded from remote planning and rephrasing",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
   "price_feed": "Yahoo Finance stream for up to 100 prioritized active names; one connection. Finnhub shared within-budget 120-second fallback, then the timestamped shared snapshot. Full-index breadth uses one adequately covered dated session, not an unqualified all-index tick claim.",
-  "verification": "480JS PASS,1080Python PASS in isolated source (runtime479fb44 byte-identical to final9b97c37);65responsive checks PASS at finalsource. Paired390 CPUx4 RTT150ms 1.6Mbps cold headline4693->4696ms, transfer605665->608680B (+0.50%), no eager company/history/intelligence. Worker189 investor and9stress checks plus327Today/45paths; one150ms machine-load threshold also fails baseline; six historical wording assertions likewise baseline. Parent CUA phone hierarchy, current quotes, shortlist and exact risk evidence inspected. Reference dates validated, undated IV re-requested through existing bounded provider path, source retrieval preserved, nonfinite values rejected. Hosted runtime/full/mirror proof still required. Actual cloudr22 rejected long EPS summary at AES, preserving last-good data. Final concise EPS fix passes565 company/contract/options tests including real validate_company on nonpositive bases; existing14word guard unchanged. UI/other runtime bytes unchanged from prior accepted source; corrected actual full still required.",
+  "verification": "480JS PASS,1080Python PASS in isolated source (runtime479fb44 byte-identical to final9b97c37);65responsive checks PASS at finalsource. Paired390 CPUx4 RTT150ms 1.6Mbps cold headline4693->4696ms, transfer605665->608680B (+0.50%), no eager company/history/intelligence. Worker189 investor and9stress checks plus327Today/45paths; one150ms machine-load threshold also fails baseline; six historical wording assertions likewise baseline. Parent CUA phone hierarchy, current quotes, shortlist and exact risk evidence inspected. Reference dates validated, undated IV re-requested through existing bounded provider path, source retrieval preserved, nonfinite values rejected. Hosted runtime/full/mirror proof still required. Actual cloudr22 rejected long EPS summary at AES, preserving last-good data. Final concise EPS fix passes565 company/contract/options tests including real validate_company on nonpositive bases; existing14word guard unchanged. UI/other runtime bytes unchanged from prior accepted source; corrected actual full still required. Final UI-only phone pass:480JS at exact c39b2df including explicit unpriced-premium guard;65responsive at23b67d1 and actual sourced-row390/1440 leg-layout probe passed before only objective wording/test change. Parent inspected readable two-leg groups. Runtime tree exactly f210012: actual full39162587684/client39163234392/news39163483451/client39163891895 allsuccess.70datedIV/EPS/Decimal/current1028member53macro/sourceclocks PASS. No new provider/full refresh needed for final UI-only publication.",
   "screener_scores": "dated 2026-07-25 snapshot; separate from refreshed prices and fundamentals",
   "methods": "docs/BRIEF-METHODS.md",
   "notes": [
