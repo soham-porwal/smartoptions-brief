@@ -507,7 +507,7 @@
   const doc = root.document; if (!doc) return;
 
   /* ------------------------------------------------------------ page */
-  const ASSET_V = 'client-20261018-classy1';
+  const ASSET_V = 'client-20261018-classy2';
   const Live = root.SmartOptionsLive;
   const S = root.__soMainState = {core: null, brief: null, rel: null, rowMap: new Map(), slots: [], view: null, chart: null, company: {}, onQuote: null};
   const $ = s => doc.querySelector(s);
@@ -736,7 +736,7 @@
   function incomeContext() {
     const t=S.incomeTicker,r=row(t);if(!r)return '<p>Choose an entered, followed or shortlisted company, or use company search.</p>';
     const d=delayedIv(r),cell=v=>v==null?'not returned':esc(v);
-    const legs=d.kind==='dated'&&d.legs.length?`<div class="tablewrap"><table><thead><tr><th>Leg</th><th class="n">Strike</th><th class="n">IV</th><th class="n">Bid / ask</th><th class="n">Open interest</th><th>Last trade (that contract only)</th></tr></thead><tbody>${d.legs.map(q=>`<tr><td>${esc(q.leg)}</td><td class="n">${cell(q.strike)}</td><td class="n">${isNum(q.iv_pct)?q.iv_pct.toFixed(1)+'%':'not returned'}</td><td class="n">${cell(q.bid)} / ${cell(q.ask)}</td><td class="n">${cell(q.open_interest)}</td><td>${q.last_trade_utc?esc(q.last_trade_utc.slice(0,16).replace('T',' '))+' UTC':'not returned'}</td></tr>`).join('')}</tbody></table></div>`:'';
+    const legs=d.kind==='dated'&&d.legs.length?`<div class="tablewrap"><table class="iv-context"><thead><tr><th>Leg</th><th class="n">Strike</th><th class="n">IV</th><th class="n">Bid / ask</th><th class="n">Open interest</th><th>Last trade (that contract only)</th></tr></thead><tbody>${d.legs.map(q=>`<tr><td data-label="Leg">${esc(q.leg)}</td><td class="n" data-label="Strike">${cell(q.strike)}</td><td class="n" data-label="IV">${isNum(q.iv_pct)?q.iv_pct.toFixed(1)+'%':'not returned'}</td><td class="n" data-label="Bid / ask">${cell(q.bid)} / ${cell(q.ask)}</td><td class="n" data-label="Open interest">${cell(q.open_interest)}</td><td data-label="Last trade (UTC)">${q.last_trade_utc?esc(q.last_trade_utc.slice(0,16).replace('T',' '))+' UTC':'not returned'}</td></tr>`).join('')}</tbody></table></div>`:'';
     return `<p><b>${esc(t)}</b> · ${r.er?`Expected earnings ${esc(r.er)} (${esc(r.ert||'timing unknown')}). An expiry across this date carries report gap risk.`:'Next earnings unavailable; calendar coverage is incomplete.'}</p><p class="dim small">${d.kind==='dated'?'Delayed chain context below':'Contract pricing unavailable'}; premiums and assignment odds are not rated.</p><details><summary>Delayed IV ${d.kind==='dated'?'context':'coverage'}</summary><p>${esc(d.text)}</p>${d.kind==='dated'?`${d.spans?'<p>This expiry spans the listed earnings date, so the IV includes report risk.</p>':''}${legs}<p class="small dim">Delayed sample, not an executable quote. Bid/ask and IV are as returned at the chain retrieval; the last trade time does not date them. IV is not compared with its own history, so premium richness and income suitability are not rated.</p>`:''}</details><p><a href="#/company/${esc(t)}/options">${esc(t)} Options</a> · <a href="#/company/${esc(t)}/events">${esc(t)} Events</a></p>`;
   }
   function moversHtml() {
