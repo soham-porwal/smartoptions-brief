@@ -329,21 +329,60 @@
   }
   function CHANGE_NAMES_FALLBACK(id){return {vix:'VIX previous-session percentage change',us10y:'10-year Treasury yield change in basis points'}[id]||id;}
   const MACRO_IMPORTANCE={FOMC:3,CPI:3,PPI:3,PCE:3,NFP:3,GDP:3,EIA:1};
-  function objectiveModel(model,b,events) {
+  function objectiveModel(model,b,events,core) {
     const risk=model.signals[3].status,price=model.signals[0].status,riskComplete=model.signals[3].coverage==='complete';
     // Only a listed MAJOR macro release or an entered equity's earnings can raise Protect; minor releases stay listed only.
     const trigger=events.items.find(e=>e.kind==='macro'&&e.major===true||e.kind==='earnings'&&e.entered);
     const calendarLimit=events.complete?'Listed calendar sources cover this window.':'Calendar coverage is incomplete for this window.';
     const protectWord=risk==='high'?'High market risk':risk==='elevated'||trigger?'Elevated market/event risk':risk==='normal'&&riskComplete&&events.complete?'Low market/event risk':'Not fully assessed';
     const eligible=(b.shortlist||[]).filter(x=>['growth','profitability','valuation'].every(k=>['ok','strong','weak'].includes(x.status?.[k])));
+    const setups=eligible.map(x=>({t:x.t,...researchSetup(x,core?.rows?.find(r=>r.t===x.t),{session:b.asof_session,events})}));
+    const lead=setups.find(x=>x.setup==='pullback')||setups.find(x=>x.concerns.length)||setups.find(x=>x.setup!=='unknown');
+    const incomeWord=risk==='high'||risk==='elevated'||price==='adverse'?'Downside first':trigger?'Event-sensitive research':price==='supportive'&&risk==='normal'&&riskComplete?'Research covered calls selectively':'Selective covered-call research';
+    const incomeSummary=risk==='high'||price==='adverse'?'Selling calls leaves share downside; wait for the market and holding thesis to stabilize.':trigger?`${trigger.title} falls inside this ${events.days}-calendar-day window; check whether an expiry crosses it.`:risk==='elevated'?'Elevated market risk: research calls only on shares you would keep through a decline, at a sale price you would accept.':price==='supportive'?'An uptrend supports researching calls on shares you would keep, only at an exit price you would accept.':'Mixed or unconfirmed trend: research calls only on shares you would keep through a decline, at an acceptable sale price.';
     return [
-      {id:'protect',title:'Protect',word:protectWord,summary:trigger?`${trigger.title} is listed in this ${events.days}-calendar-day window.`:risk==='elevated'||risk==='high'?model.signals[3].qty:`No major release or entered-equity earnings is listed in this ${events.days}-calendar-day window.`,limit:'Options positions are not covered. '+calendarLimit,target:'my-risk'},
-      {id:'income',title:'Income',word:'Not rated — contract pricing unavailable',summary:(trigger?`${trigger.title} is listed in this ${events.days}-calendar-day window. `:'')+'Check current contracts and events before selling premium.',limit:'VIX and delayed ATM IV do not establish premium quality or personal suitability.',target:'income'},
-      {id:'growth',title:'Growth',word:risk==='high'||price==='adverse'?'Wait — review conditions first':eligible.length?'Selective research':'Not rated — company evidence incomplete',summary:`${eligible.length} eligible research cases; retained statements keep their reporting periods.`,limit:model.coverage==='Coverage incomplete'?'Wider market evidence is incomplete; this list does not establish favorable timing.':'Research eligibility does not establish favorable timing or allocation.',target:'opportunity'}];
+      {id:'protect',title:'Protect',word:protectWord,summary:(trigger?`${trigger.title} is listed in this ${events.days}-calendar-day window. `:risk==='elevated'||risk==='high'?model.signals[3].qty+' ':`No major release or entered-equity earnings is listed in this ${events.days}-calendar-day window. `)+(risk==='high'||price==='adverse'?'Review entered-equity concentration and downside before adding exposure.':'Check entered equities against events before choosing an expiry.'),limit:'Options positions are not covered. '+calendarLimit,target:'my-risk'},
+      {id:'income',title:'Income',word:incomeWord,summary:incomeSummary,limit:'Premium quality not rated — contract pricing unavailable. '+(events.complete?'':'Calendar coverage incomplete.'),target:'income'},
+      {id:'growth',title:'Growth',word:risk==='high'||price==='adverse'?'Wait — review conditions first':eligible.length?'Selective research':'Not rated — company evidence incomplete',summary:lead?`${lead.t} — ${lead.concern.measured?lead.concern.text:lead.signal} ${lead.wait}`:'Business quality alone does not confirm entry timing; inspect dated trend and valuation before adding exposure.',limit:model.coverage==='Coverage incomplete'?'Wider market evidence is incomplete; this list does not establish favorable timing.':'Research eligibility does not establish favorable timing or allocation.',target:'opportunity'}];
   }
-  function researchCategory(x,eventWatch) {
+  function researchCategory(x,eventWatch,setup) {
     const s=x.status||{},required=['growth','profitability','valuation'].every(k=>['strong','ok','weak'].includes(s[k]));
-    return (required&&['growth','profitability','cash','resilience'].filter(k=>s[k]==='strong').length>=2&&s.resilience!=='weak'?'Quality research':'Research watch')+(eventWatch?' · Event watch':'');
+    return (required&&['growth','profitability','cash','resilience'].filter(k=>s[k]==='strong').length>=2&&!['growth','profitability','cash','resilience'].some(k=>s[k]==='weak')?'Quality research':'Research watch')+(setup?' · '+setup.label:'')+(eventWatch?' · Event watch':'');
+  }
+  // One completed-session setup/concern model for cards, dossiers, evidence and public chat.
+  // core.spark is explicitly the last <=63 adjusted closes. Never mix it with live/unadjusted prices,
+  // fill gaps, infer quarterly SPY performance, or reuse the historical screener's technical labels.
+  function researchSetup(short,r,opts) {
+    opts=opts||{};const c=opts.company,cards=c?.cards||{},session=opts.session||r?.pxd;
+    const concerns=[],metrics=[],add=(kind,text,ms,wait,card)=>concerns.push({kind,text,metrics:ms||[],wait,card:card||null,measured:true});
+    const ct=short?.counter?.text||cards.counter?.line,cm=short?.counter?.metrics||cards.counter?.metrics||[];
+    const measured=ct&&!/no weak area|no contrary|no counterargument|not available|unavailable/i.test(ct);
+    const weak=CARD_ORDER.slice(0,6).find(k=>(short?.status?.[k]||cards[k]?.status)==='weak');
+    if(measured)add('fundamental',ct,cm,'Wait for the weak business measure to improve in a new report.','counter');
+    else if(weak)add('fundamental',`${CARD_NAME[weak]}: ${cards[weak]?.line||'rated weak in the dated business assessment.'}`,cards[weak]?.metrics||[],`Watch the next ${CARD_NAME[weak].toLowerCase()} report before treating the business case as repaired.`,weak);
+    const validDate=/^\d{4}-\d{2}-\d{2}$/.test(session||'')&&r?.pxd===session;
+    const samples=r?.spark,usable=validDate&&r?.st?.price==='ok'&&Array.isArray(samples)&&samples.length>=50&&samples.length<=63&&samples.every(v=>isNum(v)&&v>0);
+    const metric=(label,value,unit,period,note)=>({label,value,unit,period,asof:session,source:'Yahoo Finance via yfinance · retained core.json',source_url:`https://finance.yahoo.com/quote/${encodeURIComponent(r?.t||short?.t||'')}/history/`,note});
+    let setup='unknown',label='Timing unconfirmed',wait='Wait for comparable completed-session trend evidence.',gap=null;
+    if(usable){
+      const close=samples[samples.length-1],avg=samples.slice(-50).reduce((a,v)=>a+v,0)/50;gap=100*(close/avg-1);
+      metrics.push(metric('Adjusted close',close,'USD/share',session,'Last retained adjusted close; not a live price.'),metric('50-session adjusted average',avg,'USD/share',`50 sessions to ${session}`,'Mean of last 50 core.spark values; adjusted prices, rounded to cents in the export. No 200-session or quarterly relative-performance inference.'));
+      metrics.push(metric(`Adjusted close distance ${gap<0?'below':'above'} 50-session average`,Math.abs(gap),'%',`50 sessions to ${session}`,'Absolute value of 100 × (last adjusted close / mean of last 50 adjusted closes − 1); the label records below or above.'));
+      if(gap<0){setup='pullback';label='Pullback — wait';wait='Watch for a completed close back above that average; a falling price alone is not a bargain.';add('technical',`Technical: adjusted close ${Math.abs(gap).toFixed(1)}% below its 50-session average.`,metrics,wait);}
+      else if(gap>=8){setup='extended';label='Extended — watch';wait='Wait for the gap to narrow or for a new business report to justify the price.';add('technical',`Technical: adjusted close ${gap.toFixed(1)}% above its 50-session average; extension adds entry risk.`,metrics,wait);}
+      else{setup='trend';label='Trend watch';wait='Watch whether completed closes hold above that average; timing remains unconfirmed.';}
+    }
+    if(validDate&&r?.st?.price==='ok'&&r?.st?.pe_forward==='ok'&&isNum(r.pef)&&r.pef>0&&isNum(r.pef_sec_rel)&&r.pef_sec_rel>=1.25){
+      const ms=[metric('Forward P/E / sector median',r.pef_sec_rel,'x',session,'Dated forward P/E divided by broad-sector median; not own-history valuation or a curated peer group.'),metric('Forward P/E',r.pef,'x',session,'Uses analyst earnings estimates at the retained close; not a live valuation.')];
+      add('valuation',`Valuation: forward P/E ${r.pef_sec_rel.toFixed(2)}× its sector median.`,ms,'Watch whether earnings estimates catch up or the valuation premium narrows.');
+      if(setup==='trend'){label='Valuation watch';wait=concerns[concerns.length-1].wait;}
+    }
+    const event=(opts.events?.items||[]).find(e=>e.kind==='earnings'&&e.t===(r?.t||short?.t));
+    const eventText=event?`${event.title} on ${event.date||String(event.when).slice(0,10)} falls inside the ${opts.events.days}-day window; an expiry across it carries gap risk.`:'';
+    const concern=concerns[0]||{kind:'coverage',text:'No adverse business or price signal established by these limited inputs; timing is not cleared.',metrics:[],measured:false,card:null};
+    const eventMetrics=event?[{label:event.title+` · ${opts.events.days}-day horizon`,value:event.date||event.when,unit:'date',period:`${opts.events.today||'selected start'} to ${opts.events.end||'selected end'}`,asof:event.retrieved||'',source:event.source||r?.ers||'Retained earnings calendar',note:'Provider next earnings date; event risk, not a fundamental objection. Calendar completeness is not implied.'}]:[];
+    const signal=gap===null?'Comparable trend evidence unavailable.':`Technical: adjusted close ${Math.abs(gap).toFixed(1)}% ${gap<0?'below':'above'} its 50-session average.`;
+    return {t:r?.t||short?.t,setup,label,gap,signal,session,concerns,concern,metrics,wait:concerns[0]?.wait||wait,event:eventText,eventMetrics,category:researchCategory(short||{status:Object.fromEntries(Object.entries(cards).map(([k,v])=>[k,v.status]))},!!event,{label})};
   }
   // Today's market reading from dated comparable changes. Never a directional word without both observations.
   function marketRead(b) {
@@ -374,20 +413,16 @@
   const CARD_ORDER = ['growth', 'profitability', 'cash', 'resilience', 'valuation', 'expectations', 'counter'];
   const CARD_Q = {growth: 'Is the business growing?', profitability: 'Is it profitable, and is that improving?', cash: 'Does profit turn into cash?', resilience: 'Can it carry its obligations?', valuation: 'What are you paying for it?', expectations: 'Are estimates being revised up or down?', counter: 'What is the strongest measured objection?'};
   const CARD_NAME = {growth: 'Growth', profitability: 'Profitability', cash: 'Cash generation', resilience: 'Financial resilience', valuation: 'Valuation', expectations: 'Estimate revisions', counter: 'Counterargument'};
-  // Research case: strongest positive, strongest MEASURED objection, coverage limit, next event. Earnings are an event, never the objection.
-  function caseFor(c, short, r) {
+  // Research case shares its objection with the setup model; business coverage stays separate.
+  function caseFor(c, short, r, opts) {
     const cards = (c && c.cards) || {}, live = k => cards[k] && cards[k].status !== 'unavailable';
     const strong = CARD_ORDER.slice(0, 6).filter(k => cards[k] && cards[k].status === 'strong');
     const positive = short && short.why && short.why[0] ? {text: short.why[0].text, card: null} : strong.length ? {text: cards[strong[0]].line, card: strong[0]} : null;
-    const counter = cards.counter, measured = counter && counter.status !== 'unavailable' && !/no weak area/i.test(counter.line) && !/^not available/i.test(counter.line);
-    const weak = CARD_ORDER.slice(0, 6).find(k => cards[k] && cards[k].status === 'weak');
     const missing = CARD_ORDER.slice(0, 6).filter(k => !live(k)).map(k => CARD_NAME[k].toLowerCase());
-    let objection;
-    if (measured) objection = {text: counter.line, card: 'counter', measured: true};
-    else if (weak) objection = {text: `${CARD_NAME[weak]}: ${cards[weak].line}`, card: weak, measured: true};
-    else objection = {text: 'No contrary signal in the measured dimensions' + (missing.length ? `; ${listJoin(missing)} ${missing.length > 1 ? 'remain' : 'remains'} unmeasured.` : '; that is not an all-clear.'), card: null, measured: false};
+    const setup=researchSetup(short,r,{...opts,company:c});
+    const objection=setup.concern;
     const ert = r && (r.ert === 'BMO' ? ' before the open' : r.ert === 'AMC' ? ' after the close' : ', time not confirmed');
-    return {positive, objection, coverage: missing, event: r && r.er ? `Earnings expected ${shortDate(r.er)}${ert} (provider date)` : 'No upcoming earnings date supplied'};
+    return {positive, objection, setup, coverage: missing, event: r && r.er ? `Earnings expected ${shortDate(r.er)}${ert} (provider date)` : 'No upcoming earnings date supplied'};
   }
   // Events inside an N-day ET horizon from the retained calendars. Date-only items stay dates; coverage stays explicit.
   function eventsInHorizon(core, b, nowMs, days, opts) {
@@ -443,13 +478,13 @@
     return hi > lo ? {pos: 100 * (cur.px - lo) / (hi - lo), lo, hi} : null;
   }
 
-  const API = {researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
+  const API = {researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
   if (typeof module !== 'undefined' && module.exports) { module.exports = API; return; }
   root.SmartOptionsMain = API;
   const doc = root.document; if (!doc) return;
 
   /* ------------------------------------------------------------ page */
-  const ASSET_V = 'client-20261018r16-news';
+  const ASSET_V = 'client-20261018-fit1';
   const Live = root.SmartOptionsLive;
   const S = root.__soMainState = {core: null, brief: null, rel: null, rowMap: new Map(), slots: [], view: null, chart: null, company: {}, onQuote: null};
   const $ = s => doc.querySelector(s);
@@ -647,19 +682,16 @@
       <span class="t-title">${esc(a.title)}</span><span class="t-word">${esc(a.word)}</span><span class="t-qty">${esc(a.qty)}</span>${a.change ? `<span class="t-chg">${esc(a.change)}</span>` : ''}<span class="t-basis">${esc(a.basis)}</span></button>`;
   }
   function shortCard(x) {
-    const r = row(x.t), er = r && r.er ? `Earnings ${shortDate(r.er)}` : '', st = x.status || {};
-    const miss = CARD_ORDER.slice(0, 6).filter(k => st[k] === 'unavailable').map(k => CARD_NAME[k].toLowerCase()), weak = CARD_ORDER.slice(0, 6).find(k => st[k] === 'weak');
-    const ct = (x.counter && x.counter.text) || '', measured = ct && !/no weak area/i.test(ct) && !/^not available/i.test(ct);
-    const obj = measured ? ct : weak ? `${CARD_NAME[weak]} is rated weak in the measured data.` : 'No contrary signal in the measured dimensions' + (miss.length ? `; ${listJoin(miss)} unmeasured.` : '; not an all-clear.');
-    const eventWatch=horizonEvents(S.horizon||7).items.some(e=>e.t===x.t),metrics=(x.why||[]).flatMap(w=>w.metrics||[]),retained=metrics.some(m=>/expired|retained/i.test(m.note||'')),periods=[...new Set(metrics.map(m=>m.period))];
-    return `<article data-short="${esc(x.t)}"><p class="tag" data-short-category="${esc(x.t)}">${esc(researchCategory(x,eventWatch))}</p><h3><a href="#/company/${esc(x.t)}">${esc(x.t)}</a> <span class="dim">${esc(x.name)} · ${esc(x.sector)}</span>
+    const setup=shortSetup(x),why=((x.why||[])[0]?.text||'Inspect dated company evidence.').replace(/, provider quarter label [\d-]+\.?/i,'.');
+    return `<article data-short="${esc(x.t)}"><p class="tag" data-short-category="${esc(x.t)}">${esc(setup.category)}</p><h3><a href="#/company/${esc(x.t)}">${esc(x.t)}</a> <span class="dim">${esc(x.name)} · ${esc(x.sector)}</span>
         <span class="px">${liveSpan(x.t, 'price')} <span class="chg">${liveSpan(x.t, 'chg')}</span></span></h3>
-      <p class="why"><span class="lbl">Why look</span> ${esc((x.why && x.why[0] && x.why[0].text) || 'Inspect the dated company evidence.')} ${esc(x.why?.[1]?.text||'')}</p>
-      <p class="obj"><span class="lbl">Objection</span> ${esc(obj)}</p>
-      <p class="dim small">${esc(periods.join('; ')||'Reporting period unavailable')}. ${retained?'Retained statement cache expired; original reporting periods retained.':'Statements retain their original reporting periods.'}</p>
-      <p class="dim small">${er ? esc(er) + ' (event, not an objection) · ' : ''}${slot('idea-' + x.t, ideaSlot(x.t))} ${evBtn({kind: 'shortlist', t: x.t}, 'Evidence')}</p>
-      <p class="links"><a href="#/company/${esc(x.t)}">Open dossier →</a> <a class="go" href="${esc(companyHref(x.t, x.sector))}">Compare with SPY and ${esc(x.sector)}</a></p></article>`;
+      <p class="why"><span class="lbl">Why look</span> ${esc(why)}</p>
+      <p class="obj" data-short-caution="${esc(x.t)}">${shortCaution(setup)}</p>
+      <p class="links">${evBtn({kind: 'shortlist', t: x.t}, 'Case, caution & dated evidence')} <a href="#/company/${esc(x.t)}">Open dossier →</a></p></article>`;
   }
+  function shortSetup(x){return researchSetup(x,row(x.t),{session:S.brief.asof_session,events:horizonEvents(S.horizon||7)});}
+  function shortCaution(s){return `<span class="lbl">${s.concern.measured?'Caution':'Watch'}</span> ${esc(s.concern.measured?s.concern.text:s.signal)} ${esc(s.wait)}${s.event?` <span class="small">${esc(s.event)}</span>`:''}`;}
+  function setupEvidence(s){return `<p class="lead">${esc(s.category)}</p><p><a href="#/company/${esc(s.t)}/drivers">${esc(s.t)} Chart &amp; drivers</a></p><p>Completed session ${esc(s.session||'unavailable')}; live quotes do not change this setup. Business ratings and entry timing answer different questions.</p>${s.concerns.length?s.concerns.map(c=>`<p>${c.kind==='fundamental'?'<b>Business evidence:</b> ':''}${esc(c.text)}</p><p>${esc(c.wait)}</p>${metricTable(c.metrics,true,s.t)}`).join(''):`<p>${esc(s.concern.text)} ${esc(s.wait)}</p>${metricTable(s.metrics,true,s.t)}`}<p>${esc(s.event||'No company earnings listed inside the selected horizon; calendar completeness is not implied.')}</p><details><summary>Setup method and limits</summary><p>Below the 50-session adjusted average: pullback watch. At least 8% above it: extension watch. Otherwise: trend watch. Forward P/E at least 1.25× its broad-sector median adds valuation watch. These are research thresholds, not forecasts, buy/sell rules or RSI/DMI/MACD signals. Missing or mismatched-session inputs leave timing unconfirmed. Adjusted closes can differ from the unadjusted company chart; the full quarterly relative comparison is measured only when that chart opens.</p></details>`;}
   const CHANGE_NAMES={spy_1d:'SPY',vix:'VIX',us10y:'10-year Treasury',dxy:'DXY',breadth_50_1d:'Breadth above 50-session average'};
   function comparisonText(c) {
     if(!c.available)return c.reason;
@@ -672,15 +704,15 @@
     const up=c.change>0,flat=Math.abs(c.change)<1e-8;
     return c.id==='spy_1d'?'Index movement describes the session; it is not an opportunity ranking.':c.id==='vix'?`Expected near-term market volatility ${flat?'was unchanged':up?'increased':'decreased'}; this is not single-name IV.`:c.id==='us10y'?(Math.abs(c.change)<5?'A move under 5bp is treated as little changed; no clear rate pressure or relief.':`${up?'Higher yields tighten':'Lower yields ease'} the discount-rate channel, all else equal.`):c.id==='dxy'?`${flat?'An unchanged dollar leaves':up?'A stronger dollar can weigh on':'A weaker dollar can ease'} overseas earnings translation; company exposure is not measured.`:'Same names at both endpoints; percentage-point change differs from the five-session direction.';
   }
-  function objectivesHtml() {return objectiveModel(todayModel(S.brief,S.core),S.brief,horizonEvents(S.horizon||7)).map(x=>`<article data-objective="${x.id}"><h3>${x.title}</h3><p class="objective-word">${esc(x.word)}</p><p>${esc(x.summary)}</p><p class="dim small">${esc(x.limit)}</p><p>${evBtn({kind:'objective',id:x.id})} <button data-jump="${x.target}">Investigate ${x.title.toLowerCase()}</button></p></article>`).join('');}
+  function objectivesHtml() {return objectiveModel(todayModel(S.brief,S.core),S.brief,horizonEvents(S.horizon||7),S.core).map(x=>`<article data-objective="${x.id}"><h3>${x.title}</h3><p class="objective-word">${esc(x.word)}</p><p>${esc(x.summary)}</p><p class="dim small">${esc(x.limit)}</p><p>${evBtn({kind:'objective',id:x.id})} <button data-jump="${x.target}">Investigate ${x.title.toLowerCase()}</button></p></article>`).join('');}
   function incomeHtml() {
     const names=[...new Set([...enteredNames(),...WL().get(),...(S.brief.shortlist||[]).map(x=>x.t)])].filter(t=>row(t));
-    return `<p>Not rated — contract pricing unavailable. Check current contracts and events before selling premium.</p><p class="dim">Options positions, priced chains, liquidity and IV history are not covered here. A market VIX reading does not prove attractive premiums.</p><label for="income-company">Company to investigate</label><select id="income-company"><option value="">Choose a company</option>${names.map(t=>`<option value="${esc(t)}" ${S.incomeTicker===t?'selected':''}>${esc(t)}</option>`).join('')}</select><div id="income-context">${incomeContext()}</div><button data-personal="search" data-income-search>Find another company</button>`;
+    return `<label for="income-company">Company for contract and event research</label><select id="income-company"><option value="">Choose a company</option>${names.map(t=>`<option value="${esc(t)}" ${S.incomeTicker===t?'selected':''}>${esc(t)}</option>`).join('')}</select><div id="income-context">${incomeContext()}</div><button data-personal="search" data-income-search>Find another company</button>`;
   }
   function incomeContext() {
     const t=S.incomeTicker,r=row(t);if(!r)return '<p>Choose an entered, followed or shortlisted company, or use company search.</p>';
     const sample=r.st?.atm_iv==='ok'&&isNum(r.iv);
-    return `<p><b>${esc(t)}</b> · ${r.er?`Expected earnings ${esc(r.er)} (${esc(r.ert||'timing unknown')}). Selling premium across this event needs an explicit risk decision.`:'Next earnings unavailable; calendar coverage is incomplete.'}</p><p>${sample?'A delayed ATM sample is retained, but its own retrieval timestamp is not supplied in core. The number is withheld here; an analyst refresh timestamp cannot establish IV freshness. Not a contract quote or validated surface.':'Delayed ATM IV unavailable for this company; realized volatility is not substituted.'}</p><p><a href="#/company/${esc(t)}/options">${esc(t)} Options</a> · <a href="#/company/${esc(t)}/events">${esc(t)} Events</a></p>`;
+    return `<p><b>${esc(t)}</b> · ${r.er?`Expected earnings ${esc(r.er)} (${esc(r.ert||'timing unknown')}). An expiry across this date carries report gap risk.`:'Next earnings unavailable; calendar coverage is incomplete.'}</p><p class="dim small">Contract pricing unavailable; premiums and assignment odds are not rated.</p><details><summary>Delayed IV coverage</summary><p>${sample?'A delayed ATM sample is retained, but its own retrieval timestamp is not supplied in core. The number is withheld here; an analyst refresh timestamp cannot establish IV freshness. Not a contract quote or validated surface.':'Delayed ATM IV unavailable for this company; realized volatility is not substituted.'}</p></details><p><a href="#/company/${esc(t)}/options">${esc(t)} Options</a> · <a href="#/company/${esc(t)}/events">${esc(t)} Events</a></p>`;
   }
   function moversHtml() {
     const rows=S.core.rows.filter(r=>r.sp500_member!==false&&r.pxd===S.brief.asof_session),returns=rows.filter(r=>isNum(r.d1)),volumes=rows.filter(r=>r.st?.vol_ratio_20d==='ok'&&isNum(r.vr)&&r.vr>=0).sort((a,b)=>b.vr-a.vr).slice(0,3);
@@ -705,7 +737,7 @@
       <section><h2>What does this mean for me today?</h2><p class="dim small">Investigation conditions, not a personal recommendation.</p><div id="objectives" class="objective-grid">${objectivesHtml()}</div></section>
       <section id="my-risk"><h2>My risk</h2><p>Equities entered: ${enteredNames().length} · companies followed: ${WL().get().length}. Options positions are not covered.</p><h3 id="ahead-h">Upcoming risks</h3><div id="ahead">${aheadHtml()}</div><section id="for-you" class="for-you" aria-label="For you"></section></section>
       <section id="income"><h2>Income</h2>${incomeHtml()}</section>
-      <section id="opportunity" class="research"><h2>Research shortlist</h2><p>${short.length} eligible companies. Measured fundamentals and dated signals order research; movement alone is not a thesis.</p><p class="dim small">Retained statements keep their fiscal periods. Own-history valuation and revisions may be unavailable.</p><div class="ideas">${short.map(shortCard).join('')||'<p>No company met the coverage rule. <a href="#/companies">Inspect company coverage</a>.</p>'}</div><a href="#/companies?mode=shortlist">All eligible company evidence</a></section>
+      <section id="opportunity" class="research"><h2>Research shortlist</h2><p>Business quality is separate from entry timing. Watch pullbacks, extended prices and valuation premiums before adding exposure.</p><p class="dim small">Setups: completed ${esc(b.asof_session)} session, adjusted closes. Live prices above keep their own timestamps. Full statement periods, missing measures and comparisons are in each evidence sheet.</p><div class="ideas">${short.map(shortCard).join('')||'<p>No company met the coverage rule. <a href="#/companies">Inspect company coverage</a>.</p>'}</div><a href="#/companies?mode=shortlist">All eligible company evidence</a></section>
       <section id="deep-dive" class="evidence-more"><h2>Deep dive</h2><p><a href="#/companies">Companies</a> · <a href="#/macro">Macro</a> · <a href="#/explore">Compare</a> · <a href="backup.html">Expanded strategies and private tools</a></p><details><summary>Relationships and evidence to investigate</summary><div class="insights">${insightCard(concentrationInsight(S.core.rel?.vol_breadth))}${S.rel?insightCard(leadershipInsight(S.rel))+insightCard(macroInsight(S.rel,S.core)): '<p>Relationship catalog unavailable; no inferred comparison.</p>'}</div><p class="dim">${slot('live-conc',liveConcSlot)}</p></details></section></div>`;
     S.personal=root.SmartOptionsInvestor.mountToday($('#for-you'),{...investorArgs(),compact:true});S.onQuote=changed=>S.personal?.quotes(changed);
     S.news=root.SmartOptionsNews.mount($('#news-list'),{core:S.core,disclosure:$('.news-depth')});
@@ -790,9 +822,9 @@
       if(ev.id==='positioning')return {title:'S&P positioning evidence',html:`<p>Participation is directional only over the labeled five-session same cohort. Provider-cap share is not actual index attribution.</p>${changeHtml(changeItem(b,'breadth_50_5d'))}${changeHtml(changeItem(b,'eq_cap_gap_5d'))}${metricTable([...(b.positioning?.concentration?.metrics||[]),...(b.positioning?.rotation?.metrics||[])],true)}<a href="${esc(W.encodeHash({s:[{id:'eq:RSP'},{id:'eq:SPY'}],r:'6m',m:'index'}))}">Compare RSP and SPY</a>`};
     }
     if(ev.kind==='objective'){
-      const x=objectiveModel(model,b,horizonEvents(S.horizon||7)).find(x=>x.id===ev.id),h=horizonEvents(S.horizon||7);
+      const x=objectiveModel(model,b,horizonEvents(S.horizon||7),S.core).find(x=>x.id===ev.id),h=horizonEvents(S.horizon||7);
       const names=ev.id==='growth'?(b.shortlist||[]).map(x=>x.t):[...new Set([...enteredNames(),...WL().get()])];
-      return {title:x.title+' · investigation conditions',html:`<p class="lead">${esc(x.word)}</p><p>${esc(x.summary)}</p><p>${esc(x.limit)}</p><p>Equities entered: ${enteredNames().length}; companies followed: ${WL().get().length}. These are different scopes. Options positions are not covered.</p>${ev.id==='protect'?`<p>${esc(h.notes.join(' '))}</p>${model.signals.slice(2).map(s=>`<p>${esc(s.title)}: ${esc(s.word)} ${evBtn({kind:'assessment',id:s.id})}</p>`).join('')}`:''}${ev.id==='income'?'<p>No chain, liquidity, IV-history or priced contract basis supports Good/Selective/Poor income ratings. Realized volatility is not implied volatility.</p>':''}<p>Choose an exact company to investigate:</p>${names.length?names.map(t=>`<p><a href="#/company/${esc(t)}/${ev.id==='growth'?'fundamentals':ev.id==='protect'?'events':'options'}">${esc(t)} ${ev.id==='growth'?'Fundamentals':ev.id==='protect'?'Events':'Options'}</a> · <a href="#/company/${esc(t)}/drivers">Chart & drivers</a> · <a href="#/company/${esc(t)}/events">Events</a></p>`).join(''):'<p>No company selected. Use <a href="#/companies">company search</a> to choose one; no ticker is assumed.</p>'}<a href="#/macro">Macro constraints and release evidence</a>`};
+      return {title:x.title+' · investigation conditions',html:`<p class="lead">${esc(x.word)}</p><p>${esc(x.summary)}</p><p>${esc(x.limit)}</p><p>Equities entered: ${enteredNames().length}; companies followed: ${WL().get().length}. These are different scopes. Options positions are not covered.</p>${ev.id==='growth'?(b.shortlist||[]).map(n=>`<h3>${esc(n.t)}</h3>${setupEvidence(shortSetup(n))}`).join(''):`<p>${esc(h.notes.join(' '))}</p>${model.signals.filter(s=>['price_trend','risk'].includes(s.id)).map(s=>`<p>${esc(s.title)}: ${esc(s.word)} ${evBtn({kind:'assessment',id:s.id})}</p>`).join('')}`}${ev.id==='income'?'<p>No chain, liquidity, IV-history or priced contract basis supports Good/Selective/Poor premium ratings. VIX and delayed ATM IV do not establish premium quality. A covered call retains share downside and caps gains; shares must be available to cover it. Realized volatility is not implied volatility.</p>':''}<p>Choose an exact company to investigate:</p>${names.length?names.map(t=>`<p><a href="#/company/${esc(t)}/${ev.id==='growth'?'fundamentals':ev.id==='protect'?'events':'options'}">${esc(t)} ${ev.id==='growth'?'Fundamentals':ev.id==='protect'?'Events':'Options'}</a> · <a href="#/company/${esc(t)}/drivers">Chart & drivers</a> · <a href="#/company/${esc(t)}/events">Events</a></p>`).join(''):'<p>No company selected. Use <a href="#/companies">company search</a> to choose one; no ticker is assumed.</p>'}<a href="#/macro">Macro constraints and release evidence</a>`};
     }
     if (ev.kind === 'assessment') {
       const m = b.macro || {}, a = model.signals.find(x => x.id === ev.id), obj = ev.id === 'participation' ? (b.positioning && b.positioning.breadth) || m.participation : m[ev.id];
@@ -820,13 +852,21 @@
     if (ev.kind === 'shortlist') {
       const x = (b.shortlist || []).find(s => s.t === ev.t);
       if (!x) return {title: ev.t, html: '<p>Not on the current shortlist.</p>'};
-      return {title: `${x.t}: why it is on the shortlist`, html: `<ul>${x.why.map(w => `<li>${esc(w.text)}</li>`).join('')}</ul><p><b>Objection:</b> ${esc(x.counter.text)}</p>
+      return {title: `${x.t}: case and caution`, html: `${setupEvidence(shortSetup(x))}<h3>Dated business case</h3><ul>${x.why.map(w => `<li>${esc(w.text)}</li>`).join('')}</ul><p><b>Fundamental assessment only:</b> ${esc(x.counter.text)}</p>
         <p class="dim">Research score ${x.score} of 100. ${esc(x.score_basis)} The score orders the list; it is not a forecast.</p><p class="dim">Dimension status: ${CARD_ORDER.map(k => `${CARD_NAME[k]} ${esc(x.status[k])}`).join(' · ')}</p>
-        <p>Category: ${esc(researchCategory(x,horizonEvents(S.horizon||7).items.some(e=>e.t===x.t)))}. At least two strong core dimensions, measured growth/profitability/valuation and resilience not weak permit Quality research. A listed event adds Event watch; movement is not the category rule.</p><p><a href="#/company/${esc(x.t)}/fundamentals">Open ${esc(x.t)} Fundamentals</a> · <a href="#/company/${esc(x.t)}/drivers">Chart & drivers</a> · <a href="#/company/${esc(x.t)}/events">Events</a> · <a href="#/company/${esc(x.t)}/options">Options</a></p>${metricTable(x.why.flatMap(w => w.metrics).concat(x.counter.metrics || []), true,x.t)}`, ask: {intent: 'shortlist', entities: {tickers: [x.t]}}};
+        <p>At least two strong core business dimensions, measured growth/profitability/valuation and no weak core business dimension permit Quality research. This does not establish technical strength. A listed event adds Event watch.</p><p><a href="#/company/${esc(x.t)}/fundamentals">Open ${esc(x.t)} Fundamentals</a> · <a href="#/company/${esc(x.t)}/drivers">Chart & drivers</a> · <a href="${esc(companyHref(x.t,x.sector))}">Compare with SPY and sector</a> · <a href="#/company/${esc(x.t)}/events">Events</a> · <a href="#/company/${esc(x.t)}/options">Options</a></p>${metricTable(x.why.flatMap(w => w.metrics).concat(x.counter.metrics || []), true,x.t)}`, ask: {intent: 'shortlist', entities: {tickers: [x.t]}}};
+    }
+    if(ev.kind==='research'){
+      const t=ev.t,x=(b.shortlist||[]).find(x=>x.t===t),s=researchSetup(x,row(t),{company:S.company[t],session:b.asof_session,events:horizonEvents(S.horizon||7)});
+      return {title:t+' · measured case concerns',html:setupEvidence(s)+`<p><a href="#/company/${esc(t)}/drivers">${esc(t)} Chart & drivers</a> · <a href="#/company/${esc(t)}/fundamentals">Fundamentals</a> · <a href="#/company/${esc(t)}/events">Events</a></p>`};
     }
     if (ev.kind === 'card') {
       const c = S.company[ev.t], k = c && c.cards[ev.id];
       if (!k) return {title: CARD_NAME[ev.id] || 'Evidence', html: '<p>Company evidence is not loaded.</p>'};
+      if(ev.id==='counter'){
+        const s=researchSetup((b.shortlist||[]).find(x=>x.t===ev.t),row(ev.t),{company:c,session:b.asof_session,events:horizonEvents(S.horizon||7)});
+        return {title:ev.t+' · measured countercase',html:setupEvidence(s)+`<h3>Fundamental assessment only</h3><p>${esc(k.line)}</p>${metricTable(k.metrics,true)}<a href="#/company/${esc(ev.t)}/drivers">Open Chart & drivers</a>`,ask:{intent:'ticker_card',entities:{tickers:[ev.t],card:'counter'}}};
+      }
       return {title: `${ev.t} · ${CARD_NAME[ev.id]}`, html: `<p class="dim">${esc(CARD_Q[ev.id])}</p><p class="lead"><span class="st" data-status="${esc(k.status)}">${esc(k.status)}</span> ${esc(k.line)}</p>${ev.id === 'valuation' ? `<p>${valSlot(ev.t, k)()}</p><p class="dim">Peer comparison uses the broad sector median, not a curated peer group; the company's own valuation history is not available in this build.</p>` : ''}${metricTable(k.metrics, true)}${defText(CARD_NAME[ev.id])}`,
         ask: {intent: 'ticker_card', entities: {tickers: [ev.t], card: ev.id}}};
     }
@@ -1055,7 +1095,7 @@
       $('#co-head').innerHTML = `<tr><th>Company</th><th class="n">Price</th><th class="n">Day</th>${S.co.mode === 'shortlist' ? '<th>Why look · objection</th>' : ''}${S.co.cols.map(k => `<th class="n">${esc(COLS[k][0])}</th>`).join('')}<th><span class="sr">Save</span></th></tr>`;
       $('#rows').innerHTML = view.map(r => { const sx = shortSet.get(r.t);
         return `<tr><td><a href="#/company/${esc(r.t)}"><b>${esc(r.t)}</b> ${esc(r.n)}</a><div class="dim small">${esc(r.sec)}${r.sp500_member === false ? ' · not in current S&amp;P list' : ''}</div></td>
-        <td class="n">${liveSpan(r.t, 'price')}</td><td class="n chg">${liveSpan(r.t, 'chg')}</td>${S.co.mode === 'shortlist' ? `<td class="small">${esc(sx && sx.why[0] ? sx.why[0].text : '')}<div class="dim">${esc(sx ? sx.counter.text : '')}</div></td>` : ''}
+        <td class="n">${liveSpan(r.t, 'price')}</td><td class="n chg">${liveSpan(r.t, 'chg')}</td>${S.co.mode === 'shortlist' ? `<td class="small">${esc(sx && sx.why[0] ? sx.why[0].text : '')}<div class="dim">${esc(sx ? shortSetup(sx).concern.text : '')}</div></td>` : ''}
         ${S.co.cols.map(k => `<td class="n" data-column="${k}">${COLS[k][1](r,current)}</td>`).join('')}<td>${starBtn(r.t)}</td></tr>`; }).join('')
         || `<tr><td class="dim" colspan="9">${S.co.mode === 'saved' ? (st.ok ? 'No saved companies yet. Use ☆ Save on any company.' : 'Saved companies could not be read; see the note above.') : 'No match.'}</td></tr>`;
       main.querySelector('[data-page="-1"]').disabled = S.co.page === 0; main.querySelector('[data-page="1"]').disabled = S.co.page >= pages - 1;
@@ -1117,12 +1157,17 @@
     const cards = (c && c.cards) || {};
     return CARD_ORDER.map(k => { const x = cards[k];
       if (!x) return `<details class="card frow" data-card="${k}"><summary><b>${esc(CARD_Q[k])}</b> <span class="st" data-status="unavailable">unavailable</span></summary><p class="dim">Not supplied in this build.</p></details>`;
+      if(k==='counter'){
+        const s=researchSetup((S.brief.shortlist||[]).find(x=>x.t===t),row(t),{company:c,session:S.brief.asof_session,events:horizonEvents(S.horizon||7)});
+        return `<details class="card frow" data-card="counter"><summary><b>${esc(CARD_Q.counter)}</b> <span class="qty">${esc(s.concern.text)}</span></summary>${setupEvidence(s)}<p><b>Fundamental assessment only:</b> ${esc(x.line)}</p>${metricTable(x.metrics,true)}<p>${evBtn({kind:'card',t,id:'counter'},'Open evidence')}</p></details>`;
+      }
       const m = (x.metrics || []).find(y => y.value != null) || (x.metrics || [])[0];
       return `<details class="card frow" data-card="${k}"><summary><b>${esc(CARD_Q[k])}</b> <span class="st" data-status="${esc(x.status)}">${esc(x.status)}</span> <span class="qty">${k === 'valuation' ? slot('val-sum', valShort(t, x)) : esc(x.line)}</span>${m && m.period ? ` <span class="dim small">${esc(m.period)}</span>` : ''}</summary>
         ${k === 'valuation' ? `<p>${slot('val', valSlot(t, x))}</p><p class="dim small">Broad sector median, not a curated peer group; own valuation history is not available.</p>` : ''}${metricTable(x.metrics, true)}<p>${evBtn({kind: 'card', t, id: k}, 'Open evidence')}</p></details>`; }).join('');
   }
   function driversHtml(t, r, c) {
-    return `<h3 class="question">Has ${esc(t)} outperformed the market and its sector?</h3><p id="drv-answer">${slot('drv', () => S.drv || 'Measuring against SPY and the sector basket…')}</p>
+    const s=researchSetup((S.brief.shortlist||[]).find(x=>x.t===t),r,{company:c,session:S.brief.asof_session,events:horizonEvents(S.horizon||7)});
+    return `<p class="setup-summary">${esc(s.category)} · ${esc(s.concern.measured?s.concern.text:s.wait)} ${evBtn({kind:'research',t},'Setup evidence')}</p><h3 class="question">Has ${esc(t)} outperformed the market and its sector?</h3><p id="drv-answer">${slot('drv', () => S.drv || 'Measuring against SPY and the sector basket…')}</p>
       <p><a class="go" href="${esc(companyHref(t, r.sec))}">Compare ${esc(t)} with SPY and the ${esc(r.sec)} basket</a></p>
       <h3 class="question">Is it sensitive to rates, oil, the dollar or volatility?</h3><p>${esc(relSentence(r, c && c.cards && c.cards.resilience))}</p><p class="dim">Historical association over ${r.rel && r.rel.n || 'n/a'} sessions, not a forecast. ${factorLink(r)}</p>
       <h3>Price and trend</h3><p>${slot('tech', techSlot(t, c && c.technical))}</p>`;
@@ -1170,7 +1215,7 @@
     let c = S.company[t] || null;
     if (!c) { try { c = await json(`data/brief/company/${encodeURIComponent(t)}.json`); S.company[t] = c; } catch (e) { c = null; console.warn('[brief] company evidence unavailable', t, e.message); } }
     if (route(root.location.hash).t !== t) return;   // reader moved on
-    const short = (S.brief.shortlist || []).find(x => x.t === t), cs = caseFor(c, short, r);
+    const short = (S.brief.shortlist || []).find(x => x.t === t), cs = caseFor(c, short, r,{session:S.brief.asof_session,events:horizonEvents(S.horizon||7)});
     S.coTab = S.coTab || route(root.location.hash).tab || 'overview';
     main.innerHTML = `
       <section class="co" data-t="${esc(t)}"><div class="co-head"><h1>${esc(r.n)} <span class="co-t">${esc(t)}</span></h1>${starBtn(t)}<a class="position-link" href="#/positions" data-position-t="${esc(t)}">Add/edit position</a></div>
@@ -1178,8 +1223,8 @@
         <div class="quote"><span class="big">${liveSpan(t, 'price')}</span> <span class="chg">${liveSpan(t, 'chg')}</span> ${slot('session', () => sessionNote(t))}</div>
         <p class="dim small">${slot('ctx', () => esc(Live.currentContext(t, Live.snapshot())))}</p>
         ${c ? '' : '<p class="note" role="status">Company evidence is unavailable in the published data; price and chart remain.</p>'}
-        <div class="case"><p><span class="lbl">Case</span> ${esc(cs.positive ? cs.positive.text : 'No strong measured dimension in this build.')}</p>
-          <p><span class="lbl obj">Objection</span> ${esc(cs.objection.text)} ${cs.objection.card ? evBtn({kind: 'card', t, id: cs.objection.card}) : ''}</p>
+        <div class="case"><p class="tag">${esc(cs.setup.category)} · completed ${esc(cs.setup.session||'session unavailable')}</p><p><span class="lbl">Case</span> ${esc(cs.positive ? cs.positive.text : 'No strong measured dimension in this build.')}</p>
+          <p><span class="lbl obj">Objection</span> ${esc(cs.objection.text)} ${evBtn({kind:'research',t},'Concern evidence')}</p><p class="small">${esc(cs.setup.wait)}</p>
           ${cs.coverage.length ? `<p class="dim small"><span class="lbl">Coverage</span> ${esc(listJoin(cs.coverage))} unavailable; incomplete coverage is not an all-clear.</p>` : ''}
           <p class="dim small"><span class="lbl">Next event</span> ${esc(cs.event)}</p></div></section>
       <section id="your-note" class="your-note"></section>
@@ -1734,7 +1779,7 @@
       const st = e.target.closest('[data-star]'); if (st) { toggleStar(st.dataset.star); if (S.coDraw && S.co && S.co.mode === 'saved') S.coDraw(); return; }
       const hz = e.target.closest('[data-horizon]');
       if (hz) { UI.horizon = S.horizon = +hz.dataset.horizon;
-        if (S.view === 'brief' && $('#ahead')) {$('#ahead').innerHTML = aheadHtml();$('#objectives').innerHTML=objectivesHtml();const events=horizonEvents(S.horizon);doc.querySelectorAll('[data-short-category]').forEach(el=>{const x=S.brief.shortlist.find(x=>x.t===el.dataset.shortCategory);el.textContent=researchCategory(x,events.items.some(e=>e.t===x.t));});S.personal?.refresh();}
+        if (S.view === 'brief' && $('#ahead')) {$('#ahead').innerHTML = aheadHtml();$('#objectives').innerHTML=objectivesHtml();doc.querySelectorAll('[data-short-category]').forEach(el=>{const x=S.brief.shortlist.find(x=>x.t===el.dataset.shortCategory),s=shortSetup(x);el.textContent=s.category;const caution=doc.querySelector(`[data-short-caution="${x.t}"]`);if(caution)caution.innerHTML=shortCaution(s);});S.personal?.refresh();}
         else if (S.view === 'company' && $('#co-events')) { const t = route(root.location.hash).t; $('#co-events').innerHTML = eventsHtml(t, S.company[t]); }
         else if (S.view === 'macro') renderMacro($('#view'));
         const again = doc.querySelector(`[data-horizon="${S.horizon}"]`); if (again) again.focus({preventScroll: true}); }

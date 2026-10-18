@@ -255,6 +255,20 @@
   function scoreFact(P, n, ctx) {
     return P.add({label: n.t + ' research score', value: n.score, unit: 'of 100', period: ctx.brief.asof_session, asof: ctx.brief.generated_at, source: 'Brief shortlist score: ' + (n.score_basis || '')}, {ticker: n.t});
   }
+  function setupFor(t,ctx){
+    const b=ctx.brief||{},raw=ctx.publicCore,r=raw?.rows?.find(r=>r.t===t)||ctx.core?.[t];
+    // Public context only: entered positions/notes never join this interpretation.
+    const events=Today.eventsInHorizon(raw||{rows:Object.values(ctx.core||{})},b,(ctx.now||new Date()).getTime(),7,{ticker:t});
+    return Today.researchSetup((b.shortlist||[]).find(x=>x.t===t),r,{company:company(t,ctx),session:b.asof_session,events});
+  }
+  function setupLines(P,t,ctx){
+    const s=setupFor(t,ctx),refs=P.addAll(s.metrics,8,{ticker:t});
+    P.line(s.category+'. Completed session '+(s.session||'unavailable')+'.',refs);
+    P.line('Caution: '+s.concern.text,P.addAll(s.concern.metrics,8,{ticker:t}));
+    P.line(s.wait,P.addAll(s.concern.metrics.length?s.concern.metrics:s.metrics,8,{ticker:t}));
+    if(s.event)P.line(s.event,P.addAll(s.eventMetrics,8,{ticker:t}));
+    return s;
+  }
   H.shortlist = (e, ctx) => {
     const s = ctx.brief && ctx.brief.shortlist; if (!s || !s.length) return NA('shortlist', 'Research shortlist', 'No names are on the shortlist in this brief.');
     const P = new Pack();
@@ -264,12 +278,13 @@
       if (!n) return NA('shortlist', who(t, ctx), who(t, ctx) + ' is not on today\'s shortlist of ' + s.length + ' names.', [['ticker_summary', {tickers: [t]}], ['shortlist']]);
       P.line(who(t, ctx) + ' scores ' + n.score + ' of 100. ' + (n.score_basis || ''), [scoreFact(P, n, ctx)]);
       (n.why || []).slice(0, 3).forEach(w => P.line('Why: ' + w.text, P.addAll(w.metrics, 2, {ticker: t})));
-      if (n.counter) P.line('Against: ' + n.counter.text, P.addAll(n.counter.metrics, 1, {ticker: t}));
+      setupLines(P,t,ctx);
       return P.out({intent: 'shortlist', title: 'Why ' + t + ' is on the shortlist', followups: [['open_ticker', {tickers: [t]}], ['ticker_card', {tickers: [t], card: 'counter'}]]});
     }
     s.slice(0, 5).forEach(n => {
       const w = (n.why || [])[0];
       P.line(who(n.t, ctx) + ', score ' + n.score + ': ' + (w ? w.text : 'no reason recorded'), [scoreFact(P, n, ctx)].concat(w ? P.addAll(w.metrics, 1, {ticker: n.t}) : []));
+      const s=setupFor(n.t,ctx);P.line(n.t+': '+s.concern.text+' '+s.wait,P.addAll(s.concern.metrics.length?s.concern.metrics:s.metrics,8,{ticker:n.t}));
     });
     if (s.length > 5) P.line(s.length - 5 + ' more on the Brief page: ' + s.slice(5).map(n => n.t).join(', ') + '.', [P.add({label:'Additional shortlist names',value:s.length-5,unit:'companies',period:ctx.brief.asof_session,asof:ctx.brief.generated_at,source:'Brief shortlist count minus the five names displayed'})].concat(s.slice(5).map(n => scoreFact(P, n, ctx))));
     return P.out({intent: 'shortlist', title: 'Research shortlist', followups: [['shortlist', {tickers: [s[0].t]}], ['provenance', {term: 'score'}]]});
@@ -306,8 +321,7 @@
     CARDS.forEach(k => { const cd = c.cards && c.cards[k]; if (cd && by[cd.status]) by[cd.status].push(CARD_LABEL[k].toLowerCase()); });
     const parts = [['Strong', by.strong], ['OK', by.ok], ['Weak', by.weak]].filter(x => x[1].length).map(x => x[0] + ': ' + x[1].join(', '));
     if (parts.length) P.line(parts.join('. ') + '.', []);
-    const cn = c.cards && c.cards.counter;
-    if (cn && cn.line) P.line('Against: ' + cn.line, P.addAll(cn.metrics, 1, {ticker: t}));
+    setupLines(P,t,ctx);
     return P.out({intent: 'ticker_summary', title: who(t, ctx), followups: [['open_ticker', {tickers: [t]}], ['ticker_card', {tickers: [t], card: by.weak.length ? CARDS.find(k => c.cards[k] && c.cards[k].status === 'weak') : 'valuation'}], ['earnings_date', {tickers: [t]}]]});
   };
   H.ticker_card = (e, ctx) => {
@@ -315,6 +329,11 @@
     const k = e.card, cd = c.cards && c.cards[k];
     if (!cd) return NA('ticker_card', who(t, ctx), 'The ' + CARD_LABEL[k].toLowerCase() + ' card is missing from ' + t + '\'s company file.');
     const P = new Pack();
+    if(k==='counter'){
+      setupLines(P,t,ctx);
+      P.line('Fundamental assessment only: '+(cd.line||'unavailable'),P.addAll(cd.metrics,8,{ticker:t}));
+      return P.out({intent:'ticker_card',title:'Counterargument: '+t,followups:[['ticker_card',{tickers:[t],card:'valuation'}],['open_ticker',{tickers:[t]}]]});
+    }
     if (cd.status === 'unavailable') { P.line(CARD_LABEL[k] + ' for ' + who(t, ctx) + ' is not available. ' + (cd.line || ''), P.addAll(cd.metrics, 2, {ticker: t})); }
     else {
       P.line(CARD_LABEL[k] + ' for ' + who(t, ctx) + ' rates ' + cd.status + '. ' + (cd.line || ''), P.addAll(cd.metrics, 1, {ticker: t}));

@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261018-r19-live-recovery",
-  "built_at": "2026-10-18T16:55:51.840157+00:00",
-  "source_base": "b3457ba71a328ebf80fa71b507d83ae5f944f623",
+  "release_id": "brief-client-20261018-r20-decision-fit",
+  "built_at": "2026-10-18T18:32:17.660176+00:00",
+  "source_base": "0865117e11e500ca870fc9f7008f3630025e07c2",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -32,8 +32,8 @@
       "bytes": 8355
     },
     "chat-popup.js": {
-      "sha256": "d15f1bae4038d4ecb95551a64f6316d0203a03232cff0d3c9641d55ab4850699",
-      "bytes": 24035
+      "sha256": "35bcd70dd5003b826cd47714300d09486152f4920e4f324904660edb8edeef75",
+      "bytes": 24032
     },
     "chat/actions.js": {
       "sha256": "590c07c5b33cf3512ac496f9ee685cf1e075b18ce1ab981b3f1947cd0ba9a5b2",
@@ -56,8 +56,8 @@
       "bytes": 20811
     },
     "chat/facts.js": {
-      "sha256": "0b693d36128029e7fdbc27b7a8230c5fe035d1521112c20b35ea8ebb5c85c66d",
-      "bytes": 44694
+      "sha256": "d28331d5381a03d708e56f24de11ff878897e8859bb1e13e7eedd87c9aa547af",
+      "bytes": 45891
     },
     "chat/intents.js": {
       "sha256": "21fc7a1ccb529a2048747747a86dbe80aea8f759a49149839e89bfde9ea3f886",
@@ -176,8 +176,8 @@
       "bytes": 11704
     },
     "index.html": {
-      "sha256": "8b8686fd0b69d05cd3cd96f233cc555175e987b9bb142e1e93bd9097ba0ff840",
-      "bytes": 1987
+      "sha256": "0eaefe9bf0a6dc5a9be88d4041af7f7a8583a1830c1ce01c3e196e358107cecc",
+      "bytes": 1957
     },
     "intelligence.css": {
       "sha256": "adc81cb529dfa2a34c95bbcc0d09e64411552bc274a3c7c5a3a946c8f81ceeff",
@@ -216,8 +216,8 @@
       "bytes": 24743
     },
     "main.js": {
-      "sha256": "e3308ed9a98e3502e52d39f9d064662350925c927045b77bcea2bd8e1cc064d8",
-      "bytes": 202631
+      "sha256": "7eb8b669a14a9e0267194cb60d00950022c87051fd5d8e19b4ea636a5e1ef573",
+      "bytes": 211513
     },
     "money-flow.css": {
       "sha256": "ddef742bb34f0216e5ecfbdcb9b3116ddbdc99abe8cfe13072fd7ad503c5e737",
@@ -300,8 +300,8 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "50e46e8ddd44d1e57911a0586af50e4452d34fb9724262d9ebcdcc851ea4acac",
-      "bytes": 4442
+      "sha256": "561b8181fa3d849660a97a815c9a1d38a6352634f7bca01d5d93682c9407c859",
+      "bytes": 4565
     }
   },
   "data_at_publication": {
