@@ -51,7 +51,13 @@ def fmt(value, suffix=''):
 def facts(row, records, session, cfg):
     q = {d:v for d,v in table(records, 'quarterly_income_stmt').items() if d<=session}
     cf = {d:v for d,v in table(records, 'quarterly_cashflow').items() if d<=session}
-    bs = {d:v for d,v in table(records, 'quarterly_balance_sheet').items() if d<=session}
+    # Yahoo may append a newer column containing only share counts. That is not
+    # a reported balance sheet and must not erase dated debt/liquidity evidence.
+    # Never copy old accounts into that newer reporting period.
+    balance_accounts = ('Total Assets', 'Current Assets', 'Current Liabilities',
+                        'Total Debt', 'Net Debt', 'Stockholders Equity', 'Common Stock Equity')
+    bs = {d:v for d,v in table(records, 'quarterly_balance_sheet').items()
+          if d<=session and any(number(v.get(key)) is not None for key in balance_accounts)}
     latest = next(iter(dates(q)), None)
     old = prior_year(q, latest)
     q4, cf4 = window(q), window(cf)
