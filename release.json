@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261018-r18-live-recovery",
+  "release_id": "brief-client-20261018-r19-live-recovery",
   "product": "SmartOptions Brief",
-  "built_at": "2026-10-18T16:37:16.033012+00:00",
-  "source_commit": "ef05e0d4f61c447d3e0840c15e2a038f237c9182",
+  "built_at": "2026-10-18T16:55:51.840157+00:00",
+  "source_commit": "b3457ba71a328ebf80fa71b507d83ae5f944f623",
   "data_session": "2026-10-16",
   "tickers": 509,
   "current_constituents": 503,
@@ -12,7 +12,7 @@
   "chat": "Deterministic public facts and verified actions; private positions/notes/checkpoints excluded from remote planning and rephrasing",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
   "price_feed": "Yahoo Finance stream for up to 100 prioritized active names; one connection. Finnhub shared within-budget 120-second fallback, then the timestamped shared snapshot. Full-index breadth uses one adequately covered dated session, not an unqualified all-index tick claim.",
-  "verification": "Final isolated full suite1072pass/1 Chrome local CSS ERR_NO_BUFFER_SPACE transport failure; isolated popup390/1440 retry2PASS.42targeted recovery/statement/refresh PASS. Independent exact506analyst assessment and3resilience-card reconstruction; original dates preserved. Unchanged471JS/33news/305Today/45paths/11quote stress retained. Prior1072fullPython clean at9a8367f.8protectedPNGs unchanged.",
+  "verification": "1075 full isolated Python PASS at exactb3457ba (258.40seconds);70 targeted finance/recovery/refresh PASS. Actual hosted raw3issuer failure inputs reproduced and fixed with original valid balance periods/ratios, legitimate new zero accounts retained.506analyst+3priorcard input oracles. Unchanged471JS/33news/305Today/45paths/11quote-stress and hosted390/1440 evidence retained;8protectedPNG hashes unchanged.",
   "screener_scores": "dated 2026-07-25 snapshot; separate from refreshed prices and fundamentals",
   "methods": "docs/BRIEF-METHODS.md",
   "notes": [
