@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261018-r24-clear-responsive",
-  "built_at": "2026-10-18T20:38:35.077685+00:00",
-  "source_base": "c39b2df832c5894c96faf69264a664c421460253",
+  "release_id": "brief-client-20261018-r25-clear-responsive",
+  "built_at": "2026-10-18T20:44:32.035292+00:00",
+  "source_base": "903b5ea1b47dd2966feb9e59c86c865b5661dfef",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -32,7 +32,7 @@
       "bytes": 8355
     },
     "chat-popup.js": {
-      "sha256": "89d566a2ee53d41ce150a594bf2a8a23228d2db4bd8ac741a2ff1c48cd7b7fe1",
+      "sha256": "24339ffea0aed39f2cb12a685b3a79576a58d74d373f2d7b48d76e6ef085c9b7",
       "bytes": 24035
     },
     "chat/actions.js": {
@@ -176,7 +176,7 @@
       "bytes": 11704
     },
     "index.html": {
-      "sha256": "6773957a28f27dde41eeb574ef615c30c6381b37ba09d7d7a61975a624a3371c",
+      "sha256": "8751dda5b094b1d38fdd53544ca96f00bbe88dc96ed8d12575e31474e4fdcd91",
       "bytes": 2127
     },
     "intelligence.css": {
@@ -200,8 +200,8 @@
       "bytes": 4572
     },
     "live.js": {
-      "sha256": "fb9bab41d624493f823ca87cbabcd1eb92cefcbaf22b8d73471c877f3568a540",
-      "bytes": 40321
+      "sha256": "68d27a51207909dc41e3ec3bdf7a1071bce405b129f296a727e61d00777dc08f",
+      "bytes": 40429
     },
     "local-data.js": {
       "sha256": "3201ef1cdf8df3846745027958ee61b23372dcfb6bcfbd8372ba521629bf7845",
@@ -216,7 +216,7 @@
       "bytes": 31614
     },
     "main.js": {
-      "sha256": "678dc978b8df5b1a503c0309557689a02ad73af741c123d1a14ab8128073dbdb",
+      "sha256": "54a2929382d416f9f6104dc1a90935ea6b32ebe7f6a446a3f0c0aecb2a0bc1ab",
       "bytes": 218130
     },
     "money-flow.css": {
@@ -300,8 +300,8 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "b3ab3dae0f6d42dcb80af9e4f5a23324ffe813f231b5ea8608277eb33637c578",
-      "bytes": 6162
+      "sha256": "3b974a7868780a2786f96d8e9c397faee909edb85f03a7d9837bd4e72fe78902",
+      "bytes": 6566
     }
   },
   "data_at_publication": {

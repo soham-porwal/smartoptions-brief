@@ -429,7 +429,9 @@
     if (pending) return {kind: 'pending', text: 'Updating quote…'};
     const ref = referenceQuote(row, nowMs);
     if (!ref) return {kind: 'missing', text: 'Quote unavailable'};
-    return {kind: 'reference', ref, text: 'Reference close $' + fmtPx(ref.price) + ' · ' + refDate(ref.date) + (ref.ret == null ? '' : ' · session ' + fmtPct(ref.ret)) + '\nCurrent quote unavailable'};
+    // The core's historical return need not use the same adjustment/prior-close
+    // basis as this quote. Keep that analysis in its dated evidence, not paired here.
+    return {kind: 'reference', ref, text: 'Reference close $' + fmtPx(ref.price) + ' · ' + refDate(ref.date) + '\nCurrent quote unavailable'};
   }
   function paint(scope, changed) {
     if (!scope || !scope.querySelectorAll) return;
