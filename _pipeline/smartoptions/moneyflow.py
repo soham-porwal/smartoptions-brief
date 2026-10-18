@@ -68,6 +68,10 @@ NEWS_LIMITS = dict(market=12, market_per_topic=3,official=5, company_per_symbol=
 # Source identity alone is insufficient for arbitrary tagged company articles. Only
 # these established general-market desks bypass the topic taxonomy on the market feed.
 AUTHORITATIVE_MARKET = {'reuters', 'bloomberg', 'associated press', 'ap', 'cnbc', 'marketwatch', 'financial times', 'the wall street journal'}
+# A trusted publisher also carries parenting, travel and lifestyle articles.
+# Unknown subjects remain welcome when the headline establishes economic or
+# business relevance; publisher identity alone never establishes relevance.
+BUSINESS_CONTEXT = re.compile(r'\b(markets?|stocks?|equities|shares?|bonds?|credit|debt|banks?|banking|lending|liquidity|settlement|clearing|currenc\w*|dollar|econom\w*|recession|employment|jobs?|wages?|consumer spending|retail sales|manufactur\w*|supply chain|shipping|freight|trade|exports?|imports?|regulat\w*|antitrust|industr\w*|business\w*|companies|corporat\w*|revenues?|profits?|valuation\w*|productivity|semiconductors?|chips?|artificial intelligence)\b', re.I)
 
 def classify_news(headline):
     text=headline.lower()
@@ -190,7 +194,8 @@ def collect_news(collector,key,offline,out,old,warnings,now):
         if ticker and not mentions(title,issuer_terms(names[ticker],ticker)):skipped['unrelated']+=1;return None
         category,reason=classify_news(title)
         related=[t for t in str(raw.get('related','')).split(',') if t in names and mentions(title,issuer_terms(names[t],t))]
-        trusted=scope=='market' and str(raw.get('source','')).strip().lower() in AUTHORITATIVE_MARKET
+        trusted=(scope=='market' and str(raw.get('source','')).strip().lower() in AUTHORITATIVE_MARKET
+                 and BUSINESS_CONTEXT.search(title))
         if category=='Market news' and not (ticker or related or trusted):skipped['off_topic']+=1;return None
         if category=='Market news' and (ticker or related):category='Company development'
         return dict(id=str(raw.get('id','')),headline=title[:300],url=url,published_at=published.isoformat(),retrieved_at=collector.last_retrieved_at,

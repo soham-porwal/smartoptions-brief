@@ -191,6 +191,8 @@ class CoverageValidationError(ValueError):
 def coverage_guard(old_data, new_data):
     try:
         return _coverage_guard(old_data, new_data)
+    except CoverageValidationError:
+        raise
     except ValueError as exc:
         # Do not publish arbitrary loader/provider exception strings. Known
         # invariants get safe stable identifiers; the financial guard stays intact.
@@ -263,7 +265,10 @@ def _coverage_guard(old_data, new_data):
                 if not (rows[ticker].get('basis_warning') and new.get('basis_original') and new.get('basis_source_url') == rows[ticker].get('basis_source_url')):
                     losses.append(f'{ticker}:{key}')
     if losses:
-        raise ValueError(f'Refresh lost {len(losses)} previously available fundamental assessments')
+        raise CoverageValidationError(f'Refresh lost {len(losses)} previously available fundamental assessments',
+                                      'COVERAGE_FUNDAMENTAL_LOSS',
+                                      {'assessment_count': len(losses), 'public_dimensions': sorted({x.split(':', 1)[1] for x in losses})[:12],
+                                       'public_tickers': sorted({x.split(':', 1)[0] for x in losses})[:20]})
     intelligence = load_json(new_data / 'intelligence.json', required=True)
     validate_intelligence(intelligence, list(rows))
     shocks = load_json(new_data / 'shocks.json', required=True)
@@ -387,6 +392,10 @@ def refresh(data_root, work_root, cache_root, *, source_snapshot=None, offline=F
                        *[r['t'] for r in old_core.get('rows') or []]], receipt, 1800, log_root)
         from smartoptions.relate import build as relate_build
         from smartoptions.export import build as export_build
+        if not offline:
+            from smartoptions.brief.statements import recover_analyst_observations
+            receipt['stages']['statement_recovery'] = recover_analyst_observations(
+                cache_root, ROOT / 'fixtures/analyst-statements-20261018.json')
         from smartoptions.brief.__main__ import build as brief_build
         def capital_stage():
             if importlib.util.find_spec('smartoptions.moneyflow') is None:

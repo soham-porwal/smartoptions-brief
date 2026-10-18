@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261018-r16-live-brief",
-  "built_at": "2026-10-18T14:31:36.689331+00:00",
-  "source_base": "bd75747b526a5708079c52cabd64b6cc8b2de0ff",
+  "release_id": "brief-client-20261018-r17-live-recovery",
+  "built_at": "2026-10-18T16:19:51.725289+00:00",
+  "source_base": "4f4bc194206f5aabdf3a60ee172e2421f7f00a3e",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -300,8 +300,8 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "fcf36437f2fc4928dff7e8a4a6f799138004a60c6e4b90c3e1f0919e020d02b7",
-      "bytes": 4169
+      "sha256": "cf2c014cefcc2d162e3ab21f1090c20d1a83132b92e742b3764f3d003e348357",
+      "bytes": 4445
     }
   },
   "data_at_publication": {
@@ -385,6 +385,6 @@
   "dynamic_files": {
     "data/quotes.json": "Scheduled shared observations; excluded from static hash gate, compare per-symbol observations across hosts and never regress source times."
   },
-  "note": "Exact immutable UI and publication payload hashes; dynamic quotes retain independent observations. Updated refresh runtime is verified separately.",
+  "note": "Exact immutable UI and source snapshot hashes at metadata build. The publisher preserves newer hosted news and quotes; coordinated current payload hashes and installed runtime are verified separately.",
   "publication_encoding": "Canonical Git blob bytes (GitHub Pages), not Windows worktree CRLF bytes"
 }

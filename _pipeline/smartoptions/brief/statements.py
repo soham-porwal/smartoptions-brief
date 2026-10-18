@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,41 @@ STATEMENTS = ('income_stmt', 'quarterly_income_stmt', 'cashflow', 'quarterly_cas
               'balance_sheet', 'quarterly_balance_sheet', 'eps_revisions', 'earnings_estimate')
 _lock = threading.Lock()
 _next_request = 0.0
+
+
+def recover_analyst_observations(cache_dir, seed_path):
+    """Restore missing CI cache entries from dated, already accepted observations.
+
+    Healthy cache entries are never replaced. This is a last-good input recovery,
+    not a new acquisition: source periods and retrieval clocks stay unchanged.
+    """
+    seed_path = Path(seed_path)
+    if not seed_path.exists():
+        return dict(status='not_present', restored=0)
+    if seed_path.stat().st_size > 2 * 1024 * 1024:
+        raise ValueError('Statement recovery input exceeds its bounded size')
+    seed = load_json(seed_path, required=True)
+    records = seed.get('records')
+    if seed.get('schema') != 'smartoptions.statement-recovery.v1' or not isinstance(records, dict) or len(records) > 1200:
+        raise ValueError('Invalid statement recovery input')
+    # Validate every path and record before any write. Never accept arbitrary cache files.
+    for name, rec in records.items():
+        if (not re.fullmatch(r'[A-Z0-9.\^-]{1,16}\.(eps_revisions|earnings_estimate)\.json', name)
+                or not isinstance(rec, dict) or not isinstance(rec.get('data'), dict)
+                or not rec['data'] or not parsed(rec.get('retrieved_at'))):
+            raise ValueError('Invalid dated analyst recovery record')
+    restored = 0
+    for name, rec in records.items():
+        path = Path(cache_dir) / name
+        current = load_json(path, {}) if path.exists() else {}
+        if current.get('data'):
+            continue
+        write_json(path, dict(data=rec['data'], retrieved_at=rec['retrieved_at'], status='retained',
+                             error=None, retention_reason='Restored prior accepted analyst observation after missing CI cache; original periods and acquisition date retained'))
+        restored += 1
+    event('brief.statements.recovery', 'dated analyst inputs', 'WARN' if restored else 'OK',
+          'Original acquisition dates preserved; healthy cache not replaced', restored)
+    return dict(status='retained' if restored else 'ok', restored=restored, original_dates_preserved=True)
 
 
 def throttle(spacing):
