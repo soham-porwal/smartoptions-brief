@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261018-r20-decision-fit",
-  "built_at": "2026-10-18T18:32:17.660176+00:00",
-  "source_base": "0865117e11e500ca870fc9f7008f3630025e07c2",
+  "release_id": "brief-client-20261018-r21-visual-cues",
+  "built_at": "2026-10-18T18:44:02.061691+00:00",
+  "source_base": "e776734ed9b1029530532a0f1eb48bc204426a6a",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -32,7 +32,7 @@
       "bytes": 8355
     },
     "chat-popup.js": {
-      "sha256": "35bcd70dd5003b826cd47714300d09486152f4920e4f324904660edb8edeef75",
+      "sha256": "8337995dc449c2ccf7e5a7ae1f7c64d60d78c1ee29b913524c9c1148e4088308",
       "bytes": 24032
     },
     "chat/actions.js": {
@@ -176,7 +176,7 @@
       "bytes": 11704
     },
     "index.html": {
-      "sha256": "0eaefe9bf0a6dc5a9be88d4041af7f7a8583a1830c1ce01c3e196e358107cecc",
+      "sha256": "6b8ed08132e7477c845af406afac9b9b4f2d30f8d933ddcca33e7678e930607b",
       "bytes": 1957
     },
     "intelligence.css": {
@@ -212,12 +212,12 @@
       "bytes": 6484
     },
     "main.css": {
-      "sha256": "c96e3f01d8e5d897c35b67f816c589aad59ce450c63605c9c5e4c33b9be7a028",
-      "bytes": 24743
+      "sha256": "16f2bb1727f5d15df49eddaaf7f5fb3df6a40c4adb69b26209e7c79da1d348b4",
+      "bytes": 26527
     },
     "main.js": {
-      "sha256": "7eb8b669a14a9e0267194cb60d00950022c87051fd5d8e19b4ea636a5e1ef573",
-      "bytes": 211513
+      "sha256": "1639c7fd20d4d5ae4c3786ef0dda4ef5d1418dd81be5de049c5f2ea9d7cd9566",
+      "bytes": 213487
     },
     "money-flow.css": {
       "sha256": "ddef742bb34f0216e5ecfbdcb9b3116ddbdc99abe8cfe13072fd7ad503c5e737",
@@ -300,8 +300,8 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "561b8181fa3d849660a97a815c9a1d38a6352634f7bca01d5d93682c9407c859",
-      "bytes": 4565
+      "sha256": "ebaf91c7c806fa655599aaa635395360d365908248ebdd77c271b1014b6b62a4",
+      "bytes": 4708
     }
   },
   "data_at_publication": {

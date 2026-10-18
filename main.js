@@ -329,6 +329,20 @@
   }
   function CHANGE_NAMES_FALLBACK(id){return {vix:'VIX previous-session percentage change',us10y:'10-year Treasury yield change in basis points'}[id]||id;}
   const MACRO_IMPORTANCE={FOMC:3,CPI:3,PPI:3,PCE:3,NFP:3,GDP:3,EIA:1};
+  // Meaning is always written beside the cue; unknown evidence never receives a favorable color.
+  function signalCue(tone) { return {good:'✓',mixed:'△',bad:'!',neutral:'—'}[tone]||'—'; }
+  function cue(tone) { return `<span class="signal-icon" data-tone="${esc(tone||'neutral')}" aria-hidden="true">${signalCue(tone)}</span>`; }
+  function postureTone(model) { return /^Defensive/.test(model.label)?'bad':model.label==='Supportive conditions'?'good':/incomplete/i.test(model.label)?'neutral':'mixed'; }
+  function objectiveTone(x,model) {
+    if(x.id==='protect')return /^High/.test(x.word)?'bad':/^Elevated/.test(x.word)?'mixed':/^Low/.test(x.word)?'good':'neutral';
+    if(x.id==='income')return model.signals[3].status==='high'||model.signals[0].status==='adverse'?'bad':!model.signals[0].status||!model.signals[3].status?'neutral':'mixed';
+    return /^Not rated/.test(x.word)?'neutral':'mixed';
+  }
+  function researchBadges(s) {
+    const business=s.category.split(' · ')[0],businessTone=business==='Quality research'?'good':s.concerns.some(c=>c.kind==='fundamental')?'bad':'neutral';
+    const setupTone=s.setup==='unknown'||s.label==='Trend watch'?'neutral':'mixed';
+    return `<span class="signal-badge" data-tone="${businessTone}">${cue(businessTone)}${esc(business)}</span><span class="signal-badge" data-tone="${setupTone}">${cue(setupTone)}${esc(s.label)}</span>${s.event?`<span class="signal-badge" data-tone="mixed">${cue('mixed')}Event watch</span>`:''}`;
+  }
   function objectiveModel(model,b,events,core) {
     const risk=model.signals[3].status,price=model.signals[0].status,riskComplete=model.signals[3].coverage==='complete';
     // Only a listed MAJOR macro release or an entered equity's earnings can raise Protect; minor releases stay listed only.
@@ -478,13 +492,13 @@
     return hi > lo ? {pos: 100 * (cur.px - lo) / (hi - lo), lo, hi} : null;
   }
 
-  const API = {researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
+  const API = {signalCue,postureTone,objectiveTone,researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
   if (typeof module !== 'undefined' && module.exports) { module.exports = API; return; }
   root.SmartOptionsMain = API;
   const doc = root.document; if (!doc) return;
 
   /* ------------------------------------------------------------ page */
-  const ASSET_V = 'client-20261018-fit1';
+  const ASSET_V = 'client-20261018-fit2';
   const Live = root.SmartOptionsLive;
   const S = root.__soMainState = {core: null, brief: null, rel: null, rowMap: new Map(), slots: [], view: null, chart: null, company: {}, onQuote: null};
   const $ = s => doc.querySelector(s);
@@ -679,14 +693,14 @@
   }
   function tile(a) {
     return `<button type="button" class="tile" data-tone="${esc(a.tone)}" data-assess="${esc(a.id)}" data-ev="${evAttr({kind: 'assessment', id: a.id})}">
-      <span class="t-title">${esc(a.title)}</span><span class="t-word">${esc(a.word)}</span><span class="t-qty">${esc(a.qty)}</span>${a.change ? `<span class="t-chg">${esc(a.change)}</span>` : ''}<span class="t-basis">${esc(a.basis)}</span></button>`;
+      <span class="t-title">${esc(a.title)}</span><span class="t-word">${cue(a.tone)}${esc(a.word)}</span><span class="t-qty">${esc(a.qty)}</span>${a.change ? `<span class="t-chg">${esc(a.change)}</span>` : ''}<span class="t-basis">${esc(a.basis)}</span></button>`;
   }
   function shortCard(x) {
     const setup=shortSetup(x),why=((x.why||[])[0]?.text||'Inspect dated company evidence.').replace(/, provider quarter label [\d-]+\.?/i,'.');
-    return `<article data-short="${esc(x.t)}"><p class="tag" data-short-category="${esc(x.t)}">${esc(setup.category)}</p><h3><a href="#/company/${esc(x.t)}">${esc(x.t)}</a> <span class="dim">${esc(x.name)} · ${esc(x.sector)}</span>
+    return `<article data-short="${esc(x.t)}"><p class="tag research-tags" data-short-category="${esc(x.t)}">${researchBadges(setup)}</p><h3><a href="#/company/${esc(x.t)}">${esc(x.t)}</a> <span class="dim">${esc(x.name)} · ${esc(x.sector)}</span>
         <span class="px">${liveSpan(x.t, 'price')} <span class="chg">${liveSpan(x.t, 'chg')}</span></span></h3>
       <p class="why"><span class="lbl">Why look</span> ${esc(why)}</p>
-      <p class="obj" data-short-caution="${esc(x.t)}">${shortCaution(setup)}</p>
+      <p class="obj" data-tone="${setup.concerns.some(c=>c.kind==='fundamental')?'bad':setup.concern.measured?'mixed':'neutral'}" data-short-caution="${esc(x.t)}">${shortCaution(setup)}</p>
       <p class="links">${evBtn({kind: 'shortlist', t: x.t}, 'Case, caution & dated evidence')} <a href="#/company/${esc(x.t)}">Open dossier →</a></p></article>`;
   }
   function shortSetup(x){return researchSetup(x,row(x.t),{session:S.brief.asof_session,events:horizonEvents(S.horizon||7)});}
@@ -704,7 +718,7 @@
     const up=c.change>0,flat=Math.abs(c.change)<1e-8;
     return c.id==='spy_1d'?'Index movement describes the session; it is not an opportunity ranking.':c.id==='vix'?`Expected near-term market volatility ${flat?'was unchanged':up?'increased':'decreased'}; this is not single-name IV.`:c.id==='us10y'?(Math.abs(c.change)<5?'A move under 5bp is treated as little changed; no clear rate pressure or relief.':`${up?'Higher yields tighten':'Lower yields ease'} the discount-rate channel, all else equal.`):c.id==='dxy'?`${flat?'An unchanged dollar leaves':up?'A stronger dollar can weigh on':'A weaker dollar can ease'} overseas earnings translation; company exposure is not measured.`:'Same names at both endpoints; percentage-point change differs from the five-session direction.';
   }
-  function objectivesHtml() {return objectiveModel(todayModel(S.brief,S.core),S.brief,horizonEvents(S.horizon||7),S.core).map(x=>`<article data-objective="${x.id}"><h3>${x.title}</h3><p class="objective-word">${esc(x.word)}</p><p>${esc(x.summary)}</p><p class="dim small">${esc(x.limit)}</p><p>${evBtn({kind:'objective',id:x.id})} <button data-jump="${x.target}">Investigate ${x.title.toLowerCase()}</button></p></article>`).join('');}
+  function objectivesHtml() {const model=todayModel(S.brief,S.core);return objectiveModel(model,S.brief,horizonEvents(S.horizon||7),S.core).map(x=>`<article data-objective="${x.id}" data-tone="${objectiveTone(x,model)}"><h3>${x.title}</h3><p class="objective-word">${cue(objectiveTone(x,model))}${esc(x.word)}</p><p>${esc(x.summary)}</p><p class="dim small">${esc(x.limit)}</p><p>${evBtn({kind:'objective',id:x.id})} <button data-jump="${x.target}">Investigate ${x.title.toLowerCase()}</button></p></article>`).join('');}
   function incomeHtml() {
     const names=[...new Set([...enteredNames(),...WL().get(),...(S.brief.shortlist||[]).map(x=>x.t)])].filter(t=>row(t));
     return `<label for="income-company">Company for contract and event research</label><select id="income-company"><option value="">Choose a company</option>${names.map(t=>`<option value="${esc(t)}" ${S.incomeTicker===t?'selected':''}>${esc(t)}</option>`).join('')}</select><div id="income-context">${incomeContext()}</div><button data-personal="search" data-income-search>Find another company</button>`;
@@ -726,8 +740,8 @@
     main.innerHTML=`${legacy?`<p class="note">That view lives in the <a href="backup.html${esc(legacy)}">expanded edition</a>.</p>`:''}
       <div class="cockpit"><section class="read" id="market" aria-labelledby="read-h"><h1 id="read-h">Today’s market</h1>
         <p class="trust">Updated ${esc(model.updated)} · completed session ${esc(model.session)} · ${esc(model.coverage)} ${evBtn({kind:'today',id:'trust'},'Data and sources')}</p>
-        <h2 class="headline">${esc(model.label)}</h2><p class="small dim">Dated completed-session assessment. Live quotes do not refresh these signals.</p>
-        <ul class="market-reasons">${model.reasons.map(x=>`<li><button type="button" class="ev reason" data-ev="${evAttr(x.ev)}"><span>${esc(x.text)}</span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul><p>${evBtn({kind:'today',id:'posture'},'How this reading is formed')}</p>
+        <h2 class="headline" data-tone="${postureTone(model)}">${cue(postureTone(model))}<span class="headline-copy">${esc(model.label)}</span></h2><p class="small dim">Dated completed-session assessment. Live quotes do not refresh these signals.</p>
+        <ul class="market-reasons">${model.reasons.map(x=>`<li><button type="button" class="ev reason" data-ev="${evAttr(x.ev)}">${cue(model.signals.find(s=>s.id===x.ev.id)?.tone||'neutral')}<span class="reason-copy">${esc(x.text)}</span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul><p>${evBtn({kind:'today',id:'posture'},'How this reading is formed')}</p>
         <nav class="today-jumps" aria-label="Today sections">${[['market','Market'],['my-risk','My risk'],['income','Income'],['opportunity','Opportunity'],['deep-dive','Deep dive']].map(([id,label])=>`<button data-jump="${id}">${label}</button>`).join('')}</nav></section>
       <section id="since"><h2>Since previous session</h2><p class="dim small">${esc(model.comparisons[0].x?.prior?.date||'Prior date unavailable')} → ${esc(b.asof_session)}. Five-session and monthly changes remain separate.</p><div class="comparison-grid">${model.comparisons.map(c=>`<article data-comparison="${c.id}"><h3>${CHANGE_NAMES[c.id]}</h3><p class="comparison-value">${esc(comparisonText(c))}</p>${c.available?`<p class="small">${esc(c.x.prior.date)} → ${esc(c.x.current.date)}</p>`:''}<p>${esc(comparisonMeaning(c))}</p>${evBtn({kind:'today-change',id:c.id})}</article>`).join('')}</div></section>
       <section><h2>Four signals</h2><div class="assess">${model.signals.map(tile).join('')}</div><details><summary>Detailed macro observations</summary><p><a href="#/macro">Open all eight macro groups, histories and sources</a></p>${(b.macro?.detail||[]).map(d=>`<p><b>${esc(GROUPS[d.group]||d.group)}:</b> ${esc(d.line)}</p>`).join('')}</details></section>
@@ -1223,7 +1237,7 @@
         <div class="quote"><span class="big">${liveSpan(t, 'price')}</span> <span class="chg">${liveSpan(t, 'chg')}</span> ${slot('session', () => sessionNote(t))}</div>
         <p class="dim small">${slot('ctx', () => esc(Live.currentContext(t, Live.snapshot())))}</p>
         ${c ? '' : '<p class="note" role="status">Company evidence is unavailable in the published data; price and chart remain.</p>'}
-        <div class="case"><p class="tag">${esc(cs.setup.category)} · completed ${esc(cs.setup.session||'session unavailable')}</p><p><span class="lbl">Case</span> ${esc(cs.positive ? cs.positive.text : 'No strong measured dimension in this build.')}</p>
+        <div class="case"><p class="tag research-tags">${researchBadges(cs.setup)}<span class="dim small">completed ${esc(cs.setup.session||'session unavailable')}</span></p><p><span class="lbl">Case</span> ${esc(cs.positive ? cs.positive.text : 'No strong measured dimension in this build.')}</p>
           <p><span class="lbl obj">Objection</span> ${esc(cs.objection.text)} ${evBtn({kind:'research',t},'Concern evidence')}</p><p class="small">${esc(cs.setup.wait)}</p>
           ${cs.coverage.length ? `<p class="dim small"><span class="lbl">Coverage</span> ${esc(listJoin(cs.coverage))} unavailable; incomplete coverage is not an all-clear.</p>` : ''}
           <p class="dim small"><span class="lbl">Next event</span> ${esc(cs.event)}</p></div></section>
@@ -1779,7 +1793,7 @@
       const st = e.target.closest('[data-star]'); if (st) { toggleStar(st.dataset.star); if (S.coDraw && S.co && S.co.mode === 'saved') S.coDraw(); return; }
       const hz = e.target.closest('[data-horizon]');
       if (hz) { UI.horizon = S.horizon = +hz.dataset.horizon;
-        if (S.view === 'brief' && $('#ahead')) {$('#ahead').innerHTML = aheadHtml();$('#objectives').innerHTML=objectivesHtml();doc.querySelectorAll('[data-short-category]').forEach(el=>{const x=S.brief.shortlist.find(x=>x.t===el.dataset.shortCategory),s=shortSetup(x);el.textContent=s.category;const caution=doc.querySelector(`[data-short-caution="${x.t}"]`);if(caution)caution.innerHTML=shortCaution(s);});S.personal?.refresh();}
+        if (S.view === 'brief' && $('#ahead')) {$('#ahead').innerHTML = aheadHtml();$('#objectives').innerHTML=objectivesHtml();doc.querySelectorAll('[data-short-category]').forEach(el=>{const x=S.brief.shortlist.find(x=>x.t===el.dataset.shortCategory),s=shortSetup(x);el.innerHTML=researchBadges(s);const caution=doc.querySelector(`[data-short-caution="${x.t}"]`);if(caution)caution.innerHTML=shortCaution(s);});S.personal?.refresh();}
         else if (S.view === 'company' && $('#co-events')) { const t = route(root.location.hash).t; $('#co-events').innerHTML = eventsHtml(t, S.company[t]); }
         else if (S.view === 'macro') renderMacro($('#view'));
         const again = doc.querySelector(`[data-horizon="${S.horizon}"]`); if (again) again.focus({preventScroll: true}); }

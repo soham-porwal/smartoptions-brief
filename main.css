@@ -156,3 +156,17 @@ main:has(.cockpit){max-width:1232px}.cockpit .mover-grid{display:grid;grid-templ
 @media(max-width:600px){.sheet-body{overflow-wrap:anywhere}.sheet-body table{display:block;width:100%}.sheet-body tbody{display:block}.sheet-body tr{display:grid;grid-template-columns:minmax(0,1fr) auto;border-bottom:1px solid var(--line);padding:8px 0}.sheet-body td{min-width:0;white-space:normal;overflow-wrap:anywhere;border:0;padding:4px}.sheet-body td.dim{grid-column:1/-1}.sheet-body td.n{max-width:140px}}
 
 .news-items{list-style:none;padding:0;margin:0;max-width:90ch}.news-items li{border-top:1px solid var(--line);padding:8px 0}.news-items p{margin:4px 0}.news-items a{overflow-wrap:anywhere}
+
+/* Intuitive status cues: plain words plus shape and color, never a key or color alone. */
+.signal-icon{display:inline-flex;align-items:center;justify-content:center;flex:none;width:1.45em;height:1.45em;border:1px solid currentColor;border-radius:50%;font-size:.82em;font-weight:750;line-height:1;vertical-align:middle;margin-right:.42em}
+.signal-icon[data-tone=good],.signal-badge[data-tone=good]{color:var(--up);background:var(--upbg)}
+.signal-icon[data-tone=mixed],.signal-badge[data-tone=mixed]{color:var(--amber);background:var(--ambg)}
+.signal-icon[data-tone=bad],.signal-badge[data-tone=bad]{color:var(--dn);background:var(--dnbg)}
+.signal-icon[data-tone=neutral],.signal-badge[data-tone=neutral]{color:var(--dim);background:var(--card)}
+.headline .signal-icon{font-size:.65em}.cockpit .market-reasons .reason-copy{flex:1}.market-reasons .signal-icon{margin-right:0}
+.tile[data-tone=good],.objective-grid article[data-tone=good]{border-left:4px solid var(--up)}
+.tile[data-tone=mixed],.objective-grid article[data-tone=mixed]{border-left:4px solid var(--amber)}
+.tile[data-tone=bad],.objective-grid article[data-tone=bad]{border-left:4px solid var(--dn)}
+.objective-grid article[data-tone=mixed] .objective-word{color:var(--amber)}.objective-grid article[data-tone=bad] .objective-word{color:var(--dn)}
+.research-tags.tag{display:flex;flex-wrap:wrap;align-items:center;gap:6px;border:0;padding:0;color:inherit}.signal-badge{display:inline-flex;align-items:center;gap:2px;max-width:100%;padding:3px 7px;border:1px solid currentColor;border-radius:7px;font-size:13px;line-height:1.4}.signal-badge .signal-icon{width:1.25em;height:1.25em;font-size:.85em;margin-right:3px}
+.ideas .obj[data-tone=mixed] .lbl{color:var(--amber)}.ideas .obj[data-tone=neutral] .lbl{color:var(--dim)}
