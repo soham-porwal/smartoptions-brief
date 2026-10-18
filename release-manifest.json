@@ -1,7 +1,7 @@
 {
   "release_id": "brief-client-20261018-r16-live-brief",
-  "built_at": "2026-10-18T14:25:26.255483+00:00",
-  "source_base": "13d4b0ef8798a4e126852d9cafdfe1972c719067",
+  "built_at": "2026-10-18T14:31:36.689331+00:00",
+  "source_base": "bd75747b526a5708079c52cabd64b6cc8b2de0ff",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -300,8 +300,8 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "6e420fc20446d628926f58c362b86d16a12533750310fa9f8557a088a74ba20d",
-      "bytes": 4232
+      "sha256": "fcf36437f2fc4928dff7e8a4a6f799138004a60c6e4b90c3e1f0919e020d02b7",
+      "bytes": 4169
     }
   },
   "data_at_publication": {
