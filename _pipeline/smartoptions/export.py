@@ -382,6 +382,9 @@ def build(date_s: str | None = None, out_dir: Path | None = None, input_dir: Pat
             "iv": iv_val, "ivx": iv.get("expiry") if iv else None,
             "ivk": iv.get("strike") if iv else None, "ivspan": iv.get("spans_earnings") if iv else None,
             "ivs": iv.get("source") if iv else None,
+            # Delayed chain context (optional): chain retrieval time and per-leg values as returned; last trade dates only the trade.
+            "ivat": iv.get("retrieved_at") if iv else None,
+            "ivq": [{k: q.get(k) for k in ("leg", "strike", "iv_pct", "bid", "ask", "open_interest", "last_trade_utc")} for q in (iv.get("quote") or [])] if iv and iv.get("quote") else None,
             "rv20": rv20, "iv_sec_med": iv_sec, "ivrv": ivrv, "ivrv_eff": ivrv_eff,
             "res1d": r(att_t.get("stock_specific"), 2),
             "res5d": r(att_t.get("resid_5d"), 2),

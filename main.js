@@ -338,6 +338,15 @@
     if(x.id==='income')return model.signals[3].status==='high'||model.signals[0].status==='adverse'?'bad':!model.signals[0].status||!model.signals[3].status?'neutral':'mixed';
     return /^Not rated/.test(x.word)?'neutral':'mixed';
   }
+  // Delayed ATM chain context: values as Yahoo returned them with the chain's own retrieval time. A last trade dates only that
+  // trade (never the IV or bid/ask); an undated cached sample stays withheld. No IV rank, premium quality or income rating.
+  function delayedIv(r) {
+    if (!r || r.st?.atm_iv !== 'ok' || !isNum(r.iv)) return {kind: 'missing', text: 'Delayed ATM IV unavailable for this company; realized volatility is not substituted.'};
+    if (!r.ivat || !isFinite(Date.parse(r.ivat))) return {kind: 'undated', text: 'A delayed ATM sample is retained, but its own retrieval time is not recorded (older cache). The number is withheld; a build or analyst refresh time cannot date it. Not a contract quote or validated surface.'};
+    const legs = (r.ivq || []).filter(q => q && (q.leg === 'call' || q.leg === 'put'));
+    return {kind: 'dated', iv: r.iv, expiry: r.ivx, strike: r.ivk, retrieved: r.ivat, spans: r.ivspan === true, legs,
+      text: `Delayed ATM IV ${r.iv.toFixed(1)}%${legs.length > 1 ? ' (call/put average)' : ''} · expiry ${r.ivx || 'not returned'} · strike ${isNum(r.ivk) ? r.ivk : 'not returned'} · chain retrieved ${r.ivat.slice(0, 16).replace('T', ' ')} UTC.`};
+  }
   function researchBadges(s) {
     const business=s.category.split(' · ')[0],businessTone=business==='Quality research'?'good':s.concerns.some(c=>c.kind==='fundamental')?'bad':'neutral';
     const setupTone=s.setup==='unknown'||s.label==='Trend watch'?'neutral':'mixed';
@@ -492,13 +501,13 @@
     return hi > lo ? {pos: 100 * (cur.px - lo) / (hi - lo), lo, hi} : null;
   }
 
-  const API = {signalCue,postureTone,objectiveTone,researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
+  const API = {delayedIv,signalCue,postureTone,objectiveTone,researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
   if (typeof module !== 'undefined' && module.exports) { module.exports = API; return; }
   root.SmartOptionsMain = API;
   const doc = root.document; if (!doc) return;
 
   /* ------------------------------------------------------------ page */
-  const ASSET_V = 'client-20261018-fit2';
+  const ASSET_V = 'client-20261018-classy1';
   const Live = root.SmartOptionsLive;
   const S = root.__soMainState = {core: null, brief: null, rel: null, rowMap: new Map(), slots: [], view: null, chart: null, company: {}, onQuote: null};
   const $ = s => doc.querySelector(s);
@@ -506,7 +515,7 @@
   const row = t => S.rowMap.get(t) || null;
   const learnHref=label=>'#/learn/'+encodeURIComponent(label);
   const learnLink=(label,text)=>`<a class="learn" href="${learnHref(label)}" aria-label="Explain ${esc(label)}">${esc(text||label)}</a>`;
-  const liveSpan = (t, f) => `<a class="learn" href="${learnHref((f==='price'?'Price':'Daily return')+' · '+t)}" aria-label="Explain ${esc(t)} ${f}"><span data-live="${esc(t)}" data-live-f="${f}"></span></a>`;
+  const liveSpan = (t, f, quiet) => `<a class="learn" href="${learnHref((f==='price'?'Price':'Daily return')+' · '+t)}" aria-label="Explain ${esc(t)} ${f}"><span data-live="${esc(t)}" data-live-f="${f}"${quiet?' data-live-quiet':''}></span></a>`;
   function slot(id, fn) { S.slots.push({id, fn}); return `<span class="slot" id="${id}">${fn()}</span>`; }
   function paintSlots() { S.slots.forEach(s => { const el = doc.getElementById(s.id); if (el) { const h = s.fn(); if (el.innerHTML !== h) {
     if(s.id==='heat' && el.querySelector('svg')) {const tmp=doc.createElement('div');tmp.innerHTML=h;el.querySelectorAll('[data-sector]').forEach(a=>{const newer=[...tmp.querySelectorAll('[data-sector]')].find(x=>x.dataset.sector===a.dataset.sector);if(newer){a.setAttribute('aria-label',newer.getAttribute('aria-label'));a.querySelector('rect').setAttribute('fill',newer.querySelector('rect').getAttribute('fill'));a.querySelectorAll('text,title').forEach((t,i)=>t.textContent=newer.querySelectorAll('text,title')[i].textContent);}});
@@ -680,7 +689,7 @@
   const timingWord = x => x.timing === 'bmo' ? 'before the open' : x.timing === 'amc' ? 'after the close' : x.timing === 'timed' ? '' : 'time not confirmed';
   function eventLine(x, i, scope) {
     const tw = timingWord(x);
-    return `<li><span class="when">${when(x.when)}</span> <b>${x.t ? `<a href="#/company/${esc(x.t)}/events">${esc(x.title)}</a>` : esc(x.title)}</b>${tw ? ` <span class="dim">${esc(tw)}</span>` : ''}${x.entered ? ' <span class="tag">entered equity</span>' : x.saved ? ' <span class="tag">followed company</span>' : ''}<p class="small">${x.kind==='earnings'?'Results and guidance can reset expectations.':/oil|EIA/i.test(x.title)?'Possible channel: producer revenues and input costs.':'Possible channel: demand, wages, policy and discount rates.'}</p> ${evBtn({kind: 'event', scope, i}, 'Source and evidence')}</li>`;
+    return `<li><span class="when">${when(x.when)}</span><span class="what"><b>${x.t ? `<a href="#/company/${esc(x.t)}/events">${esc(x.title)}</a>` : esc(x.title)}</b>${tw ? ` <span class="dim">${esc(tw)}</span>` : ''}${x.entered ? ' <span class="tag">entered equity</span>' : x.saved ? ' <span class="tag">followed company</span>' : ''}<span class="small channel">${x.kind==='earnings'?'Results and guidance can reset expectations.':/oil|EIA/i.test(x.title)?'Possible channel: producer revenues and input costs.':'Possible channel: demand, wages, policy and discount rates.'}</span></span> ${evBtn({kind: 'event', scope, i}, 'Source', 'text')}</li>`;
   }
   function aheadHtml() {
     const h = horizonEvents(S.horizon); S.lastEvents = S.lastEvents || {}; S.lastEvents.today = h.relevant;
@@ -697,11 +706,12 @@
   }
   function shortCard(x) {
     const setup=shortSetup(x),why=((x.why||[])[0]?.text||'Inspect dated company evidence.').replace(/, provider quarter label [\d-]+\.?/i,'.');
-    return `<article data-short="${esc(x.t)}"><p class="tag research-tags" data-short-category="${esc(x.t)}">${researchBadges(setup)}</p><h3><a href="#/company/${esc(x.t)}">${esc(x.t)}</a> <span class="dim">${esc(x.name)} · ${esc(x.sector)}</span>
-        <span class="px">${liveSpan(x.t, 'price')} <span class="chg">${liveSpan(x.t, 'chg')}</span></span></h3>
-      <p class="why"><span class="lbl">Why look</span> ${esc(why)}</p>
+    return `<article data-short="${esc(x.t)}"><div class="short-id"><h3><a href="#/company/${esc(x.t)}">${esc(x.t)}</a> <span class="co-name">${esc(x.name)}</span></h3><p class="co-sector">${esc(x.sector)}</p>
+        <p class="quote-line"><span class="px">${liveSpan(x.t, 'price', true)} <span class="chg">${liveSpan(x.t, 'chg', true)}</span></span><span class="quote-note" data-live="${esc(x.t)}" data-live-f="note"></span></p>
+        <p class="tag research-tags" data-short-category="${esc(x.t)}">${researchBadges(setup)}</p></div>
+      <p class="why"><span class="lbl">Case</span> ${esc(why)}</p>
       <p class="obj" data-tone="${setup.concerns.some(c=>c.kind==='fundamental')?'bad':setup.concern.measured?'mixed':'neutral'}" data-short-caution="${esc(x.t)}">${shortCaution(setup)}</p>
-      <p class="links">${evBtn({kind: 'shortlist', t: x.t}, 'Case, caution & dated evidence')} <a href="#/company/${esc(x.t)}">Open dossier →</a></p></article>`;
+      <p class="links">${evBtn({kind: 'shortlist', t: x.t}, `Evidence<span class="sr"> for ${esc(x.t)}: case, caution and dated sources</span>`)} <a href="#/company/${esc(x.t)}" aria-label="Open ${esc(x.t)} dossier">Open dossier →</a></p></article>`;
   }
   function shortSetup(x){return researchSetup(x,row(x.t),{session:S.brief.asof_session,events:horizonEvents(S.horizon||7)});}
   function shortCaution(s){return `<span class="lbl">${s.concern.measured?'Caution':'Watch'}</span> ${esc(s.concern.measured?s.concern.text:s.signal)} ${esc(s.wait)}${s.event?` <span class="small">${esc(s.event)}</span>`:''}`;}
@@ -718,15 +728,16 @@
     const up=c.change>0,flat=Math.abs(c.change)<1e-8;
     return c.id==='spy_1d'?'Index movement describes the session; it is not an opportunity ranking.':c.id==='vix'?`Expected near-term market volatility ${flat?'was unchanged':up?'increased':'decreased'}; this is not single-name IV.`:c.id==='us10y'?(Math.abs(c.change)<5?'A move under 5bp is treated as little changed; no clear rate pressure or relief.':`${up?'Higher yields tighten':'Lower yields ease'} the discount-rate channel, all else equal.`):c.id==='dxy'?`${flat?'An unchanged dollar leaves':up?'A stronger dollar can weigh on':'A weaker dollar can ease'} overseas earnings translation; company exposure is not measured.`:'Same names at both endpoints; percentage-point change differs from the five-session direction.';
   }
-  function objectivesHtml() {const model=todayModel(S.brief,S.core);return objectiveModel(model,S.brief,horizonEvents(S.horizon||7),S.core).map(x=>`<article data-objective="${x.id}" data-tone="${objectiveTone(x,model)}"><h3>${x.title}</h3><p class="objective-word">${cue(objectiveTone(x,model))}${esc(x.word)}</p><p>${esc(x.summary)}</p><p class="dim small">${esc(x.limit)}</p><p>${evBtn({kind:'objective',id:x.id})} <button data-jump="${x.target}">Investigate ${x.title.toLowerCase()}</button></p></article>`).join('');}
+  function objectivesHtml() {const model=todayModel(S.brief,S.core);return objectiveModel(model,S.brief,horizonEvents(S.horizon||7),S.core).map(x=>`<article data-objective="${x.id}" data-tone="${objectiveTone(x,model)}"><h3>${x.title}</h3><p class="objective-word">${cue(objectiveTone(x,model))}${esc(x.word)}</p><p>${esc(x.summary)}</p><p class="dim small objective-limit">${esc(x.limit)}</p><p class="objective-actions">${evBtn({kind:'objective',id:x.id},'','text')} <button class="text" data-jump="${x.target}">Investigate ${x.title.toLowerCase()} →</button></p></article>`).join('');}
   function incomeHtml() {
     const names=[...new Set([...enteredNames(),...WL().get(),...(S.brief.shortlist||[]).map(x=>x.t)])].filter(t=>row(t));
     return `<label for="income-company">Company for contract and event research</label><select id="income-company"><option value="">Choose a company</option>${names.map(t=>`<option value="${esc(t)}" ${S.incomeTicker===t?'selected':''}>${esc(t)}</option>`).join('')}</select><div id="income-context">${incomeContext()}</div><button data-personal="search" data-income-search>Find another company</button>`;
   }
   function incomeContext() {
     const t=S.incomeTicker,r=row(t);if(!r)return '<p>Choose an entered, followed or shortlisted company, or use company search.</p>';
-    const sample=r.st?.atm_iv==='ok'&&isNum(r.iv);
-    return `<p><b>${esc(t)}</b> · ${r.er?`Expected earnings ${esc(r.er)} (${esc(r.ert||'timing unknown')}). An expiry across this date carries report gap risk.`:'Next earnings unavailable; calendar coverage is incomplete.'}</p><p class="dim small">Contract pricing unavailable; premiums and assignment odds are not rated.</p><details><summary>Delayed IV coverage</summary><p>${sample?'A delayed ATM sample is retained, but its own retrieval timestamp is not supplied in core. The number is withheld here; an analyst refresh timestamp cannot establish IV freshness. Not a contract quote or validated surface.':'Delayed ATM IV unavailable for this company; realized volatility is not substituted.'}</p></details><p><a href="#/company/${esc(t)}/options">${esc(t)} Options</a> · <a href="#/company/${esc(t)}/events">${esc(t)} Events</a></p>`;
+    const d=delayedIv(r),cell=v=>v==null?'not returned':esc(v);
+    const legs=d.kind==='dated'&&d.legs.length?`<div class="tablewrap"><table><thead><tr><th>Leg</th><th class="n">Strike</th><th class="n">IV</th><th class="n">Bid / ask</th><th class="n">Open interest</th><th>Last trade (that contract only)</th></tr></thead><tbody>${d.legs.map(q=>`<tr><td>${esc(q.leg)}</td><td class="n">${cell(q.strike)}</td><td class="n">${isNum(q.iv_pct)?q.iv_pct.toFixed(1)+'%':'not returned'}</td><td class="n">${cell(q.bid)} / ${cell(q.ask)}</td><td class="n">${cell(q.open_interest)}</td><td>${q.last_trade_utc?esc(q.last_trade_utc.slice(0,16).replace('T',' '))+' UTC':'not returned'}</td></tr>`).join('')}</tbody></table></div>`:'';
+    return `<p><b>${esc(t)}</b> · ${r.er?`Expected earnings ${esc(r.er)} (${esc(r.ert||'timing unknown')}). An expiry across this date carries report gap risk.`:'Next earnings unavailable; calendar coverage is incomplete.'}</p><p class="dim small">${d.kind==='dated'?'Delayed chain context below':'Contract pricing unavailable'}; premiums and assignment odds are not rated.</p><details><summary>Delayed IV ${d.kind==='dated'?'context':'coverage'}</summary><p>${esc(d.text)}</p>${d.kind==='dated'?`${d.spans?'<p>This expiry spans the listed earnings date, so the IV includes report risk.</p>':''}${legs}<p class="small dim">Delayed sample, not an executable quote. Bid/ask and IV are as returned at the chain retrieval; the last trade time does not date them. IV is not compared with its own history, so premium richness and income suitability are not rated.</p>`:''}</details><p><a href="#/company/${esc(t)}/options">${esc(t)} Options</a> · <a href="#/company/${esc(t)}/events">${esc(t)} Events</a></p>`;
   }
   function moversHtml() {
     const rows=S.core.rows.filter(r=>r.sp500_member!==false&&r.pxd===S.brief.asof_session),returns=rows.filter(r=>isNum(r.d1)),volumes=rows.filter(r=>r.st?.vol_ratio_20d==='ok'&&isNum(r.vr)&&r.vr>=0).sort((a,b)=>b.vr-a.vr).slice(0,3);
@@ -738,12 +749,12 @@
     Live.watch('index',['SPY','RSP']);Live.watch('research',short.map(x=>x.t));Live.watch('company',[]);
     const gap=changeItem(b,'eq_cap_gap_5d');
     main.innerHTML=`${legacy?`<p class="note">That view lives in the <a href="backup.html${esc(legacy)}">expanded edition</a>.</p>`:''}
-      <div class="cockpit"><section class="read" id="market" aria-labelledby="read-h"><h1 id="read-h">Today’s market</h1>
-        <p class="trust">Updated ${esc(model.updated)} · completed session ${esc(model.session)} · ${esc(model.coverage)} ${evBtn({kind:'today',id:'trust'},'Data and sources')}</p>
-        <h2 class="headline" data-tone="${postureTone(model)}">${cue(postureTone(model))}<span class="headline-copy">${esc(model.label)}</span></h2><p class="small dim">Dated completed-session assessment. Live quotes do not refresh these signals.</p>
-        <ul class="market-reasons">${model.reasons.map(x=>`<li><button type="button" class="ev reason" data-ev="${evAttr(x.ev)}">${cue(model.signals.find(s=>s.id===x.ev.id)?.tone||'neutral')}<span class="reason-copy">${esc(x.text)}</span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul><p>${evBtn({kind:'today',id:'posture'},'How this reading is formed')}</p>
-        <nav class="today-jumps" aria-label="Today sections">${[['market','Market'],['my-risk','My risk'],['income','Income'],['opportunity','Opportunity'],['deep-dive','Deep dive']].map(([id,label])=>`<button data-jump="${id}">${label}</button>`).join('')}</nav></section>
-      <section id="since"><h2>Since previous session</h2><p class="dim small">${esc(model.comparisons[0].x?.prior?.date||'Prior date unavailable')} → ${esc(b.asof_session)}. Five-session and monthly changes remain separate.</p><div class="comparison-grid">${model.comparisons.map(c=>`<article data-comparison="${c.id}"><h3>${CHANGE_NAMES[c.id]}</h3><p class="comparison-value">${esc(comparisonText(c))}</p>${c.available?`<p class="small">${esc(c.x.prior.date)} → ${esc(c.x.current.date)}</p>`:''}<p>${esc(comparisonMeaning(c))}</p>${evBtn({kind:'today-change',id:c.id})}</article>`).join('')}</div></section>
+      <div class="cockpit"><section class="read" id="market" aria-labelledby="read-h"><h1 id="read-h" class="page-label">Today’s market</h1>
+        <p class="trust"><span>Completed session ${esc(model.session)}</span><span>Updated ${esc(model.updated)}</span><span>${esc(model.coverage)}</span> ${evBtn({kind:'today',id:'trust'},'Data and sources','text')}</p>
+        <div class="opening"><div class="opening-read"><h2 class="headline" data-tone="${postureTone(model)}">${cue(postureTone(model))}<span class="headline-copy">${esc(model.label)}</span></h2><p class="small dim">Dated completed-session assessment. Live quotes do not refresh these signals.</p><p>${evBtn({kind:'today',id:'posture'},'How this reading is formed','text')}</p></div>
+        <ul class="market-reasons">${model.reasons.map(x=>`<li><button type="button" class="ev reason" data-ev="${evAttr(x.ev)}">${cue(model.signals.find(s=>s.id===x.ev.id)?.tone||'neutral')}<span class="reason-copy">${esc(x.text)}</span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul></div>
+        <nav class="today-jumps" aria-label="Today sections">${[['market','Market'],['my-risk','My risk'],['income','Income'],['opportunity','Opportunity'],['deep-dive','Deep dive']].map(([id,label])=>`<button type="button" class="text" data-jump="${id}">${label}</button>`).join('')}</nav></section>
+      <section id="since"><h2>Since previous session</h2><p class="dim small">${esc(model.comparisons[0].x?.prior?.date||'Prior date unavailable')} → ${esc(b.asof_session)}. Five-session and monthly changes remain separate.</p><div class="comparison-grid">${model.comparisons.map(c=>`<article data-comparison="${c.id}"><h3>${CHANGE_NAMES[c.id]}</h3><p class="comparison-value">${esc(comparisonText(c))}</p>${c.available&&(c.x.prior.date!==model.comparisons[0].x?.prior?.date||c.x.current.date!==b.asof_session)?`<p class="small">${esc(c.x.prior.date)} → ${esc(c.x.current.date)}</p>`:''}<p>${esc(comparisonMeaning(c))}</p>${evBtn({kind:'today-change',id:c.id})}</article>`).join('')}</div></section>
       <section><h2>Four signals</h2><div class="assess">${model.signals.map(tile).join('')}</div><details><summary>Detailed macro observations</summary><p><a href="#/macro">Open all eight macro groups, histories and sources</a></p>${(b.macro?.detail||[]).map(d=>`<p><b>${esc(GROUPS[d.group]||d.group)}:</b> ${esc(d.line)}</p>`).join('')}</details></section>
       <section id="developments"><h2>Recent developments</h2><p class="dim small">Dated developments from market desks, official releases and matched companies. A headline is context to check; it is not a measured cause of any price move.</p><details class="news-depth"><summary>Show dated headlines and their sources</summary><div id="news-list"><p class="dim">Opens on request so the first view stays fast.</p></div></details></section>
       <section id="positioning"><h2>S&P positioning</h2><p>${esc(model.signals[1].word)}. ${esc(conc.line||'Provider-cap concentration unavailable.')} ${esc(rotation.line||'Leadership unavailable.')}</p><p class="dim small">Provider capitalization is a proxy, not official index contribution. ${gap?.status==='ok'?`RSP minus SPY 20-session price gap ${pp(gap.prior.value)} → ${pp(gap.current.value)}, ${gap.prior.date} → ${gap.current.date} (five sessions apart).`: 'Equal versus cap-weight comparison unavailable.'}</p><p>${evBtn({kind:'today',id:'positioning'})} <a href="${esc(W.encodeHash({s:[{id:'eq:RSP'},{id:'eq:SPY'}],r:'6m',m:'index'}))}">Compare RSP and SPY</a></p>
@@ -751,7 +762,7 @@
       <section><h2>What does this mean for me today?</h2><p class="dim small">Investigation conditions, not a personal recommendation.</p><div id="objectives" class="objective-grid">${objectivesHtml()}</div></section>
       <section id="my-risk"><h2>My risk</h2><p>Equities entered: ${enteredNames().length} · companies followed: ${WL().get().length}. Options positions are not covered.</p><h3 id="ahead-h">Upcoming risks</h3><div id="ahead">${aheadHtml()}</div><section id="for-you" class="for-you" aria-label="For you"></section></section>
       <section id="income"><h2>Income</h2>${incomeHtml()}</section>
-      <section id="opportunity" class="research"><h2>Research shortlist</h2><p>Business quality is separate from entry timing. Watch pullbacks, extended prices and valuation premiums before adding exposure.</p><p class="dim small">Setups: completed ${esc(b.asof_session)} session, adjusted closes. Live prices above keep their own timestamps. Full statement periods, missing measures and comparisons are in each evidence sheet.</p><div class="ideas">${short.map(shortCard).join('')||'<p>No company met the coverage rule. <a href="#/companies">Inspect company coverage</a>.</p>'}</div><a href="#/companies?mode=shortlist">All eligible company evidence</a></section>
+      <section id="opportunity" class="research"><h2>Research shortlist</h2><p>Business quality is separate from entry timing. Watch pullbacks, extended prices and valuation premiums before adding exposure.</p><p class="dim small">Setups: completed ${esc(b.asof_session)} session, adjusted closes. Live prices above keep their own timestamps. Full statement periods, missing measures and comparisons are in each evidence sheet.</p><div class="ideas">${short.length?'<div class="short-head" aria-hidden="true"><span>Company</span><span>Business case</span><span>Concern / next check</span><span></span></div>':''}${short.map(shortCard).join('')||'<p>No company met the coverage rule. <a href="#/companies">Inspect company coverage</a>.</p>'}</div><a href="#/companies?mode=shortlist">All eligible company evidence</a></section>
       <section id="deep-dive" class="evidence-more"><h2>Deep dive</h2><p><a href="#/companies">Companies</a> · <a href="#/macro">Macro</a> · <a href="#/explore">Compare</a> · <a href="backup.html">Expanded strategies and private tools</a></p><details><summary>Relationships and evidence to investigate</summary><div class="insights">${insightCard(concentrationInsight(S.core.rel?.vol_breadth))}${S.rel?insightCard(leadershipInsight(S.rel))+insightCard(macroInsight(S.rel,S.core)): '<p>Relationship catalog unavailable; no inferred comparison.</p>'}</div><p class="dim">${slot('live-conc',liveConcSlot)}</p></details></section></div>`;
     S.personal=root.SmartOptionsInvestor.mountToday($('#for-you'),{...investorArgs(),compact:true});S.onQuote=changed=>S.personal?.quotes(changed);
     S.news=root.SmartOptionsNews.mount($('#news-list'),{core:S.core,disclosure:$('.news-depth')});
@@ -1819,8 +1830,20 @@
     };
     inp.addEventListener('input', show);
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') { const a = hits.querySelector('a'); if (a) { e.preventDefault(); root.location.hash = a.getAttribute('href'); inp.value = ''; hits.hidden = true; inp.blur(); } } if (e.key === 'Escape') { hits.hidden = true; } if (e.key === 'ArrowDown') { const a = hits.querySelector('a'); if (a) { e.preventDefault(); a.focus(); } } });
-    hits.addEventListener('click', e => { if (e.target.closest('a')) { inp.value = ''; hits.hidden = true; } });
+    hits.addEventListener('click', e => { if (e.target.closest('a')) { inp.value = ''; hits.hidden = true; S.closeSearch?.(false); } });
     doc.addEventListener('click', e => { if (!e.target.closest('.gsearch')) hits.hidden = true; });
+    // Phone header: Search expands the same input/results row on request; desktop keeps it visible (CSS).
+    const hdr = $('#hdr'), tog = $('#gs-toggle');
+    const setOpen = (open, refocus) => { if (!hdr || !tog) return; hdr.classList.toggle('search-open', open); tog.setAttribute('aria-expanded', String(open)); tog.textContent = open ? 'Close' : 'Search'; if (open) inp.focus(); else { hits.hidden = true; if (refocus) tog.focus(); } };
+    S.openSearch = () => setOpen(true); S.closeSearch = refocus => { if (hdr?.classList.contains('search-open')) setOpen(false, refocus); };
+    if (tog) tog.addEventListener('click', () => setOpen(!hdr.classList.contains('search-open'), true));
+    // Existing "find a company" actions focus #gsearch; on phone, open its row first (capture runs before their handlers).
+    doc.addEventListener('click', e => { if (tog && e.target.closest('[data-personal="search"],[data-income-search]') && root.getComputedStyle(tog).display !== 'none') setOpen(true); }, true);
+    inp.addEventListener('keydown', e => { if (e.key === 'Escape' && hdr?.classList.contains('search-open')) { e.preventDefault(); setOpen(false, true); } });
+    root.addEventListener?.('hashchange', () => S.closeSearch(false));
+    // Sticky/anchor offsets follow the real header height, including an expanded search row.
+    const syncH = () => { if (hdr) doc.documentElement.style.setProperty('--hdr-h', Math.ceil(hdr.getBoundingClientRect().height) + 'px'); };
+    syncH(); if (root.ResizeObserver && hdr) new root.ResizeObserver(syncH).observe(hdr); else root.addEventListener?.('resize', syncH);
   }
   function initTheme() {
     const b = $('#theme'); let t = null; try { t = root.localStorage.getItem('so-brief-theme'); } catch (e) { t = null; }

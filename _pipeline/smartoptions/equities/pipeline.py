@@ -190,7 +190,7 @@ def build(out_dir: Path, refresh: bool = False, limit: int | None = None, extra:
 
     def iv_job(s):
         t = tickers[s]
-        if iv_cache.get(s, {}).get("result"):  # a good result from an earlier run today is kept
+        if (iv_cache.get(s, {}).get("result") or {}).get("retrieved_at"):  # only a dated result from earlier today is reusable
             return s, iv_cache[s]["result"], None
         r, reason = None, None
         for attempt in range(2):
@@ -205,8 +205,11 @@ def build(out_dir: Path, refresh: bool = False, limit: int | None = None, extra:
         for s, r, reason in ex.map(iv_job, iv_syms):
             t = tickers[s]
             t["status"]["atm_iv"] = "ok" if r else "missing"
+            # A kept result carries its own chain retrieval time; an older cache without one stays unknown, never "now".
+            at = (r.get("retrieved_at") if r else utc_now())
             t["provenance"]["atm_iv"] = {"provider": "Yahoo Finance via yfinance", "source": options.IV_SOURCE,
-                                         "retrieved_at": utc_now(), **({} if r else {"reason": reason})}
+                                         "retrieved_at": at, **({} if r else {"reason": reason}),
+                                         **({"retrieval_note": "inherited cache result; original retrieval time not recorded"} if r and not at else {})}
             iv_cache[s] = {"result": r, "reason": reason}
             if r:
                 t["atm_iv"] = r

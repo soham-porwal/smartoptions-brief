@@ -415,6 +415,22 @@
       default: return '';
     }
   }
+  // Presentation-only reference: the dated completed-session close in core. Never a current price; never fed to derive/currentRow.
+  function referenceQuote(row, nowMs = Date.now()) {
+    if (!row || !isNum(row.px) || row.px <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(String(row.pxd || ''))) return null;
+    const at = Date.parse(row.pxd + 'T00:00:00Z');
+    if (!Number.isFinite(at) || new Date(at).toISOString().slice(0, 10) !== row.pxd || at > nowMs) return null;
+    return {price: row.px, date: row.pxd, ret: isNum(row.d1) ? row.d1 : null, basis: 'completed-session close'};
+  }
+  const refDate = d => { const [y, m, dd] = d.split('-').map(Number); return new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString('en-US', {timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric'}); };
+  // Opt-in "note" slot: one clock line for a usable quote, or one dated reference (or one neutral status) during a gap.
+  function quoteNote(row, q, state, unavailable, nowMs, pending) {
+    if (!unavailable) { const w = {live: 'Live', closed: 'Close', delayed: 'Delayed', older: 'Older quote'}[state] || state; return {kind: 'current', text: w + ' · ' + etLabel(q && (q.asof_utc || q.ts), nowMs).replace(/^as of /, '')}; }
+    if (pending) return {kind: 'pending', text: 'Updating quote…'};
+    const ref = referenceQuote(row, nowMs);
+    if (!ref) return {kind: 'missing', text: 'Quote unavailable'};
+    return {kind: 'reference', ref, text: 'Reference close $' + fmtPx(ref.price) + ' · ' + refDate(ref.date) + (ref.ret == null ? '' : ' · session ' + fmtPct(ref.ret)) + '\nCurrent quote unavailable'};
+  }
   function paint(scope, changed) {
     if (!scope || !scope.querySelectorAll) return;
     observe(scope);
@@ -426,11 +442,13 @@
       if(f==='fresh'||f==='asof'){el.hidden=true;return;}
       const state=feedSummary(ST.quotes,[t],nowMs,ST.worker.errors).items[0].state;
       const unavailable=predatesRow(coreRow(t),q)||!['live','older','closed','delayed'].includes(state);
-      const text=f==='fresh'?(state==='older'?'older quote':state==='blocked'?'source wait':state):(['price','pe','pef','chg','range','hi','since'].includes(f)&&unavailable)?(ST.worker.pending?.includes(t)?'Updating…':'Unavailable'):fieldText(f,d,q,nowMs);
+      const quiet=el.hasAttribute('data-live-quiet'),note=f==='note'?quoteNote(coreRow(t),q,state,unavailable,nowMs,ST.worker.pending?.includes(t)):null;
+      if(quiet||note){if(unavailable)el.dataset.state=note?note.kind:'unavailable';else delete el.dataset.state;}
+      const text=note?note.text:f==='fresh'?(state==='older'?'older quote':state==='blocked'?'source wait':state):(['price','pe','pef','chg','range','hi','since'].includes(f)&&unavailable)?(quiet?'':ST.worker.pending?.includes(t)?'Updating…':'Unavailable'):fieldText(f,d,q,nowMs);
       if(q)el.title='Last reported '+fmtPx(q.price)+' at '+(q.asof_utc||q.ts)+'; source checked '+(q.checked_at||q.retrieved_at||'unknown')+(unavailable?'; current value unavailable':'');
       if (f === 'fresh') { const c = classify(q, nowMs); el.dataset.fresh = c.word; el.title = q ? (q.provider || '') + ', trade ' + etLabel(q.asof_utc || q.ts, nowMs) + (q.checked_at||q.retrieved_at ? '; source checked ' + (q.checked_at||q.retrieved_at) : '') : 'No observation'; }
       if (f === 'range' && el.style) el.style.setProperty('--pos', isNum(d.range_pct) ? d.range_pct.toFixed(1) + '%' : '50%');
-      if (f === 'chg' || f === 'since') el.dataset.dir = isNum(f === 'chg' ? d.chg_pct : d.since_close_pct) ? ((f === 'chg' ? d.chg_pct : d.since_close_pct) >= 0 ? 'up' : 'dn') : '';
+      if (f === 'chg' || f === 'since') el.dataset.dir = unavailable ? '' : isNum(f === 'chg' ? d.chg_pct : d.since_close_pct) ? ((f === 'chg' ? d.chg_pct : d.since_close_pct) >= 0 ? 'up' : 'dn') : '';
       if (f === 'range') { const bar = el.querySelector && el.querySelector('i'); if (bar) bar.style.left = isNum(d.range_pct) ? d.range_pct.toFixed(1) + '%' : '50%'; const lab = el.querySelector && el.querySelector('b'); if (lab) lab.textContent = text; return; }
       if (el.textContent === text) return;
       const old = el.textContent; el.textContent = text;
@@ -472,6 +490,6 @@
   function paintHealth() { if (root.CustomEvent && root.dispatchEvent) root.dispatchEvent(new root.CustomEvent('so:live-health', {detail: health()})); }
 
   return {start, setRows, refresh, configure, watch, subscribe, get, snapshot, health, coverage, paint, accept, loadFile, pollWorker, onScreen,
-    marketClock, classify, etLabel, merge, batches, decodeYahooMessage, yahooQuote, syncStream, stopStream, derive, currentRow, currentBrief, currentContext, predatesRow, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH, STREAM_MAX,
+    marketClock, classify, etLabel, merge, batches, decodeYahooMessage, yahooQuote, syncStream, stopStream, derive, currentRow, currentBrief, currentContext, predatesRow, referenceQuote, quoteNote, worstOf, feedSummary, fmtPx, fmtPct, ALLOWED_ORIGINS, MAX_BATCH, STREAM_MAX,
     _state: ST};
 });

@@ -97,6 +97,8 @@ def facts(row, records, session, cfg):
     # A single 0q EPS period is used; do not sum overlapping fiscal horizons.
     return dict(rev_growth=growth(rev, old_rev),
                 eps_growth=growth(field(q, latest, 'Diluted EPS', 'Basic EPS'), field(q, old, 'Diluted EPS', 'Basic EPS')),
+                # Endpoints kept so a nonpositive year-ago EPS reads as not comparable rather than missing.
+                eps_latest=field(q, latest, 'Diluted EPS', 'Basic EPS'), eps_prior=field(q, old, 'Diluted EPS', 'Basic EPS'), eps_prior_period=old,
                 rev_ttm=ttm_rev, rev_ttm_growth=growth(ttm_rev, prev_rev),
                 margin=margin, margin_delta=margin-old_margin if margin is not None and old_margin is not None else None,
                 fcf=fcf, conversion=ratio(fcf, ni) if aligned else None,
@@ -135,8 +137,15 @@ def company(row, records, session, cfg, sector_pe, px=None):
     gm = [met('Revenue growth YoY', f['rev_growth']), met('Diluted EPS growth YoY', f['eps_growth'], note='Positive prior-year EPS required'),
           met('Revenue TTM', f['rev_ttm'], money_unit, 'Four provider quarters through label ' + str(latest)),
           met('Revenue TTM growth YoY', f['rev_ttm_growth'], note='Eight contiguous quarters required')]
+    eps_text = f"EPS {fmt(f['eps_growth'], '%')} YoY"
+    if f['eps_growth'] is None and f.get('eps_latest') is not None and f.get('eps_prior') is not None and f['eps_prior'] <= 0:
+        # Growth from a nonpositive base is not meaningful; show the two reported values instead of a percent.
+        transition = ('loss to profit' if f['eps_latest'] > 0 else 'loss both quarters' if f['eps_latest'] < 0 else 'loss to breakeven') if f['eps_prior'] < 0 else ('breakeven to profit' if f['eps_latest'] > 0 else 'breakeven to loss' if f['eps_latest'] < 0 else 'breakeven both quarters')
+        eps_text = f"EPS {f['eps_latest']:.2f} vs {f['eps_prior']:.2f} a year earlier ({transition}; growth % not meaningful)"
+        gm.insert(2, met('Diluted EPS (latest quarter)', f['eps_latest'], money_unit))
+        gm.insert(3, met('Diluted EPS (year-ago quarter)', f['eps_prior'], money_unit, 'Provider quarter label ' + str(f.get('eps_prior_period'))))
     gs = worst([scored(k, 'growth_weak', 'growth_strong') for k in ['rev_growth', 'eps_growth']])
-    cards['growth'] = card(gs, f"Revenue {fmt(f['rev_growth'], '%')}; EPS {fmt(f['eps_growth'], '%')} YoY, provider quarter label {latest}.", gm) if gs != 'unavailable' else missing('comparable year-ago revenue and EPS missing')
+    cards['growth'] = card(gs, f"Revenue {fmt(f['rev_growth'], '%')}; {eps_text}, provider quarter label {latest}.", gm) if gs != 'unavailable' else missing('comparable year-ago revenue and EPS missing')
     if financial:
         ms = worst([scored('roe', 'roe_weak', 'roe_strong'), scored('roa', 'roa_weak', 'roa_strong')])
         cards['profitability'] = card(ms, f"Return on equity is {f['roe']:.1f}% over four quarters.",
