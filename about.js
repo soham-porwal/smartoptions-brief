@@ -34,7 +34,7 @@ window.SO2_about = function (el) {
     <p>Market fundamentals, macro context and company research. Session ${e(D.asof_session)}; exported ${e(D.exported_at)}. Displayed quotes use the shared price source; historical closes retain their own dates. Relationships are measured associations over ${e(D.rel.window)}, not causes; scenario numbers are historical associations, not forecasts. Education only, not advice; no orders.</p>
     <h3>Data &amp; sources</h3>
     <p>Macro observations: ${st.ok} ok, ${st.stale || 0} stale, ${st.missing || 0} missing, ${st.error || 0} error. Cross-checks: ${xc.map(c => `${e(c.check)}: ${e(c.result)}`).join('; ') || 'none'}.</p>
-    <p>Historical reference columns use the 2026-07-25 SmartOptions snapshot. The component split is shown only where the documented formula reproduces that historical composite.</p>
+    <p>Historical reference columns use the 2026-07-25 screener snapshot. The component split is shown only where the documented formula reproduces that historical composite.</p>
     <h3>App methods</h3>${Object.entries(D.methods || {}).map(([k, v]) => `<li><b>${e(k)}</b>: ${e(v)}</li>`).join('')}
     <h3>Mover ranking</h3><p>${e((D.movers || {}).method || '')}</p>
     ${md(D.docs && D.docs.methods_md, e)}

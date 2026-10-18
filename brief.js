@@ -329,7 +329,7 @@
     const hdr = doc.createElement('header');
     hdr.className = 'bv-hdr'; hdr.id = 'bv-hdr';
     hdr.innerHTML = `<div class="bv-hdr-in">
-      <a class="bv-mark" id="back-to-main" href="index.html#/" aria-label="SmartOptions Brief, main dashboard">SmartOptions<span>Brief</span></a>
+      <a class="bv-mark" id="back-to-main" href="index.html#/" aria-label="Market Brief, main dashboard">Market<span>Brief</span></a>
       <nav class="bv-nav" aria-label="Main">
         <a href="#/brief" data-nav="brief">Brief</a><a href="#/company" data-nav="company"><span class="nav-wide">Companies</span><span class="nav-small">Company</span></a><a href="#/flows" data-nav="flows"><span class="nav-wide">Capital &amp; news</span><span class="nav-small">Capital</span></a><a href="#/my-dash" data-nav="my-dash">My Dash</a><a href="#/macro" data-nav="macro" class="nav-secondary">Macro</a><a href="#/research/overview" data-nav="research" class="nav-secondary">Research</a><button type="button" class="bv-more" id="bv-more" aria-expanded="false" aria-controls="bv-more-menu">More</button>
       </nav>
@@ -515,15 +515,15 @@
       if (!doc.getElementById('bv-research-bridge')) { const bridge = doc.createElement('p'); bridge.id = 'bv-research-bridge'; bridge.className = 'b-reason'; bridge.innerHTML = '<a href="#/brief">Back to the two-minute Brief</a> · Research exposes full source tables, optional historical references and modeled strategies. Start with a company, then expand the evidence you need.<details><summary>Terms used here</summary>IV: volatility inferred from option prices. RV: measured historical volatility. Beta: fitted sensitivity to a market move. OLS: a least-squares statistical fit. Residual: the return left unexplained by that fit. Basis point: 0.01 percentage point. These describe inputs and associations, not validated forecasts.</details>'; doc.getElementById('hdr').after(bridge); }
       if (!r.legacy) { try { root.history.replaceState(null, '', legacyHash(r)); } catch (e) { /* file:// may refuse; Edge reads the tab below */ } }
       if (!fromLoad && r.tab) openEdgeTab(r.tab);
-      doc.title = 'Research | SmartOptions Brief';
+      doc.title = 'Research | Market Brief';
       watchOnScreen();
       return;
     }
     const view = doc.getElementById('bv-view');
     loadReceipt().then(renderPill);
-    if (r.view === 'brief') { renderBrief(view); doc.title = 'Brief | SmartOptions'; }
-    else if (r.view === 'macro') { renderMacroPage(view); doc.title = 'Macro | SmartOptions Brief'; }
-    else if (r.view === 'company') { if (r.ticker) renderCompany(view, r.ticker); else renderCompanies(view); doc.title = (r.ticker ? r.ticker + ' | ' : 'Companies | ') + 'SmartOptions Brief'; }
+    if (r.view === 'brief') { renderBrief(view); doc.title = 'Brief | Market Brief'; }
+    else if (r.view === 'macro') { renderMacroPage(view); doc.title = 'Macro | Market Brief'; }
+    else if (r.view === 'company') { if (r.ticker) renderCompany(view, r.ticker); else renderCompanies(view); doc.title = (r.ticker ? r.ticker + ' | ' : 'Companies | ') + 'Market Brief'; }
     else if (r.view === 'my-dash') { mountPage(view,'SmartOptionsMyDashboard','My Dash'); }
     else if (r.view === 'flows') { mountPage(view,'MoneyFlow','Capital & news'); }
     if (!fromLoad) root.scrollTo(0, 0);
@@ -531,7 +531,7 @@
   }
   function mountPage(view,name,label) {
     const module = root[name] || root.SO2 && root.SO2[name];
-    doc.title=label+' | SmartOptions Brief';
+    doc.title=label+' | Market Brief';
     if (module && typeof module.mount==='function') {
       try { module.mount(view); } catch(e) {console.error('[brief] '+label+' failed',e);view.innerHTML=`<div class="bv-wrap"><section class="b-card"><h1 class="b-h1">${esc(label)}</h1><p role="alert">Not available: ${esc(e.message || e)}</p></section></div>`;}
     } else view.innerHTML=`<div class="bv-wrap"><section class="b-card"><h1 class="b-h1">${esc(label)}</h1><p role="status">Not available: this page module did not load.</p><a class="b-link-btn" href="#/brief">Return to Brief</a></section></div>`;

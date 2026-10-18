@@ -195,11 +195,11 @@
       series: t.symbol, as_of: m.generated.equities || m.exported_at, url: yahooUrl(t.symbol)});
   }
   function citeSam(m, t, ctx) {
-    return ctx.cite({label: 'Historical reference (2026-07-25)', source: "Historical SmartOptions screener snapshot (read-only)",
+    return ctx.cite({label: 'Historical reference (2026-07-25)', source: "Historical screener snapshot (read-only)",
       series: t.symbol, as_of: t.sam && t.sam.asof, url: null});
   }
   function citeRel(m, sym, ctx) {
-    return ctx.cite({label: (sym ? sym + ' ' : '') + 'macro sensitivities (OLS)', source: 'SmartOptions V2 relations: OLS of daily returns on SPY, d10Y bp, DXY, WTI, dVIX',
+    return ctx.cite({label: (sym ? sym + ' ' : '') + 'macro sensitivities (OLS)', source: 'Stored relations: OLS of daily returns on SPY, d10Y bp, DXY, WTI, dVIX',
       series: sym || 'relations', as_of: m.rel_window, url: null});
   }
   function citeObs(o, ctx) {
@@ -332,7 +332,7 @@
     });
     const cites = [ctx.cite({label: 'Screen over dashboard tickers: price, valuation, analyst, earnings, ATM IV', source: 'Yahoo Finance via yfinance',
       series: 'all tickers', as_of: m.asof_session, url: 'https://finance.yahoo.com/'})];
-    if (f.min_sam_opp != null || f.sam_risk || f.sam_quality || sortKey.startsWith('sam')) cites.push(ctx.cite({label: 'SmartOptions snapshot 2026-07-25', source: "Historical SmartOptions screener snapshot (read-only)", series: 'all tickers', as_of: '2026-07-25', url: null}));
+    if (f.min_sam_opp != null || f.sam_risk || f.sam_quality || sortKey.startsWith('sam')) cites.push(ctx.cite({label: 'Screener snapshot 2026-07-25', source: "Historical screener snapshot (read-only)", series: 'all tickers', as_of: '2026-07-25', url: null}));
     if (fac) cites.push(citeRel(m, null, ctx));
     return {matched: total, shown: out.length, sort: (desc ? '-' : '+') + sortKey, filters: f, excluded_by_filter: excluded, notes,
       days_reference: 'days_to_earnings counted from ' + etToday(ctx.now) + ' (ET)', factor_units: fac ? m.units[fac] : undefined,
@@ -415,11 +415,11 @@
 
   function get_regime(m, args, ctx) {
     if (!m.regime) return {error: 'not in the data: regime'};
-    const cites = [ctx.cite({label: 'Market regime score (Historical\'s market_regime.py method, recomputed)', source: 'SmartOptions V2 relations (VIX, A/D, new highs/lows)', series: 'regime', as_of: m.asof_session, url: null})];
+    const cites = [ctx.cite({label: 'Market regime score (Historical\'s market_regime.py method, recomputed)', source: 'Stored relations (VIX, A/D, new highs/lows)', series: 'regime', as_of: m.asof_session, url: null})];
     const vb = m.vol_breadth;
     let vol = null;
     if (vb) {
-      cites.push(ctx.cite({label: 'Options-seller context: VRP, VIX/VIX3M, RSP-SPY breadth', source: 'SmartOptions V2 (Cboe VIX, Yahoo SPY/RSP)', series: 'vol_breadth', as_of: m.asof_session, url: null}));
+      cites.push(ctx.cite({label: 'Options-seller context: VRP, VIX/VIX3M, RSP-SPY breadth', source: 'Stored relations (Cboe VIX, Yahoo SPY/RSP)', series: 'vol_breadth', as_of: m.asof_session, url: null}));
       const pick = k => vb[k] ? {value: vb[k].value, unit: vb[k].unit, last_5: (vb[k].history || []).slice(-5)} : null;
       vol = {vrp: pick('vrp'), term_ratio_vix_vix3m: pick('term_ratio'), breadth_rsp_minus_spy_20d: pick('breadth_rsp_spy_20d'), method: vb.method,
         interpretation_reference:{term_ratio_parity:1,vrp_parity:0,note:'Term ratio = VIX / VIX3M; above parity is backwardation. VRP = implied minus realized volatility; zero is parity.'}};
@@ -515,7 +515,7 @@
     if (out.result && out.result.error) return {error: out.result.error};
     const result = out.result;
     const cite = ctx.cite({label: name + (argv[0] ? ' · ' + argv[0] : '') + ' · stored dashboard inputs; model outputs are educational estimates',
-      source: 'SmartOptions dashboard ' + name, series: name,
+      source: 'Dashboard ' + name, series: name,
       as_of: result && result.asof || m.asof_session, url: null});
     return {data: result, cite: [cite], method: name === 'recommend_strategy' ? 'Sum of documented strategy rule points; payoffs are model estimates, not market quotes.' : 'Dashboard API result; retain its method, inputs and provenance.'};
   }
@@ -592,7 +592,7 @@
   function systemPrompt(m) {
     const c = m.meta.counts || {};
     return [
-      'You are the analyst assistant inside the SmartOptions V2 dashboard (daily macro + market fundamentals for options sellers).',
+      'You are the analyst assistant inside this market dashboard (daily macro + market fundamentals for options sellers).',
       'Data loaded: as-of session ' + m.asof_session + ', exported ' + m.exported_at + '. ' + (c.tickers || Object.keys(m.tickers).length) + ' tickers (set A = top S&P 500 movers, set B = Historical\'s universe). Macro groups: ' + m.groups.join(', ') + '. Relations factors: ' + m.factors.join(', ') + ' (' + Object.entries(m.units).map(([k, v]) => k + ': ' + v).join('; ') + '), window ' + m.rel_window + '.',
       'RULES (hard):',
       '1. Use tools for every fact. Never invent or estimate numbers, consensus, forecasts, formulas or thresholds. If a value is missing or not in the tools, write "not in the data".',
@@ -825,7 +825,7 @@
     wrap.className = 'soc-host';
     wrap.innerHTML =
       '<button type="button" id="soc-toggle" class="soc-toggle" title="Analyst chat (/)">ASK</button>' +
-      '<aside id="soc-panel" class="soc" aria-hidden="false" aria-label="SmartOptions analyst chat">' +
+      '<aside id="soc-panel" class="soc" aria-hidden="false" aria-label="Analyst chat">' +
       '<div class="soc-hd"><span class="soc-tt">ASK YOUR DASHBOARD <span class="soc-tagline">· Explain the data or arrange your view</span></span><select class="soc-model" aria-label="Model">' +
       MODELS.map(x => '<option value="' + x.id + '">' + x.label + '</option>').join('') + '</select>' +
       '<button type="button" class="soc-set" title="Connect your Anthropic API key">KEY</button><button type="button" class="soc-new">NEW</button><button type="button" class="soc-expand" aria-label="Expand chat" aria-expanded="false">Expand ↗</button><button type="button" class="soc-x" aria-label="Collapse chat">Collapse ↙</button></div>' +

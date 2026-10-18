@@ -36,7 +36,7 @@ def bundle_path_allowed(name):
     path = Path(name)
     if path.is_absolute() or '..' in path.parts or '\\' in name:
         return False
-    return name in {'core.json', 'brief.json', 'intelligence.json', 'shocks.json', 'refresh-status.json', 'money-flow.json', 'relationships.json'} or (
+    return name in {'core.json', 'brief.json', 'intelligence.json', 'shocks.json', 'refresh-status.json', 'money-flow.json', 'relationships.json', 'news-refresh-status.json'} or (
         path.suffix == '.json' and (len(path.parts) == 2 and path.parts[0] == 'px' or
                                   len(path.parts) == 3 and path.parts[:2] == ('brief', 'company')))
 
@@ -447,6 +447,25 @@ def mirror(data_root, work_root, url, workspace=None):
         canonical = load_json(candidate / 'refresh-status.json', required=True)
         if canonical.get('status') not in ('ok', 'degraded'):
             raise ValueError('Canonical snapshot receipt does not indicate a successful build')
+        # A delayed/CDN-cached daily bundle must not undo a newer news-only
+        # collection already mirrored by this client. Manager data still comes
+        # from the coordinated incoming daily snapshot.
+        from smartoptions.news_refresh import NEWS_FIELDS, stamp
+        incoming_capital = load_json(candidate / 'money-flow.json', required=True)
+        previous_capital = load_json(data_root / 'money-flow.json', {})
+        incoming_date = incoming_capital.get('news_status', {}).get('retrieved_at')
+        previous_date = previous_capital.get('news_status', {}).get('retrieved_at')
+        retained_news = bool(previous_date and (not incoming_date or stamp(incoming_date) < stamp(previous_date)))
+        if retained_news:
+            incoming_capital.update({k: previous_capital[k] for k in NEWS_FIELDS if k in previous_capital})
+            write_json(candidate / 'money-flow.json', incoming_capital)
+            news_receipt = load_json(data_root / 'news-refresh-status.json', {})
+            if news_receipt.get('source_collection_at') != previous_date:
+                news_receipt = dict(schema='smartoptions.news-refresh.v1', status='degraded',
+                                    mode='daily_mirror_retained_news', provider_calls=0,
+                                    source_collection_at=previous_date, sources=incoming_capital['news_status']['sources'])
+            news_receipt['money_flow_sha256'] = hashlib.sha256((candidate / 'money-flow.json').read_bytes()).hexdigest()
+            write_json(candidate / 'news-refresh-status.json', news_receipt)
         receipt.update(status=canonical['status'], reasons=canonical.get('reasons') or [],
                        asof_session=manifest['asof_session'], canonical_generated_at=manifest['generated_at'],
                        model_asof=canonical.get('model_asof'), source_url=url,
@@ -456,9 +475,14 @@ def mirror(data_root, work_root, url, workspace=None):
                        relationships_sha256=manifest['files']['relationships.json'],
                        source_dates=canonical.get('source_dates', source_dates(candidate)),
                        coverage=coverage_guard(data_root, candidate), publication_changed=True,
+                       retained_newer_local_news=retained_news,
                        stages=dict(download=dict(status='ok'), manifest=dict(status='ok'), verify=dict(status='ok')))
         receipt['finished_at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
         write_json(candidate / 'refresh-status.json', receipt)
+        # refresh-status itself changed to the mirror receipt (and news may have
+        # been retained). Rehash those exact members rather than keep a stale or
+        # absent bundle after the full daily mirror.
+        write_bundle(candidate)
         promote(candidate, data_root, run_root / 'previous-data', workspace)
         write_json(work_root / 'refresh-status.json', receipt)
         event('refresh.mirror', 'canonical', 'OK', 'Verified hashes and coverage; no provider requests')

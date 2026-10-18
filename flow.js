@@ -75,7 +75,7 @@
     const rg = (D.rel || {}).regime || {};
     add('regime', 'Regime score (V2 proxy)', fin(rg.score) ? rg.score : null, fin(rg.score) ? `${rg.score} ${rg.tier || ''}`.trim() : null,
       fin(rg.score) ? (rg.score >= R.regimeBull ? 1 : rg.score <= R.regimeBear ? -1 : 0) : null, `>= ${R.regimeBull} = +1, <= ${R.regimeBear} = -1`,
-      {provider: 'SmartOptions regime (VIX, A/D, new hi/lo)', series: 'rel.regime', period: D.asof_session, note: rg.method}, fin(rg.score) ? null : 'regime score missing');
+      {provider: 'Regime score (VIX, A/D, new hi/lo)', series: 'rel.regime', period: D.asof_session, note: rg.method}, fin(rg.score) ? null : 'regime score missing');
     const vb = (D.rel || {}).vol_breadth || {}, br = vb.breadth_rsp_spy_20d || {};
     add('breadth', 'Breadth: RSP - SPY 20d', fin(br.value) ? br.value : null, fin(br.value) ? `${br.value > 0 ? '+' : ''}${br.value.toFixed(2)} pp` : null,
       fin(br.value) ? (br.value > R.breadthPP ? 1 : br.value < -R.breadthPP ? -1 : 0) : null, `> +${R.breadthPP} pp = +1 (broad), < -${R.breadthPP} pp = -1 (narrow)`,
@@ -178,12 +178,12 @@
       d.push({k: 'sam', label: 'Snapshot', vote: isQuarantined ? null : rawVote,
         chip: `snap ${s.q || '?'} T${fin(s.trend) ? s.trend.toFixed(0) : '?'}${driftTag}`,
         detail: `${'Historical reference (2026-07-25)'}: quality ${s.q || 'n/a'}${qSub ? ' (' + qSub + ')' : ''}, TrendScore ${fin(s.trend) ? s.trend : 'n/a'}, opp ${fin(s.opp) ? s.opp : 'n/a'}${driftTag}${fpeTag}; GREAT/GOOD AND trend >= 60 = +1, WEAK/AVOID = -1.${isQuarantined ? ' Excluded from the current vote after 30 days.' : ' Historical reference, not recomputed.'}`, src: 'Historical reference (2026-07-25)'});
-    } else d.push({k: 'sam', label: 'Snapshot', vote: null, chip: 'snap n/a', detail: 'not in SmartOptions snapshot', src: 'SmartOptions snapshot'});
+    } else d.push({k: 'sam', label: 'Snapshot', vote: null, chip: 'snap n/a', detail: 'not in the historical snapshot', src: 'Historical snapshot'});
     if (fin(r.res20d)) {
       const aTh = (R && fin(R.alpha20dMin)) ? R.alpha20dMin : 3.0;
       const aVote = r.res20d >= aTh ? 1 : r.res20d <= -aTh ? -1 : 0;
       d.push({k: 'alpha20d', label: '20d Alpha (Resid)', vote: aVote, chip: `20d α ${r.res20d > 0 ? '+' : ''}${r.res20d.toFixed(1)}%`,
-        detail: `20-session stock-specific residual ${r.res20d > 0 ? '+' : ''}${r.res20d.toFixed(2)}% after stripping 5-factor OLS macro move; >= +${aTh}% = +1, <= -${aTh}% = -1`, src: 'SmartOptions Edge 252d OLS attribution'});
+        detail: `20-session stock-specific residual ${r.res20d > 0 ? '+' : ''}${r.res20d.toFixed(2)}% after stripping 5-factor OLS macro move; >= +${aTh}% = +1, <= -${aTh}% = -1`, src: '252d OLS attribution'});
     }
     return d;
   }

@@ -167,6 +167,10 @@ def collect_calendar(out, today):
     for name,raw in raws.items():
         source_status[name]={"status":"missing", "source_url":SOURCES[name],
                              "reason":"No parseable official calendar events"}
+        if not raw and name=="jolts":
+            # Not a fetch failure worth reporting as one: JOLTS is outside the tracked event types either way.
+            notes.append("jolts: JOLTS omitted; it is not in the tracked release set, so its dates are not listed")
+            continue
         if not raw:
             if name in FRED_RELEASES:
                 try:

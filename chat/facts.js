@@ -5,16 +5,17 @@
    The template answer is complete and correct on its own; a model may only rephrase it (see polish.js). */
 'use strict';
 (function (root, factory) {
-  const M = factory();
+  const M = factory(root);
   if (typeof module !== 'undefined' && module.exports) module.exports = M;
   root.SmartOptionsFacts = M;
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+})(typeof window !== 'undefined' ? window : globalThis, function (root) {
+  const Today=typeof module!=='undefined'&&module.exports?require('../main.js'):root.SmartOptionsMain;
   const isNum = v => typeof v === 'number' && isFinite(v);
   const CARD_LABEL = {growth: 'Growth', profitability: 'Profitability', cash: 'Cash generation', resilience: 'Financial resilience',
     valuation: 'Valuation', expectations: 'Expectations', counter: 'Counterargument'};
   const CARDS = Object.keys(CARD_LABEL);
   const DIR_WORD = {up: 'rising', flat: 'flat', down: 'falling'};
-  const CORE_SRC = 'SmartOptions core build (core.json)';
+  const CORE_SRC = 'Core build (core.json)';
 
   /* ---------------------------------------------------------------- formatting */
   function trim(n, d) { return Number(n.toFixed(d)).toString(); }
@@ -154,6 +155,12 @@
   H.pulse = (e, ctx) => {
     const b = ctx.brief, p = b && b.pulse; if (!p) return NA('pulse', 'Market pulse', 'The market pulse is not in today\'s brief file.');
     const P = new Pack();
+    if(Today?.todayModel){
+      const model=Today.todayModel(b,ctx.publicCore||{});
+      P.line(model.label+'. Completed session '+model.session+'. '+model.coverage+'.',[P.add({label:'Completed-session Today coverage',value:model.coverage,unit:'',period:model.session,asof:b.generated_at,source:'Retained Brief inputs; deterministic decision table'})]);
+      model.reasons.forEach(x=>P.line(x.text,P.addAll(x.metrics||[],8)));
+      return P.out({intent:'pulse',title:model.label,followups:[['risk_conditions'],['breadth'],['macro']]});
+    }
     P.line('Overall the market read is ' + p.status + '. ' + (p.headline || ''), []);
     (p.changed || []).slice(0, 2).forEach(x => P.line('Changed: ' + x.text, P.addAll(x.metrics, 2)));
     (p.supports || []).slice(0, 2).forEach(x => P.line('Supports: ' + x.text, P.addAll(x.metrics, 2)));
@@ -163,21 +170,24 @@
   H.macro = (e, ctx) => {
     const m = ctx.brief && ctx.brief.macro; if (!m || !m.backdrop) return NA('macro', 'Macro backdrop', 'The macro section is not in today\'s brief file.');
     const P = new Pack(), bd = m.backdrop, det = g => ((m.detail || []).find(d => d.group === g) || {}).metrics || [];
-    P.line('The macro backdrop reads ' + bd.status + '. ' + (bd.line || ''), []);
+    const backdrop=Today?.normalizedSignals(ctx.brief).find(x=>x.id==='backdrop');
+    const word=backdrop?.word||'Incomplete';   // one normalized projection for title and body
+    P.line('The macro backdrop reads ' + word + '. ' + (backdrop?.status ? (bd.line || '') : 'Missing or stale: ' + ((bd.missing || []).join('; ') || 'required growth, inflation or policy inputs') + '.'), []);
     [['growth', 'Growth', ['growth', 'labor']], ['inflation', 'Inflation', ['inflation']], ['policy', 'Policy', ['policy']]].forEach(([k, lab, gs]) => {
       const d = bd[k]; if (!d) return;
       const ms = [].concat(...gs.map(det)).slice(0, 2);
-      P.line(lab + ' is ' + (DIR_WORD[d.direction] || d.direction || 'unclear') + ': ' + (d.line || ''), P.addAll(ms, 2));
+      P.line(lab + ' is ' + (d.available===false?'incomplete':DIR_WORD[d.direction] || d.direction || 'unclear') + ': ' + (d.line || ''), P.addAll(ms, 2));
     });
-    return P.out({intent: 'macro', title: 'Macro backdrop: ' + bd.status, followups: [['risk_conditions'], ['expand_macro'], ['risks']]});
+    return P.out({intent: 'macro', title: 'Macro backdrop: ' + word, followups: [['risk_conditions'], ['expand_macro'], ['risks']]});
   };
   H.risk_conditions = (e, ctx) => {
     const m = ctx.brief && ctx.brief.macro; if (!m || !m.risk) return NA('risk_conditions', 'Risk conditions', 'Risk conditions are not in today\'s brief file.');
     const P = new Pack(), det = g => ((m.detail || []).find(d => d.group === g) || {});
-    P.line('Risk conditions are ' + m.risk.status + '. ' + (m.risk.line || ''), P.addAll(m.risk.metrics, 2));
+    const riskWord=Today?.normalizedSignals(ctx.brief).find(x=>x.id==='risk')?.word||'Incomplete';
+    P.line('Risk conditions are ' + riskWord + '. ' + (m.risk.line || '')+' Coverage: '+(m.risk.coverage||'unavailable')+'.', P.addAll(m.risk.metrics, 2));
     const v = det('volatility'); if (v.line) P.line('Volatility: ' + v.line, P.addAll(v.metrics, 2));
     const c = det('credit_funding'); if (c.line) P.line('Credit: ' + c.line, P.addAll(c.metrics, 2));
-    return P.out({intent: 'risk_conditions', title: 'Risk conditions: ' + m.risk.status, followups: [['risks'], ['glossary', {term: 'credit spread'}], ['glossary', {term: 'vix'}]]});
+    return P.out({intent: 'risk_conditions', title: 'Risk conditions: ' + riskWord, followups: [['risks'], ['glossary', {term: 'credit spread'}], ['glossary', {term: 'vix'}]]});
   };
   H.risks = (e, ctx) => {
     const b = ctx.brief; if (!b || !Array.isArray(b.risks)) return NA('risks', 'Upcoming risks', 'Upcoming releases and earnings are not in today\'s brief file.');
@@ -199,7 +209,7 @@
   H.breadth = (e, ctx) => {
     const p = ctx.brief && ctx.brief.positioning; if (!p) return NA('breadth', 'Breadth', 'Positioning is not in today\'s brief file.');
     const P = new Pack();
-    if (p.breadth) P.line('Breadth is ' + p.breadth.status + '. ' + p.breadth.line, P.addAll(p.breadth.metrics, 2));
+    if (p.breadth) P.line('Breadth is ' + (Today?.normalizedSignals(ctx.brief).find(x=>x.id==='participation')?.word||'Direction unavailable') + '. ' + p.breadth.line, P.addAll(p.breadth.metrics, 2));
     const c = p.concentration;
     if (c) {
       P.line('Concentration: ' + c.line, P.addAll(c.metrics, 2));

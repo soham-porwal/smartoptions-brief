@@ -148,7 +148,7 @@ function state(core, th) {
   return {label: LABEL, asof: core && (core.asof_session || core.date) || null, thresholds: th,
     overall: {phase, reason: `Cycle read: ${phase} (${why}); context: ${tilt.join(', ') || 'none'}. Overall rule: the activity pair (employment, GDP) sets the phase when they agree; otherwise "mixed".`},
     pillars: six, context: ctx, missing: six.concat(ctx).filter(p => p.phase === 'missing').map(p => p.pillar + ': ' + p.reason),
-    timeline: {series: rel.regime_hist || [], what: "Historical SmartOptions regime score history (partial; " + ((rel.regime && rel.regime.history_note) || 'see methods') + ')', today: rel.regime ? {score: rel.regime.score, tier: rel.regime.tier} : null},
+    timeline: {series: rel.regime_hist || [], what: "Historical regime score history (partial; " + ((rel.regime && rel.regime.history_note) || 'see methods') + ')', today: rel.regime ? {score: rel.regime.score, tier: rel.regime.tier} : null},
     note: "G. Mundada's own cycle charts are images in his shared files and could not be extracted; this panel does not reproduce them."};
 }
 

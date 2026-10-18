@@ -1,39 +1,39 @@
 {
-  "release_id": "brief-client-20261018-r14-investor",
-  "built_at": "2026-10-18T03:34:52.072134+00:00",
-  "source_base": "599d93b03a074d4f29f10ea9c2e8ecb072b01235",
+  "release_id": "brief-client-20261018-r16-live-brief",
+  "built_at": "2026-10-18T14:25:26.255483+00:00",
+  "source_base": "13d4b0ef8798a4e126852d9cafdfe1972c719067",
   "ui_assets": {
     "about.js": {
-      "sha256": "547fe112ab4c3c86ef33729f18b5f9c3c9f938a3dd1fd455e7ac6b2d42e0a0b5",
-      "bytes": 3247
+      "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
+      "bytes": 3243
     },
     "app.css": {
       "sha256": "09b4ad91f8ca2057d4968cc3a368a18cb0599b0d1ed760817aa31e6f62cbc2ce",
       "bytes": 11449
     },
     "app.js": {
-      "sha256": "ce1e6f4c6c5ab33165751146e37c122ff034ac48c4beb33136b1a2999ab616e3",
-      "bytes": 56204
+      "sha256": "ab92395c4c33e6609fa8df62300f1698d6168447ef24ed9a86d1bbffc6216d9d",
+      "bytes": 56196
     },
     "backup.html": {
-      "sha256": "f4f6a4b38fb9e80f81cd4329c8129c54f1c76bc68a6069d79fba3779c600c5d7",
-      "bytes": 6553
+      "sha256": "cd0f8b7cf76ada690187d744ac5c5d3318a7a7f688137ac0972a2656cccfd551",
+      "bytes": 6382
     },
     "brief.css": {
       "sha256": "2dc63a07d3a99b62b52c646c0e4571ec71adb11416eec35cbd3d5a9d25745d8a",
       "bytes": 32611
     },
     "brief.js": {
-      "sha256": "1746b78199349a8c409b76a446b34d0bfa04509b7c6f52bb10b3877cce04d3f4",
-      "bytes": 80182
+      "sha256": "c835a8f433f11d17acdd64b5de85469c8319db9b803d644ceba00468a019f5ac",
+      "bytes": 80146
     },
     "chat-popup.css": {
       "sha256": "4e1618d9c6933a29420fcabe93f731cd2372e03512b36346b1029fd9a1fc7911",
       "bytes": 8355
     },
     "chat-popup.js": {
-      "sha256": "1d1623dda3964151cf0cfde9101179633acdef5e26eedcac1d51359cca67d608",
-      "bytes": 24039
+      "sha256": "d15f1bae4038d4ecb95551a64f6316d0203a03232cff0d3c9641d55ab4850699",
+      "bytes": 24035
     },
     "chat/actions.js": {
       "sha256": "590c07c5b33cf3512ac496f9ee685cf1e075b18ce1ab981b3f1947cd0ba9a5b2",
@@ -48,16 +48,16 @@
       "bytes": 5677
     },
     "chat/chat.js": {
-      "sha256": "56469f9c594fab46c9da866e037fb1cfa68fde690563c2e0fc033536cb80ce31",
-      "bytes": 72222
+      "sha256": "0b9f565b3e9ae26225a162b49ce63da41b4efc6b76b4090085201c2c2d004c3d",
+      "bytes": 72141
     },
     "chat/dashboard.js": {
       "sha256": "fb5256d9bc32d4a5bb34949a2b654cdd8f3bd51fe9e650a714dd2aab15b2cda4",
       "bytes": 20811
     },
     "chat/facts.js": {
-      "sha256": "8f3d44d516cb3cb050e9617c26f88f9cb932196b813dd9fe637f648317eb0758",
-      "bytes": 43492
+      "sha256": "0b693d36128029e7fdbc27b7a8230c5fe035d1521112c20b35ea8ebb5c85c66d",
+      "bytes": 44694
     },
     "chat/intents.js": {
       "sha256": "21fc7a1ccb529a2048747747a86dbe80aea8f759a49149839e89bfde9ea3f886",
@@ -72,8 +72,8 @@
       "bytes": 2416
     },
     "chat/runtime.js": {
-      "sha256": "5e2cad99e336465704fb8f83e5bc5042affe5ab6bdafc6e7b42adf84e0873ec3",
-      "bytes": 5409
+      "sha256": "aea2964289a0be29233b227bda7b66e965a9f5c51541259ecb934da68020dd87",
+      "bytes": 5624
     },
     "chat/universe.js": {
       "sha256": "b7c2ee0134e9eb2041e4833db1df993f61c2ac39b8d55cb9b11af5e7a3e3444d",
@@ -104,32 +104,32 @@
       "bytes": 4530
     },
     "custom.js": {
-      "sha256": "8ad5cc89d420ddcd67b3a2c4e51ed3e6b6759c296b6335ca79a757cdc1482836",
-      "bytes": 33053
+      "sha256": "005ee573da7fc019a3631c909530fa39893b09fe10017b72d7d8b38f460dc668",
+      "bytes": 33060
     },
     "cycles.css": {
       "sha256": "c57ac9b1e84300fa570c29f88543422b7f1da07b156e8c8f7ad71afbba742804",
       "bytes": 2320
     },
     "cycles.js": {
-      "sha256": "cf0881028f4074590b3206f7111c78deeb30811e3466ed05a524f95c23ada315",
-      "bytes": 20240
+      "sha256": "9b515ae919ceb868499d67af3f239ca75e0000c1981bc896dd5226ad2f9efc0b",
+      "bytes": 20227
     },
     "edge-desk.css": {
       "sha256": "0c57121ee6586067b1c2dabfa66f303ad9e55d9056324b4548da7a896ad09fd8",
       "bytes": 16722
     },
     "edge-desk.js": {
-      "sha256": "17426b122b1adf9dc3f1413e6cb43bb9097cff202d0f3903fedf6252030a91b0",
-      "bytes": 70359
+      "sha256": "2e24db18eaa4d2b81e762e6b9f7530adc44a31098ec87df52b23a4b1b7f36a0e",
+      "bytes": 70331
     },
     "explore.css": {
       "sha256": "41e12753586c4348a5e93ba3a43544c7d0f93e0166b675a3ce54de94936cab51",
       "bytes": 1229
     },
     "explore.js": {
-      "sha256": "425ce53fe6e7e645e4830b9061500eb8604d2ec96fad34f7f039b285f79cb3b5",
-      "bytes": 11915
+      "sha256": "80dbb9ed3771167cbc5fe651847c01411527ba109df50ee6a88a1d667eceb77f",
+      "bytes": 11884
     },
     "favicon.ico": {
       "sha256": "f59841e4067a87ab16863c34f5e96a60bf6cd373258fbacc9482cbd069f3fde0",
@@ -140,8 +140,8 @@
       "bytes": 8144
     },
     "flow.js": {
-      "sha256": "5642602f6d0f2897ab6955f43985a95acdc2b9b4791208e931c0ccf473d8e4ef",
-      "bytes": 54668
+      "sha256": "1a94df89d40a92f6c6d82d58ebdcaf3d8d0f2233d48fdffe250d65d6756368f7",
+      "bytes": 54643
     },
     "fvchart.css": {
       "sha256": "d1380716b2abfde062c68d356beddd6665a3a5da8ab55301c6ed6dfbea89b989",
@@ -176,8 +176,8 @@
       "bytes": 11704
     },
     "index.html": {
-      "sha256": "07d4ca7f5c86cbf214444b1e37a5483f08bac4de8891d0cd1801b55908d96ab6",
-      "bytes": 1971
+      "sha256": "8b8686fd0b69d05cd3cd96f233cc555175e987b9bb142e1e93bd9097ba0ff840",
+      "bytes": 1987
     },
     "intelligence.css": {
       "sha256": "adc81cb529dfa2a34c95bbcc0d09e64411552bc274a3c7c5a3a946c8f81ceeff",
@@ -188,8 +188,8 @@
       "bytes": 13895
     },
     "investor.js": {
-      "sha256": "3def0c941837c60ffbc922db7d942d8fe878803032f88499e6d487037d02b93b",
-      "bytes": 36226
+      "sha256": "88abbc23445104590771310629fc2c8f13e4e612862741a19f7ae64dd885fa78",
+      "bytes": 37524
     },
     "legacy/index.html": {
       "sha256": "21c5be195686fed2cca21a8e5361cdaef44c0ddea9602eca26e0f54c070a2dde",
@@ -212,28 +212,32 @@
       "bytes": 6484
     },
     "main.css": {
-      "sha256": "80ce6c699795286b523197fd358146a9f06b2f262ff0fe9dbead3bb0b9974bd6",
-      "bytes": 20163
+      "sha256": "c96e3f01d8e5d897c35b67f816c589aad59ce450c63605c9c5e4c33b9be7a028",
+      "bytes": 24743
     },
     "main.js": {
-      "sha256": "904965ed4d4ea440b69a416ddf87ef82600309c279cb8b62d927303ad598b860",
-      "bytes": 171484
+      "sha256": "e3308ed9a98e3502e52d39f9d064662350925c927045b77bcea2bd8e1cc064d8",
+      "bytes": 202631
     },
     "money-flow.css": {
       "sha256": "ddef742bb34f0216e5ecfbdcb9b3116ddbdc99abe8cfe13072fd7ad503c5e737",
       "bytes": 1806
     },
     "money-flow.js": {
-      "sha256": "7d1a85b109c26f536fd5b6baa9be9afaaed2368af9815e411bc1487eba7ed732",
-      "bytes": 6494
+      "sha256": "3e83ae84b93b68340093a00678f0753ff87d9ee142caae4612af548fc99b0819",
+      "bytes": 6461
     },
     "my-dashboard.css": {
       "sha256": "c30f63304badc474731123d9fd9b824597e0209eb840221a490a26d184d63fbc",
       "bytes": 4982
     },
     "my-dashboard.js": {
-      "sha256": "f527b604a8410ef135640b2186a59c423b2a26e9075713c96c4b218b3f11b1d7",
-      "bytes": 19934
+      "sha256": "9223b31573638a2423b339f5f26b64f2a199413003c84107710a3bc6dbdec659",
+      "bytes": 19930
+    },
+    "news.js": {
+      "sha256": "2bea16b1231aec940a75aeefa179a9fc24246b26d05214a80701c464f566efaf",
+      "bytes": 8950
     },
     "overview.css": {
       "sha256": "4e347a69023fd77efc18ab12189358f144ba89b2cbb6bc49848314d46d42a039",
@@ -296,53 +300,65 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "f777dfa2e81c46d90381989fae9282df7e8cb3afe773b95946ce60a17147c07d",
-      "bytes": 3847
+      "sha256": "6e420fc20446d628926f58c362b86d16a12533750310fa9f8557a088a74ba20d",
+      "bytes": 4232
     }
   },
   "data_at_publication": {
     "data/brief.json": {
-      "sha256": "e9d65e438ccc3b780a204b8f1506af36523716ae4b3ded697d038df4637e1e3f",
-      "bytes": 115856
+      "sha256": "29041212dd584473813770649654e2cc3cf539da94f91b76f0916f1c7ec53fef",
+      "bytes": 117010
     },
     "data/brief/company/AAPL.json": {
-      "sha256": "a24f2c594a6f5f61d3e51fccfd05e5987c52e5e7cd03470c2e39997d4c6e02ba",
-      "bytes": 10583
+      "sha256": "d643ef2b5df89fc3ab792e54a5bd964b067f743ba453d81ffae05e034209919e",
+      "bytes": 9591
     },
     "data/brief/company/ABT.json": {
-      "sha256": "d9ce4b7e6c97bda35c183d003b37e4a28fa2638f1de38fcac17e482ce1dbc568",
-      "bytes": 10365
+      "sha256": "0d562da2839179f2b64f05e54fb4b43aa365e58574b9abe5a69579b5a9a7a1be",
+      "bytes": 9435
     },
     "data/brief/company/COP.json": {
-      "sha256": "aef5b971901ceb6e4d8225fcf91dc610b2fec30e53d85f0ba13fe943e6f6ed37",
-      "bytes": 10518
+      "sha256": "8079897944ee87893c83d3fb4508f51eabea55f480518abd1951d9f08565a59c",
+      "bytes": 9530
     },
     "data/brief/company/CTVA.json": {
-      "sha256": "c3ce81397afd513027118933e3b8edc42acaaae1d6dd336d865e98de95f61209",
-      "bytes": 10976
+      "sha256": "5220dae6017e97b092a443c56b47ff0cdf3603a506ef1638f82b357db465b548",
+      "bytes": 10855
     },
     "data/brief/company/JPM.json": {
-      "sha256": "ed9a0e4a8d9700572d817a88978da746ce50dbc92c054dc8c775cc62c16f11f3",
-      "bytes": 8232
+      "sha256": "8c7ada90e2f2d670a8e2d4835e03a6a29b7792ee93dc56583e6f66749d5cf871",
+      "bytes": 7678
     },
     "data/brief/company/MSFT.json": {
-      "sha256": "5a7cef9f1d498c0b94241a7802560715a26d2211bc90c75f127fc0737a9d3f84",
-      "bytes": 10079
+      "sha256": "9222b14dcb0f9401d99db74f6737361e4b125b78c0133ca4d1d0978708a0fd7c",
+      "bytes": 9561
+    },
+    "data/chat-demo.json": {
+      "sha256": "1fe547428c84b566283cad1fd6f5ca750936dcdf264fd1a299b1a80815e2440a",
+      "bytes": 134
+    },
+    "data/config.json": {
+      "sha256": "abad96acdb4d079c65f00fff11e9e9304a0a2f4a971a9c61e8950df203153aae",
+      "bytes": 815
     },
     "data/core.json": {
-      "sha256": "6d998fde81f5fec224d7338762305d5468725ffc02031faf622cca3948a65326",
-      "bytes": 1709494
+      "sha256": "6d415112712b762e1e03aa31477717f4f7b3788758d8a322508c76c3bae5afab",
+      "bytes": 1707229
     },
     "data/intelligence.json": {
-      "sha256": "b7e7b156a5c5425317558d1eea250db47daaa93590299c750623c6e453a8b119",
-      "bytes": 4851506
+      "sha256": "b944fdc80ded6590fd0eae001702d9c0687f43c11fa65cef1d3c5e2eefc310e8",
+      "bytes": 4857506
     },
     "data/money-flow.json": {
-      "sha256": "ced1079581c4ec5252cb4206b422daf61c6c9e237d6d304b165149893b842a85",
-      "bytes": 32717
+      "sha256": "77bfd51e0ed678ea06bbfc685d2a4324837b6746934c5e955a5d31fa7faa937e",
+      "bytes": 36316
+    },
+    "data/news-refresh-status.json": {
+      "sha256": "26d4f96b0fdab1fe327b82b96e26e11b77e7eebd4ba99ba7d26fca6ee534d5cc",
+      "bytes": 1342
     },
     "data/px/AAPL.json": {
-      "sha256": "5e259d7fa50f7ed6a6f68fdaca8d2a5ad7a6230307fc8a11932bb1cc1533266c",
+      "sha256": "420c9272d1f6615de9b2a13cd5bf2a3ddbf8bd0d2dddbfdc44982fd638299b84",
       "bytes": 20949
     },
     "data/px/SPY.json": {
@@ -350,25 +366,25 @@
       "bytes": 13530
     },
     "data/refresh-status.json": {
-      "sha256": "dad43ad1a5d2ca250d7ebf284a90db3c240a82d92decfa0a36eddaef7560d85f",
-      "bytes": 13495
+      "sha256": "27b8f321ddbb3ff7a1f5ec8d4206bc5ced5781a55a5a69f0bdeca95c15a26c51",
+      "bytes": 13005
     },
     "data/relationships.json": {
-      "sha256": "78367b61107af254ce9acdbf0cb76a0eac9bdb45d9fc37cdad2e10c41b3af09b",
-      "bytes": 143398
+      "sha256": "502de3745f6561a2769fc97d4a914a0bbaf3503f9ae205641af5000af4fffbe1",
+      "bytes": 143360
     },
     "data/shocks.json": {
-      "sha256": "ba101459a7d4350b5f8e6222810d0e64656b0754ac856ddd6d6ff07d3fa84b95",
-      "bytes": 2713934
+      "sha256": "31670bb69ea1d1b521cf1434fc750f094fe1c9204696656fd7d34fdd6c0247ff",
+      "bytes": 2722564
     },
     "data/snapshot.zip": {
-      "sha256": "b821719a1c062347a6915eefead06e2dd205be9e8ab91ef32afca3b50a7397d7",
-      "bytes": 5321222
+      "sha256": "df73868c43b2a12d2209cba8cbed4774610cef9aa2839da39f018486b60defe5",
+      "bytes": 5302560
     }
   },
   "dynamic_files": {
     "data/quotes.json": "Scheduled shared observations; excluded from static hash gate, compare per-symbol observations across hosts and never regress source times."
   },
-  "note": "Exact immutable UI and publication payload hashes; independently scheduled quotes must not regress during publication.",
+  "note": "Exact immutable UI and publication payload hashes; dynamic quotes retain independent observations. Updated refresh runtime is verified separately.",
   "publication_encoding": "Canonical Git blob bytes (GitHub Pages), not Windows worktree CRLF bytes"
 }

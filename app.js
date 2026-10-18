@@ -159,7 +159,7 @@ const COLS = [
   {k: 'res5d', h: '5d α', ph: 1, opt: 1, tip: '5-session idiosyncratic return (%) after stripping 5-factor OLS macro move'},
   {k: 'rv20', h: 'RV20', ph: 1, opt: 1, tip: '20-session annualized realized volatility (%) from Adj Close log returns'},
   {k: 'ivrv', h: 'IV/RV', ph: 1, opt: 1, tip: 'ATM IV (or sector median IV proxy) / 20d realized volatility'},
-  {k: 'drift', h: 'Δ07-25', ph: 1, opt: 1, tip: 'Price drift % since the 2026-07-25 SmartOptions snapshot'},
+  {k: 'drift', h: 'Δ07-25', ph: 1, opt: 1, tip: 'Price drift % since the 2026-07-25 screener snapshot'},
 ];
 const COLK = {};
 COLS.forEach(c => { COLK[c.k] = c; });
@@ -558,7 +558,7 @@ function samBlock(r, d) {
     bar = `<svg width="100%" viewBox="0 0 ${W} 12" preserveAspectRatio="none" style="height:12px">${segs.join('')}</svg>
       <div class="sub" style="padding:3px 0">${c.parts.map((p, i) => `<span style="color:${cols[i]}">■</span> ${p.k} ${p.score.toFixed(0)}`).join(' · ')}<br>base ${c.base_score == null ? (c.parts.reduce((a, p) => a + p.w * p.score, 0) / 100).toFixed(2) : c.base_score.toFixed(2)} x Q ${c.qmult} x R ${c.rmult} = ${c.derived} (published ${c.published})</div>`;
   } else if (c) bar = `<div class="sub">components not shown: could not reproduce published score from EXPLAIN</div>`;
-  return `<div class="blk"><div class="sech" data-tip="${esc("Historical own scores, read-only. SmartOptions snapshot " + (s.asof || '2026-07-25') + '. Component split uses the documented formula and is shown only when it reproduces the historical composite.')}">Historical score <span class="dim">Historical scores are optional in Settings</span></div>
+  return `<div class="blk"><div class="sech" data-tip="${esc("Historical own scores, read-only. Screener snapshot " + (s.asof || '2026-07-25') + '. Component split uses the documented formula and is shown only when it reproduces the historical composite.')}">Historical score <span class="dim">Historical scores are optional in Settings</span></div>
     <div style="padding:0 12px">
     <div class="grid" style="grid-template-columns:repeat(4,1fr);border:0">${stat('Opp', num(s.opp, 1))}${stat('Quality', esc(s.q || '—'))}${stat('Trend', num(s.trend, 0))}${stat('Risk', esc(s.risk || '—'))}</div>
     ${bar}<div class="sub">flags: ${esc(s.flags || '—')} · snapshot price ${num(s.px, 2)}${r.sam_drift && isNum(r.sam_drift.px_pct) ? ` · <b>drift since 07-25: ${pct(r.sam_drift.px_pct, 1)} px${isNum(r.sam_drift.pef_chg) ? ', ' + (r.sam_drift.pef_chg > 0 ? '+' : '') + r.sam_drift.pef_chg.toFixed(1) + 'x fP/E' : ''}</b>` : ''}${r.sam_drift && (isNum(r.sam_drift.roe) || isNum(r.sam_drift.de)) ? `<br>retained quality inputs (07-25): ROE ${num(r.sam_drift.roe, 1)}% · D/E ${num(r.sam_drift.de, 2)} · Rev g ${num(r.sam_drift.rev_g, 1)}% · EPS g ${num(r.sam_drift.eps_g, 1)}%` : ''}</div></div></div>`;

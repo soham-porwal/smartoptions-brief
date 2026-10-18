@@ -12,10 +12,12 @@ GROUPS = ('inflation','labor','growth','policy','curve','cross_asset','credit_fu
 
 def obs_metric(obs):
     ok = obs.get('status') in ('ok', None)
-    return metric(obs.get('label','Not available'), obs.get('v') if ok else None,
+    out = metric(obs.get('label','Not available'), obs.get('v') if ok else None,
                   obs.get('unit',''), obs.get('period'), obs.get('retrieved_at') or obs.get('date'),
                   obs.get('provider') or 'Retained macro observation', obs.get('url') or '',
                   obs.get('note') or ('' if ok else 'Observation is '+str(obs.get('status'))))
+    out.update(observation_date=obs.get('date'), retrieved_at=obs.get('retrieved_at'), observation_status=obs.get('status'))
+    return out
 
 
 def observation(core, id_):
@@ -24,11 +26,24 @@ def observation(core, id_):
 
 def value(core, id_):
     o = observation(core,id_)
-    return number(o.get('v')) if o.get('status') in ('ok',None) else None
+    v = number(o.get('v')) if o.get('status') in ('ok',None) else None
+    h = o.get('h') or []
+    if h and (h[-1][0] != o.get('date') or number(h[-1][1]) is None or v is None or abs(h[-1][1]-v)>1e-6): return None
+    return v
 
 
 def history(core,id_):
-    return [(d,number(v)) for d,v in observation(core,id_).get('h',[]) if number(v) is not None]
+    o = observation(core,id_)
+    h = [(d,number(v)) for d,v in o.get('h',[]) if number(v) is not None]
+    if value(core,id_) is None or not h or h[-1][0] != o.get('date') or abs(h[-1][1]-value(core,id_)) > 1e-6 or any(a[0] >= b[0] for a,b in zip(h,h[1:])):
+        return []
+    return h
+
+
+def validity(obj, status, missing, rule, core, ids=()):
+    obj.update(observed_status=status, coverage='partial' if missing else 'complete', missing=missing, rule=rule,
+               inputs=[dict(id=k, observation_date=observation(core,k).get('date'), retrieved_at=observation(core,k).get('retrieved_at'), status=observation(core,k).get('status')) for k in ids])
+    return obj
 
 
 def annualized_3m(core,id_):
@@ -138,7 +153,7 @@ def positioning(core,rows,prices,cfg,membership=None):
                        top10_share_pct=round(share10,2) if share10 is not None else None,eq_vs_cap_20d_pp=gap,
                        metrics=[met('Top-ten market-cap share',share10,'%',note=f'{len(caps)} of {len(selected)} names have market caps; current provider capitalization, not official float-adjusted index weights; issuer caps may repeat across share classes'),
                                 met('Top-ten contribution to universe return',contribution,'pp','20 sessions',note='Approximation using current weights and unadjusted closes; not actual S&P index contribution'),
-                                metric('RSP minus SPY',gap,'pp','20 sessions to '+str(gap_asof),gap_asof,'Yahoo Finance via retained relations','https://finance.yahoo.com/quote/RSP/history/','ETF total-return gap; different coverage from company subset')])
+                                metric('RSP minus SPY',gap,'pp','20 sessions to '+str(gap_asof),gap_asof,'Yahoo Finance via retained relations','https://finance.yahoo.com/quote/RSP/history/','ETF price-return gap; different coverage from company subset')])
     ordered=sorted((s for s in sectors if s['m1'] is not None),key=lambda s:s['m1'],reverse=True)
     leaders=[dict(sector=s['sector'],ret_20d_pct=s['m1']) for s in ordered[:2]]
     laggards=[dict(sector=s['sector'],ret_20d_pct=s['m1']) for s in ordered[-2:]]
@@ -162,7 +177,8 @@ def macro_assessment(core,position,cfg,risks):
     session=core['asof_session'];spy=[(d,number(v)) for d,v in core.get('spy_close',[]) if d<=session and number(v) is not None]
     vals=[v for _,v in spy]
     trend_metrics=[]; state='mixed';line='Not available: 200 SPY closes are required'
-    if len(vals)>=200:
+    price_ok = len(vals)>=200 and spy[-1][0]==session and all(a[0]<b[0] for a,b in zip(spy,spy[1:])) and all(v>0 for v in vals)
+    if price_ok:
         ma50,ma200=mean(vals[-50:]),mean(vals[-200:]); recent=vals[-63:];xbar=(len(recent)-1)/2
         slope=sum((i-xbar)*(v-mean(recent)) for i,v in enumerate(recent))/sum((i-xbar)**2 for i in range(len(recent)))/mean(recent)*100
         state='supportive' if vals[-1]>ma50>ma200 and slope>0 else 'adverse' if vals[-1]<ma50<ma200 and slope<0 else 'mixed'
@@ -171,6 +187,7 @@ def macro_assessment(core,position,cfg,risks):
             trend_metrics.append(metric(label,v,unit,period+' to '+spy[-1][0],spy[-1][0],url='https://finance.yahoo.com/quote/SPY/history/',note='Retained SPY close series; unadjusted'))
     else:trend_metrics=[metric('SPY history',None,'sessions','200 sessions',session,note='Not enough SPY history')]
     price=card(state,line,trend_metrics)
+    validity(price,state if price_ok else None,[] if price_ok else ['200 ordered usable SPY closes ending at declared session required'],'close > MA50 > MA200 and positive 63-session slope: supportive; inverse: adverse; otherwise mixed',core)
     gdp,pay=value(core,'real_gdp_saar'),value(core,'payrolls')
     gdph=history(core,'real_gdp_saar');payh=history(core,'payrolls')
     gdp_change=gdph[-1][1]-gdph[-2][1] if len(gdph)>=2 and gdp is not None else None
@@ -189,13 +206,17 @@ def macro_assessment(core,position,cfg,risks):
     policy_line='Effective policy rates rose over 20 observations.' if policy_dir=='up' else 'Effective policy rates fell over 20 observations.' if policy_dir=='down' else 'Effective policy rates changed little or lack comparable observations.'
     bs='supportive' if growth_dir=='up' and inflation_dir=='down' and policy_dir!='up' else 'adverse' if growth_dir=='down' or (inflation_dir=='up' and policy_dir=='up') else 'mixed'
     backdrop=dict(status=bs,growth=dict(direction=growth_dir,line=growth_line,available=gdp_change is not None and pay_change is not None),inflation=dict(direction=inflation_dir,line=inflation_line,available=len(gaps)==2),policy=dict(direction=policy_dir,line=policy_line,available=fed_delta is not None),line='Growth, inflation and policy do not all point the same way.' if bs=='mixed' else 'Growth and policy conditions support the market.' if bs=='supportive' else 'Growth or tightening conditions challenge the market.')
+    missing_backdrop=[k+' current source/history unavailable or stale' for k in ('growth','inflation','policy') if not backdrop[k]['available']]
+    validity(backdrop,bs if not missing_backdrop else None,missing_backdrop,'Existing GDP/payroll acceleration, inflation horizons and 20-observation policy rules; all three required',core,('real_gdp_saar','payrolls','cpi_headline','pce_headline','cpi_headline_mom','pce_headline_mom','effective_fed_funds'))
+    if missing_backdrop: backdrop['line']='Not available: growth, inflation or policy evidence is incomplete.'
     vix,hy=value(core,'vix'),value(core,'hy_oas');vixh=history(core,'vix');hych=trend_delta(core,'hy_oas',20)
     pct=sum(v<=vix for _,v in vixh)/len(vixh)*100 if vix is not None and vixh else None
     v3=value(core,'vix3m');term=vix/v3 if vix is not None and v3 is not None and v3>0 and observation(core,'vix').get('date')==observation(core,'vix3m').get('date') else None
     n_major=sum(r['kind']=='macro' and r['importance']==3 for r in risks)
     stressed=(vix is not None and vix>=cfg['vix_stressed']) or (hy is not None and hy>=cfg['hy_stressed_bps'])
     elevated=(vix is not None and vix>=cfg['vix_elevated']) or (hy is not None and hy>=cfg['hy_elevated_bps']) or (hych is not None and hych>=cfg['hy_change_elevated_bps']) or (term is not None and term>1)
-    risk_state='stressed' if stressed else 'elevated' if elevated or any(v is None for v in [vix,hy,term,hych]) else 'calm'
+    missing_risk=[k+' unavailable or stale' for k,v in [('VIX',vix),('HY OAS',hy),('matched term ratio',term),('HY 20-observation history',hych)] if v is None]
+    risk_state='stressed' if stressed else 'elevated' if elevated else 'calm' if not missing_risk else 'incomplete'
     rm=[obs_metric(observation(core,k)) for k in ['vix','hy_oas']]
     rm += [metric('VIX percentile',pct,'percentile','Available daily history ('+str(len(vixh))+' observations)',observation(core,'vix').get('date'), 'Cboe via retained macro data',observation(core,'vix').get('url','')),
            metric('VIX / VIX3M',term,'x','Matched observation dates',observation(core,'vix').get('date'),'Cboe via retained macro data',observation(core,'vix').get('url',''), 'Term comparison requires same dates'),
@@ -220,6 +241,7 @@ def macro_assessment(core,position,cfg,risks):
     else:
         risk_line='Volatility and credit inputs are calm.' if risk_state=='calm' else 'Not available: some risk observations are missing'
     risk=card(risk_state,risk_line,rm)
+    validity(risk,{'stressed':'high','elevated':'elevated','calm':'normal'}.get(risk_state),missing_risk,'VIX >=30 or HY >=600bp: high; VIX >=20, HY >=450bp, usable HY widening >=30bp or matched term ratio >1: elevated; complete below thresholds: normal',core,('vix','vix3m','hy_oas'))
     details=[]
     for group in GROUPS:
         observations=core.get('macro',{}).get(group,[])

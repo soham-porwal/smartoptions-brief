@@ -1,0 +1,98 @@
+name: Refresh dated news only
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Best effort, including weekends. Offset from the full/quote cron minutes.
+    - cron: '23,53 * * * *'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: quotes-refresh
+  # Keep pending news/manual runs when another shared publication is queued.
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  news:
+    if: github.repository == 'soham-porwal/smartoptions-brief'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      PYTHONPATH: _pipeline
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate and install existing free-source runtime
+        run: |
+          test -s _pipeline/smartoptions/news_refresh.py
+          python -m pip install -r _pipeline/requirements-refresh.txt
+      - name: Collect canonical news or mirror its verified public bundle
+        id: build
+        continue-on-error: true
+        run: |
+          if [ "$GITHUB_REPOSITORY" = 'soham-porwal/smartoptions-brief' ]; then
+            python -m smartoptions.news_refresh --data-root data --work-root _pipeline/out/news --cache-root _pipeline/data/cache/news
+          else
+            python -m smartoptions.news_refresh --data-root data --work-root _pipeline/out/news --cache-root _pipeline/data/cache/news --mirror-url https://soham-porwal.github.io/smartoptions-brief/data/snapshot.zip
+          fi
+      - name: Commit only validated news and its coordinated bundle
+        if: steps.build.outcome == 'success'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- data/money-flow.json data/news-refresh-status.json data/snapshot.zip
+          if ! git diff --cached --quiet; then
+            git commit -m 'Refresh dated public news without recollecting fundamentals'
+            # Fail on a concurrent external publication. Never rebase a stale
+            # snapshot bundle over a newer dataset; the next run recollects it.
+            git push origin HEAD:main
+          fi
+      - uses: actions/configure-pages@v5
+        if: steps.build.outcome == 'success'
+      - name: Prepare committed public files only
+        if: steps.build.outcome == 'success'
+        run: |
+          mkdir -p _site
+          git archive HEAD | tar -x -C _site --exclude='_pipeline' --exclude='.github' --exclude='logs' --exclude='tests' --exclude='out'
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.build.outcome == 'success'
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        if: steps.build.outcome == 'success'
+        id: deployment
+      - name: Publish dated source receipt in run summary
+        if: always()
+        shell: python
+        run: |
+          import os, pathlib
+          path = pathlib.Path('_pipeline/out/news/news-refresh-status.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+              stream.write('### News-only collection / canonical mirror\n\n')
+              stream.write(path.read_text() if path.exists() else 'FAIL: no news receipt; previous data retained. Inspect artifacts.')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: news-refresh-${{ github.run_id }}
+          path: |
+            _pipeline/out/news/*/receipt.json
+            _pipeline/out/news/news-refresh-status.json
+            _pipeline/logs/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Fail visibly on collection or validation failure
+        if: steps.build.outcome == 'failure'
+        run: exit 1

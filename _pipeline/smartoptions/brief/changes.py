@@ -46,7 +46,7 @@ def spy_change(core):
     session = core['asof_session']
     spy = [(d, number(v)) for d, v in core.get('spy_close', []) if d <= session and number(v) is not None]
     label, cmp_ = 'SPY close versus previous session', 'previous session'
-    if len(spy) < 2:
+    if len(spy) < 2 or any(a[0] >= b[0] for a, b in zip(spy, spy[1:])) or any(v <= 0 for _, v in spy):
         return missing('spy_1d', label, '%', cmp_, 'Fewer than two retained SPY closes', 'Yahoo Finance', YAHOO_SPY)
     if spy[-1][0] != session:
         return missing('spy_1d', label, '%', cmp_, f'Latest SPY close {spy[-1][0]} is not the {session} session', 'Yahoo Finance', YAHOO_SPY)
@@ -65,10 +65,11 @@ def participation_change(core, rows, prices, membership, n=50, back=5):
     up to each date; names failing either test are excluded from both shares and counted.
     """
     session = core['asof_session']
-    label, cmp_ = f'Share above {n}-session average', f'{back} sessions'
+    label, cmp_ = f'Share above {n}-session average', 'previous session' if back == 1 else f'{back} sessions'
+    id_ = f'breadth_{n}_{back}d'
     index = [d for d, v in core.get('spy_close', []) if d <= session and number(v) is not None]
-    if len(index) <= back or index[-1] != session:
-        return missing('breadth_50_5d', label, 'pp', cmp_, 'Shared session index unavailable for the comparison dates', 'Yahoo Finance', YAHOO_SPY)
+    if len(index) <= back or index[-1] != session or any(a >= b for a, b in zip(index, index[1:])):
+        return missing(id_, label, 'pp', cmp_, 'Shared session index unavailable for the comparison dates', 'Yahoo Finance', YAHOO_SPY)
     d_now, d_then = index[-1], index[-1 - back]
     symbols = set((membership or {}).get('symbols', []))
     selected = [r for r in rows if r.get('sp500_member') is not False and (not symbols or r['t'].replace('.', '-') in symbols)]
@@ -76,6 +77,8 @@ def participation_change(core, rows, prices, membership, n=50, back=5):
     for r in selected:
         bars = [b for b in prices.get(r['t'], {}).get('bars', []) if number(b[4]) is not None and b[0] <= d_now]
         dates = [b[0] for b in bars]
+        if any(a >= b for a, b in zip(dates, dates[1:])):
+            excluded.append(r['t']); continue
         try:
             i_now, i_then = dates.index(d_now), dates.index(d_then)
         except ValueError:
@@ -87,10 +90,10 @@ def participation_change(core, rows, prices, membership, n=50, back=5):
         above_now += closes[i_now] > mean(closes[i_now - n + 1:i_now + 1])
         above_then += closes[i_then] > mean(closes[i_then - n + 1:i_then + 1])
     if cohort < 0.9 * max(1, len(selected)):
-        return missing('breadth_50_5d', label, 'pp', cmp_, f'Only {cohort} of {len(selected)} names have bars on both {d_then} and {d_now}',
+        return missing(id_, label, 'pp', cmp_, f'Only {cohort} of {len(selected)} names have bars on both {d_then} and {d_now}',
                        'Yahoo Finance via retained histories', 'https://finance.yahoo.com/')
     now_share, then_share = 100 * above_now / cohort, 100 * above_then / cohort
-    out = item('breadth_50_5d', label, 'pp', (now_share, d_now), (then_share, d_then), cmp_, 'Yahoo Finance via retained histories', 'https://finance.yahoo.com/',
+    out = item(id_, label, 'pp', (now_share, d_now), (then_share, d_then), cmp_, 'Yahoo Finance via retained histories', 'https://finance.yahoo.com/',
                cohort=dict(n=cohort, excluded=len(excluded), universe=len(selected), basis='same names on both dates; shared SPY session index'),
                note='Unadjusted closes; a split inside the window can create a false crossing')
     out['counts'] = dict(current=above_now, prior=above_then)
@@ -157,6 +160,8 @@ def macro_changes(core):
             base = dict(source=o.get('provider') or 'Retained macro observation', url=o.get('url') or 'https://fred.stlouisfed.org/')
             if len(h) < 2:
                 out.append(missing(o['id'], o.get('label', o['id']), unit, 'prior observation', 'Fewer than two observations retained', base['source'], base['url'])); continue
+            if any(a[0] >= b[0] for a, b in zip(h, h[1:])) or number(o.get('v')) is None or abs(h[-1][1] - o['v']) > 1e-6:
+                out.append(missing(o['id'], o.get('label', o['id']), unit, 'prior observation', 'Current value/history disagree or dates are not distinct and ordered', base['source'], base['url'])); continue
             if o.get('date') and h[-1][0] != str(o['date'])[:10]:
                 out.append(missing(o['id'], o.get('label', o['id']), unit, 'prior observation', f"History ends {h[-1][0]} but the observation is dated {o['date']}", base['source'], base['url'])); continue
             note = 'Prior is from the current data vintage and may include revisions'
@@ -171,7 +176,7 @@ def macro_changes(core):
 
 def daily_changes(core, rows, prices, membership):
     try:
-        items = [spy_change(core), participation_change(core, rows, prices, membership), eq_cap_change(core)]
+        items = [spy_change(core), participation_change(core, rows, prices, membership, back=1), participation_change(core, rows, prices, membership), eq_cap_change(core)]
         sectors = sector_moves(core, rows, prices, membership)
         macro = macro_changes(core)
     except Exception as exc:   # optional block: never block the brief, never pass silently
@@ -208,7 +213,7 @@ def calendar_coverage(core, rows, now):
     session = core['asof_session']
     cal = core.get('calendar') or []
     notes = [str(n) for n in core.get('calendar_notes') or []]
-    gaps = [n for n in notes if any(w in n.lower() for w in ('unavailable', 'omitted', 'failed', 'error'))]
+    gaps = [n for n in notes if any(w in n.lower() for w in ('unavailable', 'omitted', 'failed', 'error', 'not in the tracked'))]
     listed = sorted(str(e.get('scheduled_et'))[:10] for e in cal if e.get('scheduled_et'))
     future = [d for d in listed if d >= session]
     macro_status = 'unavailable' if not cal else 'expired' if not future else 'partial'

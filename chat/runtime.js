@@ -13,11 +13,13 @@
     const L=root.SmartOptionsLive; const canonical=L&&L.snapshot?L.snapshot():quotes;
     const core=Object.fromEntries(raw.rows.map(r=>[r.t,L&&L.currentRow?L.currentRow(r):r]));
     if(L&&canonical?.quotes)canonical.quotes=Object.fromEntries(Object.entries(canonical.quotes).map(([t,q])=>[t,L.get?.(t)||q]));
-    const currentBrief=L&&L.currentBrief?L.currentBrief(brief,canonical):brief;
+    // Main's Today model is explicitly completed-session analysis. Quote-dependent
+    // company rows remain canonical below; a tick must not rewrite its market signals.
+    const currentBrief=root.SmartOptionsMain?brief:L&&L.currentBrief?L.currentBrief(brief,canonical):brief;
     const rows=(root.SmartOptionsUniverse?.rows||[]).filter(r=>core[r[0]]);
     for(const r of raw.rows)if(!rows.some(x=>x[0]===r.t))rows.push([r.t,r.n,r.sec]);
     const wl=root.SmartOptionsWatchlist;
-    return {brief:currentBrief,core,quotes:canonical?.quotes||{},quotesMeta:canonical,universe:rows,covered:new Set(Object.keys(core)),watch:wl?wl.get():[],company:{},now:new Date(),page:{ticker:(root.location?.hash.match(/^#\/company\/([^/]+)/)||[])[1]},get};
+    return {brief:currentBrief,publicCore:raw,core,quotes:canonical?.quotes||{},quotesMeta:canonical,universe:rows,covered:new Set(Object.keys(core)),watch:wl?wl.get():[],company:{},now:new Date(),page:{ticker:(root.location?.hash.match(/^#\/company\/([^/]+)/)||[])[1]},get};
   }
   function personalQuestion(question){
     return /\b(my|our)\b.{0,80}\b(positions?|holdings?|portfolio|book|notes?|research note|review|checkpoint|shares?|cost|basis|exposure|worth|quantit(?:y|ies))\b|\b(i|we)\s+(own|hold|have|bought|paid|purchased|am\s+long|are\s+long)\b|\b(i['’]m|i am|we['’]re|we are)\s+(holding|long|buying|selling)\b|\bwhat\s+did\s+(i|we)\s+pay\b|\b(private|personal)\s+(note|position|review)|\b(my|our)\s+(?:[0-9,.]+\s+)?[A-Z]{1,6}\b|\b[0-9][0-9,.]*\s*(shares?|units?|lots?)\b|\b(cost(?: basis)?|basis|paid|average cost|avg cost|purchase price)\s*(of|was|is|:|=|at)?\s*\$?[0-9]/i.test(question) || /\b[0-9][0-9,.]*\s+[A-Z]{1,6}\s+(at|@)\s*\$?[0-9]/.test(question);

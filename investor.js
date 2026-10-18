@@ -148,6 +148,7 @@
     const s=data();let quoteTask=null,rowObserver=null,page=0,expanded=false,scope=host.dataset.scope||(active(s.book.get().book).length?'positions':'saved');
     function draw() {
       if(!host.isConnected)return;
+      const reviewOpen=host.querySelector('.personal-review')?.open||false;
       host.dataset.scope=scope;
       const book=s.book.get().book||{},priv=s.private.get(),names=scope==='positions'?active(book):a.watch.get(),ev=a.events(),days=a.days();
       const res=queue({names,scope,book,rows:a.core.rows,get:a.live.get,current:(r,q)=>r?a.live.currentRow(r,q):null,session:a.brief.asof_session,notes:priv.notes,prior:priv.checkpoints?.[scope],events:ev.items});
@@ -171,6 +172,14 @@
         <details class="personal-exposure"><summary>${scope==='positions'?'Position and sector shares':'Followed sectors (counts)'}</summary><p data-personal-coverage>${scope==='positions'?summary.weightLabel+'; '+summary.priced.length+'/'+summary.items.length+' positions priced.':'Counts are not capital exposure.'}</p><ul>${Object.entries(sector).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).map(([k,v])=>`<li>${esc(k)}: <span data-sector-share="${esc(k)}">${scope==='positions'?(summary.total>0?(100*v/summary.total).toFixed(1)+'%':'Unavailable'):v+' names'}</span></li>`).join('')}</ul>${scope==='positions'?`<ul>${summary.priced.slice().sort((a,b)=>b.value-a.value).map(p=>`<li><a href="#/company/${esc(p.t)}">${esc(p.t)}</a>: <span data-position-share="${esc(p.t)}">${money(p.value)}${summary.total>0?' · '+(100*p.value/summary.total).toFixed(1)+'%':''}</span></li>`).join('')}</ul>`:''}</details>
         <details><summary>Relevant known events · next ${days} days</summary>${relevant.length?`<ul>${relevant.map(e=>`<li>${esc(e.date)} · ${esc(e.title)} · ${esc(e.timing==='date_only'?'timing unknown':e.timing)}${e.kind==='earnings'&&scope==='positions'?' · entered size '+money(summary.items.find(p=>p.t===e.t)?.value):''}${e.kind==='macro'?`<p>Possible channel: ${/oil|energy/i.test(e.title)?'energy costs and producer revenues':/employment|payroll|job/i.test(e.title)?'demand, wages and policy expectations':'discount rates, financing costs and demand'}. Sign and magnitude are unknown. Affected names to investigate: </p><ul>${eventRelationships(e,names,a)}</ul><p class="dim small">Measured associations: ${esc(a.core.rel?.window||'fit window unavailable')}. The unadjusted screen is not a probability. These conditional historical slopes do not estimate this event’s impact.</p>`:''}</li>`).join('')}</ul>`:'<p>No relevant events listed in this horizon. An empty calendar is not evidence that nothing is scheduled.</p>'}<p>${ev.notes.map(esc).join(' ')}</p><a href="#/macro">Release evidence and sources</a></details>`}
         <p class="dim small">${notice}</p>`;
+      if(a.compact&&names.length){
+        const detail=root.document.createElement('details');detail.className='personal-review';detail.open=reviewOpen;
+        const heading=root.document.createElement('summary');heading.textContent=scope==='positions'?'Review entered equities':'Review saved companies';detail.append(heading);
+        [...host.childNodes].forEach(n=>{if(n.nodeType===1&&(n.matches('.personal-heading,.personal-summary,.note,.wl-note')||n.getAttribute('role')==='status'))return;detail.append(n);});
+        const recap=root.document.createElement('p');recap.className='personal-recap small';recap.textContent=res.items.slice(0,2).map(x=>x.t+': '+x.why.slice(0,1).join('')).join(' · ')||'No priority reason measured; review coverage.';
+        const next=root.document.createElement('p');next.className='personal-next-event small';next.textContent=relevant[0]?'Next listed relevant event: '+relevant[0].date+' · '+relevant[0].title+' · '+(relevant[0].timing==='date_only'?'timing unknown':relevant[0].timing)+' ET':'No relevant events listed; coverage is incomplete.';
+        host.append(recap,next,detail);
+      }
       rowObserver?.disconnect();a.live.watch('investor',[]);
       const visible=new Set(),rows=[...host.querySelectorAll('[data-personal-t]')];
       if(root.IntersectionObserver){rowObserver=new root.IntersectionObserver(entries=>{if(!host.isConnected)return;entries.forEach(e=>{if(e.isIntersecting)visible.add(e.target.dataset.personalT);else visible.delete(e.target.dataset.personalT);});a.live.watch('investor',shown.map(x=>x.t).filter(t=>visible.has(t)));});rows.forEach(el=>rowObserver.observe(el));}
@@ -250,5 +259,6 @@
     host.querySelector('[data-note-reload]').onclick=()=>{s.private.reload({discard:true});mountNote(host,t);};
   }
   if(root.addEventListener)root.addEventListener('storage',e=>{if(!['so_import_v1','so_local_imports_v1',KEY].includes(e.key))return;root.document.querySelectorAll('#position-status,[data-note-status]').forEach(n=>n.textContent='Another tab changed local data. Reload latest before saving; unsaved typing is retained.');root.document.querySelectorAll('#for-you').forEach(n=>{const msg=root.document.createElement('p');msg.className='note';msg.setAttribute('role','status');msg.textContent='Another tab changed local data. Reload this page to compare the latest.';n.prepend(msg);});});
-  return {KEY,defaults,active,regularBasis,humanET,quoteObservation,position,summarize,checkpoint,changes,attribution,relationships,queue,mountToday,mountPositions,mountNote};
+  function enteredNames(){return active(data().book.get().book||{});}
+  return {enteredNames,KEY,defaults,active,regularBasis,humanET,quoteObservation,position,summarize,checkpoint,changes,attribution,relationships,queue,mountToday,mountPositions,mountNote};
 });

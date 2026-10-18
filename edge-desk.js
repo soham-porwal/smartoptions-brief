@@ -898,8 +898,8 @@
             <thead>
               <tr>
                 <th>System / Capability</th>
-                <th>Original SmartOptions V2</th>
-                <th>SmartOptions Edge (Overhauled)</th>
+                <th>Original edition</th>
+                <th>Expanded edition</th>
                 <th>Deterministic Formula / Live Proof</th>
               </tr>
             </thead>
@@ -1044,7 +1044,7 @@
       if (!page.hidden) render();
     });
     const brand = $('#hdr .brand');
-    if (brand) brand.innerHTML = 'SmartOptions <span style="color:var(--ed-brass);font-weight:700">Brief</span>';
+    if (brand) brand.innerHTML = 'Market <span style="color:var(--ed-brass);font-weight:700">Brief</span>';
 
     page = document.createElement('main');
     page.id = 'pg-edge';

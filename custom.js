@@ -331,7 +331,7 @@ function settingsWire() {
     }
     if (b.dataset.import != null) {
       let j; try { j = JSON.parse($('#ioBox').value); } catch (err) { $('#ioBox').value = 'Not valid JSON: ' + err.message; return; }
-      if (!j || j.smartoptions_settings !== 1) { $('#ioBox').value = 'Not a SmartOptions settings export (missing smartoptions_settings: 1)'; return; }
+      if (!j || j.smartoptions_settings !== 1) { $('#ioBox').value = 'Not a settings export from this dashboard (missing smartoptions_settings: 1)'; return; }
       if (j.workspaces && typeof j.workspaces === 'object') lsSet(LS_WS, Object.assign(wsAll(), j.workspaces));
       if (j.current) applySnapshot(j.current);
       window.SO2_settings(el); return;

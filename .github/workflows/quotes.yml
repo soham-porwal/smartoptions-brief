@@ -21,6 +21,8 @@ permissions:
 
 concurrency:
   group: quotes-refresh
+  # Keep pending news/manual runs when another shared publication is queued.
+  queue: max
   cancel-in-progress: false
 
 jobs:

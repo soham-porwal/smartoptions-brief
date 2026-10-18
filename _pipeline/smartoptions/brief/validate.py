@@ -71,7 +71,12 @@ def validate_brief(b):
         require(len(p[k])<=3,'pulse count')
         for obj in p[k]:bullet(obj)
     m=b['macro']
-    for k,vocab in [('price_trend',('supportive','mixed','adverse')),('participation',('broadening','mixed','narrowing')),('risk',('calm','elevated','stressed'))]:assessment(m[k],vocab)
+    for k,vocab in [('price_trend',('supportive','mixed','adverse')),('participation',('broadening','mixed','narrowing')),('risk',('calm','elevated','stressed','incomplete'))]:assessment(m[k],vocab)
+    for k in ('price_trend','backdrop','risk'):
+        obj=m[k]
+        if 'observed_status' in obj:
+            require(obj.get('coverage') in ('complete','partial','unavailable') and isinstance(obj.get('missing'),list) and bool(obj.get('rule')) and isinstance(obj.get('inputs'),list),'normalized assessment metadata')
+            require(obj['observed_status'] is not None or obj['coverage']!='complete','missing assessment cannot be complete')
     require(m['backdrop']['status'] in ('supportive','mixed','adverse'),'backdrop status')
     for k in ('growth','inflation','policy'):
         require(m['backdrop'][k]['direction'] in ('up','flat','down'),'direction vocabulary')
@@ -121,7 +126,13 @@ def change_item(x):
     require(abs(x['change']-(cur['value']-pri['value']))<1e-3,'change equals current minus prior: '+x['id'])
     require(x['direction'] in ('up','down','flat'),'direction requires both values')
     require(x['source_url'].startswith('https://'),'change source url')
-    if x['unit']=='pp' and x['id'].startswith('breadth'):require(isinstance(x.get('cohort'),dict) and x['cohort'].get('n',0)>0,'breadth change requires cohort')
+    if x['unit']=='pp' and x['id'].startswith('breadth'):
+        cohort=x.get('cohort') or {};n=cohort.get('n',0)
+        require(n>0 and n>=.9*cohort.get('universe',n) and cohort.get('excluded',0)+n==cohort.get('universe',n),'breadth comparable cohort coverage')
+        if 'counts' in x:
+            for side in ('current','prior'):
+                count=x['counts'].get(side)
+                require(isinstance(count,int) and 0<=count<=n and abs(x[side]['value']-100*count/n)<.00011,'breadth counts reconcile to shares')
 
 
 def daily_changes(d,session):
@@ -133,6 +144,13 @@ def daily_changes(d,session):
     require(d['status']!='unavailable' or bool(d.get('reason')),'unavailable daily_changes needs reason')
     for x in d['items']:
         if x['status']=='ok':require(x['current']['date']==session,'change current date is the brief session: '+x['id'])
+    ids=[x['id'] for x in d['items']]
+    require(len(ids)==len(set(ids)),'unique market change identities')
+    spy=next((x for x in d['items'] if x['id']=='spy_1d' and x['status']=='ok'),None)
+    daily=next((x for x in d['items'] if x['id']=='breadth_50_1d' and x['status']=='ok'),None)
+    if daily:
+        require(spy and daily['prior']['date']==spy['prior']['date'],'daily breadth shares SPY endpoints')
+        require(daily['cohort']['n']>=.9*daily['cohort']['universe'],'daily breadth coverage >=90%')
 
 
 def calendar_coverage(c,session):
