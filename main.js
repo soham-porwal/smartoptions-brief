@@ -100,6 +100,7 @@
     let m;
     if (!h || h === '/' || h === '/brief') return {view: 'brief'};
     if (h === '/positions') return {view:'positions'};
+    if (h === '/room' || h === '/my-dash') return {view:'room'};
     if (/^\/explore(\?|$)/.test(h)) return {view: 'explore', hash: '#' + h};
     if ((m = h.match(/^\/sector\/(.+)$/))) { try { return {view:'sector', sector:decodeURIComponent(m[1])}; } catch(e) { return {view:'brief', invalid:true}; } }
     if ((m = h.match(/^\/learn\/(.+)$/))) { try { return {view:'learn', label:decodeURIComponent(m[1])}; } catch(e) { return {view:'brief',invalid:true}; } }
@@ -219,7 +220,7 @@
       qty: s50 && isNum(s50.value) ? `${s50.value.toFixed(0)}% of names above their 50-day average` : 'Share above averages unavailable',
       change: ch && ch.status === 'ok' ? `${ch.change >= 0 ? '+' : '−'}${Math.abs(ch.change).toFixed(1)} pp since ${shortDate(ch.prior.date)} (same ${ch.cohort.n} names)` : 'Five-session change unavailable',
       basis: 'Level of participation; direction only from the dated change'});
-    const bd = m.backdrop || {}, dirWord = k => bd[k] ? (bd[k].available === false ? 'incomplete' : {up: 'rising', down: 'falling', flat: 'steady'}[bd[k].direction] || bd[k].direction) : 'n/a';
+    const bd = m.backdrop || {}, mw = macroWords(b), dirWord = k => bd[k] ? (bd[k].available === false ? 'incomplete' : mw[k]?.word || bd[k].direction) : 'n/a';
     out.push({id: 'backdrop', title: 'Macro backdrop', word: cap1(bd.status || 'unavailable'), tone: bd.status === 'supportive' ? 'good' : bd.status === 'adverse' ? 'bad' : 'mixed',
       qty: `Growth ${dirWord('growth')} · inflation ${dirWord('inflation')} · policy rate ${dirWord('policy')}`, basis: 'Latest releases; each keeps its own period'});
     const rk = m.risk || {}, ev = m.risk_events;
@@ -313,11 +314,85 @@
     const why=[v(/^HY OAS change/)>=30&&'high-yield credit spreads widened notably over the past 20 trading days',v(/^ICE BofA US High Yield OAS/)>=450&&'high-yield credit spreads are wide',v(/^VIX close/)>=20&&'the VIX is at or above 20',v(/^VIX \/ VIX3M/)>1&&'near-term volatility is priced above three-month volatility'].filter(Boolean);
     return `Risk conditions are ${sig.status}${why.length?': '+listJoin(why):''}.`;
   }
+  // Source-grounded macro words; each keeps its own horizon. A flat classifier over disagreeing horizons reads "mixed",
+  // never "steady"; a 20-observation effective-rate move is not a new decision; slower positive growth is not contraction.
+  function macroWords(b) {
+    const bd=b?.macro?.backdrop||{},m=(k,re)=>{const x=findMetric(bd[k]?.metrics,re);return x&&isNum(x.value)?x:null;},out={};
+    const g=bd.growth,i=bd.inflation,p=bd.policy;
+    if(g&&g.available!==false){const gdp=m('growth',/^Real GDP growth \(quarterly SAAR\)/),pos=gdp?gdp.value>0:null;
+      out.growth=g.direction==='down'?{word:pos===false?'contracting':'slowing',text:pos?'growth is slowing but still positive':pos===false?'output is contracting':'growth slowed'}:g.direction==='up'?{word:'picking up',text:'growth picked up'}:{word:'little changed',text:null};}
+    if(i&&i.available!==false){const mixed=i.direction==='flat'&&/differ|incomplete/i.test(i.line||'');
+      out.inflation=mixed?{word:'mixed across measures',text:'inflation measures disagree'}:i.direction==='up'?{word:'rising',text:'inflation is rising'}:i.direction==='down'?{word:'easing',text:'inflation is easing'}:{word:'steady',text:null};}
+    if(p&&p.available!==false){const s=m('policy',/^Policy comparison start/),since=s&&/^\d{4}-\d{2}-\d{2}$/.test(s.period||'')?shortDate(s.period):null;
+      out.policy=p.direction==='up'?{word:since?'higher than '+since:'higher',text:'the effective fed funds rate is higher'+(since?' than on '+since:'')}:p.direction==='down'?{word:since?'lower than '+since:'lower',text:'the effective fed funds rate is lower'+(since?' than on '+since:'')}:{word:'unchanged',text:null};}
+    return out;
+  }
   function macroSentence(b,sig) {
     if(sig.status!=='adverse'&&sig.status!=='supportive')return null;
-    const bd=b.macro?.backdrop||{},w={growth:{down:'growth slowed',up:'growth picked up'},inflation:{up:'inflation is rising',down:'inflation is easing'},policy:{up:'policy rates rose',down:'policy rates fell'}};
-    const parts=['growth','inflation','policy'].map(k=>bd[k]?.available!==false&&w[k][bd[k]?.direction]).filter(Boolean);
+    const w=macroWords(b),parts=['growth','inflation','policy'].map(k=>w[k]?.text).filter(Boolean);
     return `The macro backdrop is ${sig.status}${parts.length?': '+listJoin(parts):''}.`;
+  }
+  // First-view synthesis: measured supports beside measured challenges, then a conditional implication.
+  // It never presumes holdings or gains, never rates a trade, and ranks nothing by colour alone.
+  function pricePhrase(b,sig) {
+    const ms=b.macro?.price_trend?.metrics||[],c=findMetric(ms,/^SPY close$/),a50=findMetric(ms,/50-session average/),a200=findMetric(ms,/200-session average/);
+    if(!sig.status||!c||!a50||!a200)return null;const u50=c.value>a50.value,u200=c.value>a200.value;
+    return sig.status==='supportive'?['s','the S&P 500 uptrend']:sig.status==='adverse'?['c','the S&P 500 downtrend']:u200&&!u50?['c','a short-term S&P 500 trend break (long-term trend intact)']:!u200&&u50?['c','a long-term S&P 500 trend that has not recovered']:['c','an unclear S&P 500 trend'];
+  }
+  // First-view reason: one short accurate clause; the full sentence, horizons and figures stay in its evidence sheet.
+  function shortReason(x,b,model) {
+    const id=x.ev.id,[p,pa,m,r]=model.signals;
+    if(id==='price_trend'){const pp=pricePhrase(b,p),ms=b.macro?.price_trend?.metrics||[],c=findMetric(ms,/^SPY close$/),a50=findMetric(ms,/50-session average/),a200=findMetric(ms,/200-session average/);
+      if(!pp||!c||!a50||!a200)return x.text;return `S&P 500 ${c.value>a50.value?'above':'below'} its 50-day, ${c.value>a200.value?'above':'below'} its 200-day average`;}
+    if(id==='participation'&&pa.status){const s50=findMetric((b.macro?.participation||b.positioning?.breadth||{}).metrics,/Above 50-session/),under=s50&&isNum(s50.value)?(s50.value<50?'; still under half':'; over half'):'';
+      return (pa.status==='broadening'?'More stocks above their 50-day average than five sessions ago':pa.status==='narrowing'?'Fewer stocks above their 50-day average than five sessions ago':'Participation roughly unchanged over five sessions')+under;}
+    if(id==='risk'&&(r.status==='elevated'||r.status==='high')){const hy=findMetric(b.macro?.risk?.metrics,/^HY OAS change/);return `Risk ${r.status}`+(hy&&isNum(hy.value)&&hy.value>=30?': credit spreads widened over 20 days':'');}
+    if(id==='backdrop'&&m.status){const w=macroWords(b),bits=[w.growth&&w.growth.word!=='little changed'&&'growth '+w.growth.word.replace(' but still positive',''),w.inflation&&(w.inflation.word==='mixed across measures'?'inflation mixed':'inflation '+w.inflation.word),w.policy&&w.policy.word!=='unchanged'&&'policy rate '+w.policy.word.split(' than ')[0]].filter(Boolean);
+      return `Macro ${m.status}`+(bits.length?': '+listJoin(bits):'');}
+    return x.text;
+  }
+  function takeaway(model,b) {
+    const [p,pa,m,r]=model.signals,sup=[],ch=[],pp=pricePhrase(b,p);
+    if(pp)(pp[0]==='s'?sup:ch).push(pp[1]);
+    if(pa.status==='broadening')sup.push('more companies joining the advance');else if(pa.status==='narrowing')ch.push('fewer companies participating');
+    if(r.status==='normal'&&r.coverage==='complete')sup.push('calm credit and volatility');
+    else if(r.status==='elevated'||r.status==='high'){const hy=findMetric(b.macro?.risk?.metrics,/^HY OAS change/);ch.push(hy&&isNum(hy.value)&&hy.value>=30?'widening credit spreads':'elevated risk measures');}
+    if(m.status==='supportive')sup.push('a supportive macro backdrop');else if(m.status==='adverse')ch.push('an adverse macro backdrop');
+    const label=model.label;
+    const so=/^Defensive/.test(label)?'Downside first: review concentration and event dates before adding exposure.':label==='Supportive conditions'?'Conditions support adding exposure selectively; valuation and event dates still decide timing.':/incomplete/i.test(label)?'Too little comparable evidence for a market call; dated company evidence below still applies.':ch.length>sup.length?'Be selective: weigh downside and event dates before adding exposure, and watch whether the challenges ease.':'Be selective: the supports are real, but wait for the challenges to ease before adding broadly.';
+    return {supports:sup,challenges:ch,so};
+  }
+  // Current SPY beside the completed-session read. The comparison basis is proven, not assumed: the quote's previous
+  // regular close must equal the retained unadjusted SPY close for the read session (so no split, dividend or other
+  // basis change sits between them), in USD, and the averages must be dated that session. Otherwise the current
+  // price and its own change stay separate from the dated averages. Ticks never re-label macro, credit or breadth.
+  function nowVsClose(b,q,nowMs,breadth) {
+    const session=b?.asof_session,ms=b?.macro?.price_trend?.metrics||[],close=findMetric(ms,/^SPY close$/),a50=findMetric(ms,/50-session average/),a200=findMetric(ms,/200-session average/);
+    const t=Date.parse(q?.asof_utc||q?.ts||''),qSession=isFinite(t)?new Date(t).toLocaleDateString('en-CA',{timeZone:'America/New_York'}):null,base={session};
+    if(!session||!q||!isNum(q.price)||q.price<=0||!isFinite(t)||t>nowMs+60000)return {...base,state:'unavailable',reason:'no current SPY quote'};
+    if(q.current_usable===false||['stale','missing','blocked'].includes(q.delivery_state))return {...base,state:'unavailable',reason:'the SPY quote is stale or unavailable'};
+    if(qSession<session)return {...base,state:'unavailable',reason:'the latest SPY quote predates the '+shortDate(session)+' session'};
+    if(qSession===session)return {...base,state:'closed',price:q.price,qTime:t};
+    const prior=isNum(q.prior_close)&&q.prior_close>0?q.prior_close:null,own=isNum(q.chg_pct)?q.chg_pct:isNum(q.change_pct)?q.change_pct:null;
+    // Proof needs the provider's own dated previous close in USD; absent fields or a loose price coincidence prove nothing.
+    const proven=!!(prior&&close&&isNum(close.value)&&close.value>0&&q.prior_close_date===session&&q.currency==='USD'&&Math.abs(prior/close.value-1)<=.0005);
+    const out={...base,state:'current',fresh:q.freshness_label||q.delivery_state||'freshness unknown',price:q.price,qTime:t,qSession,proven,own,chg:proven?100*(q.price/prior-1):null};
+    if(proven&&a50&&a200&&isNum(a50.value)&&isNum(a200.value)&&String(a50.asof||'').slice(0,10)===session&&String(a200.asof||'').slice(0,10)===session)
+      Object.assign(out,{v50:100*(q.price/a50.value-1),v200:100*(q.price/a200.value-1),closeAbove50:close.value>a50.value,closeAbove200:close.value>a200.value,nowAbove50:q.price>a50.value,nowAbove200:q.price>a200.value});
+    if(breadth&&breadth.complete&&breadth.session>session&&breadth.session===qSession)out.breadth={up:breadth.up,n:breadth.n,pct:breadth.up_pct};
+    return out;
+  }
+  function nowText(n,b) {
+    const d=shortDate(n.session),et=ms=>new Date(ms).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'})+' ET';
+    if(n.state==='unavailable')return `Now: no current SPY price (${n.reason}). Signals are the ${d} close.`;
+    if(n.state==='closed')return `Now: no session since ${d}. SPY $${n.price.toFixed(2)}`+(n.last&&isNum(n.last.pct)?`, ${pct(n.last.pct)} that day`:'')+'. Signals refresh automatically after each close.';
+    let s=`Now: SPY $${n.price.toFixed(2)} · ${n.fresh} · ${et(n.qTime)}${n.marketOpen===false?' · market closed':''}`;
+    if(n.proven&&isNum(n.chg))s+=`, ${pct(n.chg)} since the ${d} close.`;else s+=(isNum(n.own)?`, ${pct(n.own)} vs provider's previous close`:'')+'.';
+    if(isNum(n.v50)){const f50=n.nowAbove50!==n.closeAbove50,f200=n.nowAbove200!==n.closeAbove200;
+      s+=f50||f200?` Intraday SPY is ${f50?(n.nowAbove50?'back above':'below')+' its '+d+' 50-day':(n.nowAbove200?'back above':'below')+' its '+d+' 200-day'} average; not yet confirmed by a close.`:` Still ${n.nowAbove50?'above':'below'} its ${d} 50-day and ${n.nowAbove200?'above':'below'} its 200-day average.`;}
+    else s+=` Not compared with the ${d} averages: close basis unconfirmed.`;
+    if(n.breadth)s+=` ${n.breadth.up} of ${n.breadth.n} S&P 500 names up.`;
+    return s;
   }
   function participationSentence(b,sig) {
     const s50=findMetric((b.macro?.participation||b.positioning?.breadth||{}).metrics,/Above 50-session/),share=s50&&isNum(s50.value)?s50.value:null;
@@ -501,13 +576,13 @@
     return hi > lo ? {pos: 100 * (cur.px - lo) / (hi - lo), lo, hi} : null;
   }
 
-  const API = {delayedIv,signalCue,postureTone,objectiveTone,researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
+  const API = {macroWords,takeaway,nowVsClose,nowText,coherentPair,delayedIv,signalCue,postureTone,objectiveTone,researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
   if (typeof module !== 'undefined' && module.exports) { module.exports = API; return; }
   root.SmartOptionsMain = API;
   const doc = root.document; if (!doc) return;
 
   /* ------------------------------------------------------------ page */
-  const ASSET_V = 'client-20261018-classy3';
+  const ASSET_V = 'client-20261018-adaptive-rooms1';
   const Live = root.SmartOptionsLive;
   const S = root.__soMainState = {core: null, brief: null, rel: null, rowMap: new Map(), slots: [], view: null, chart: null, company: {}, onQuote: null};
   const $ = s => doc.querySelector(s);
@@ -555,11 +630,11 @@
   // Bounded session back stack. Detaching actual DOM preserves controls, chart
   // instances and their internal zoom/crosshair state, including unsaved typing.
   const frames = new Map(); const frameEpoch = Date.now().toString(36) + Math.random().toString(36).slice(2, 9); let frameId = null, frameSerial = 0;
-  const persistentKeys = new Set(['core','brief','rel','relError','rowMap','company','metricEvidence']);
+  const persistentKeys = new Set(['core','brief','rel','relError','rowMap','company','metricEvidence','generation','genPending','genNote','refreshGeneration']);
   function saveFrame() {
     if (!frameId || !$('#view').firstChild) return;
-    const frame = {nodes:[...$('#view').childNodes], state:{}, y:root.scrollY, focus:doc.activeElement,
-      watch:Object.fromEntries(['explore','company','research','index','investor'].map(k=>[k,[...(Live._state.owners[k]||[])]]))};
+    const frame = {gen:S.generation||0, nodes:[...$('#view').childNodes], state:{}, y:root.scrollY, focus:doc.activeElement,
+      watch:Object.fromEntries(['explore','company','research','index','investor','dashboard'].map(k=>[k,[...(Live._state.owners[k]||[])]]))};
     Object.keys(S).filter(k=>!persistentKeys.has(k)).forEach(k=>{frame.state[k]=S[k];});
     frames.delete(frameId);frames.set(frameId,frame);
     frame.nodes.forEach(n=>n.remove());
@@ -571,7 +646,7 @@
   function backControl(main) {
     if (S.view==='brief') return;
     const el=doc.createElement('div');el.className='depth-nav';
-    el.innerHTML='<button type="button" data-depth-back>← Back</button><a href="#/">Today</a><span class="dim"> / '+esc(S.view==='company' ? 'Company' : S.view==='sector' ? 'Sector' : S.view==='explore' ? 'Compare' : S.view==='companies' ? 'Companies' : S.view==='macro' ? 'Macro' : S.view)+'</span>';
+    el.innerHTML='<button type="button" data-depth-back>← Back</button><a href="#/">Today</a><span class="dim"> / '+esc(S.view==='company' ? 'Company' : S.view==='sector' ? 'Sector' : S.view==='explore' ? 'Compare' : S.view==='companies' ? 'Companies' : S.view==='macro' ? 'Macro' : S.view==='room' ? 'Saved rooms' : S.view)+'</span>';
     main.prepend(el);
     el.querySelector('button').onclick=()=>{if(root.history.state?.soParent)root.history.back();else root.location.hash='#/';};
   }
@@ -582,7 +657,10 @@
     saveFrame();
     frameId=root.history.state?.soFrame || 'depth-'+frameEpoch+'-'+(++frameSerial);
     root.history.replaceState({...root.history.state,soFrame:frameId,soParent:root.history.state?.soParent || (previous!==frameId ? previous : null)},'');
-    const cached=frames.get(frameId);
+    if(S.genPending)adoptPending();
+    let cached=frames.get(frameId);
+    // A view saved under an older data generation is redrawn from the adopted one instead of restored.
+    if(cached&&cached.gen!==(S.generation||0)){frames.delete(frameId);try{['chart','exChart','exRc'].forEach(c=>cached.state[c]?.remove());cached.state.news?.destroy();cached.state.fv?.destroy();}catch(e){console.warn('Older-generation view could not be released');}cached=null;}
     if(cached) {
       frames.delete(frameId);
       Object.keys(S).filter(k=>!persistentKeys.has(k)).forEach(k=>{delete S[k];});Object.assign(S,cached.state);
@@ -606,6 +684,7 @@
     S.slots = []; S.onQuote = null; S.exToken = (S.exToken || 0) + 1; S.exChart=null;S.exRc=null;S.chart=null;S.exSeries=[];S.jointChart=null;S.jointBand=[];S.coTab=null;S.co=null;S.fv=null;S.drv=null;S.coDraw=null;S.news=null;S.horizon=UI.horizon;S.lastEvents={};
     if (r.view !== 'brief') Live.watch('investor', []);
     if (r.view !== 'explore') Live.watch('explore', []);
+    if (r.view !== 'room') Live.watch('dashboard', []);
     S.view = r.view; setView(r.view === 'company' ? 'companies' : r.view);
     const main = $('#view');
     try {
@@ -616,6 +695,7 @@
       else if (r.view === 'explore') renderExplore(main, r.hash);
       else if (r.view === 'sector') renderSector(main,r.sector);
       else if (r.view === 'learn') renderLearn(main,r.label);
+      else if (r.view === 'room') renderRoom(main);
       else renderBrief(main, r.legacy);
     } catch (e) { main.innerHTML = `<p>This view could not be drawn from the published data. <a href="backup.html">Expanded dashboard (backup)</a></p>`; console.error(e); }
     Live.paint(doc, null);
@@ -685,7 +765,13 @@
   const evBtn = (ev, label, cls) => `<button type="button" class="ev${cls ? ' ' + cls : ''}" data-ev="${evAttr(ev)}">${label || 'Evidence'}</button>`;
   function bigNames() { return new Set(S.core.rows.filter(r => r.sp500_member !== false && isNum(r.mcap)).sort((a, b) => b.mcap - a.mcap).slice(0, 60).map(r => r.t)); }
   function enteredNames() {return root.SmartOptionsInvestor.enteredNames();}
-  function horizonEvents(days, ticker) { return eventsInHorizon(S.core, S.brief, Date.now(), days, {watch: new Set(WL().get()),entered:new Set(enteredNames()), big: bigNames(), ticker}); }
+  // One calendar computation per horizon/minute/generation/saved-set; a horizon click redraws several consumers.
+  const horizonMemo=new Map();
+  function horizonEvents(days, ticker) {
+    const watch=WL().get(),entered=enteredNames(),key=[days,ticker||'',Math.floor(Date.now()/60000),S.generation||0,S.brief?.generated_at,watch.join(','),entered.join(',')].join('|');
+    if(horizonMemo.has(key))return horizonMemo.get(key);if(horizonMemo.size>24)horizonMemo.clear();
+    const v=eventsInHorizon(S.core, S.brief, Date.now(), days, {watch: new Set(watch),entered:new Set(entered), big: bigNames(), ticker});horizonMemo.set(key,v);return v;
+  }
   const timingWord = x => x.timing === 'bmo' ? 'before the open' : x.timing === 'amc' ? 'after the close' : x.timing === 'timed' ? '' : 'time not confirmed';
   function eventLine(x, i, scope) {
     const tw = timingWord(x);
@@ -744,17 +830,41 @@
     const groups=[['Gainers',returns.filter(r=>r.d1>0).sort((a,b)=>b.d1-a.d1).slice(0,3)],['Decliners',returns.filter(r=>r.d1<0).sort((a,b)=>a.d1-b.d1).slice(0,3)],['Volume / 20-session average',volumes]];
     return `<h3>Movers to investigate</h3><p class="dim small">${esc(S.brief.asof_session)} · session observations, not investment opportunities. True index contribution is unavailable. Unusual volatility is not established by price movement.</p><div class="mover-grid">${groups.map(([label,names],i)=>`<div><h4>${label}</h4>${names.map(r=>`<p><a href="#/company/${esc(r.t)}/drivers">${esc(r.t)} ${i===2?r.vr.toFixed(2)+'×':pct(r.d1)}</a> ${evBtn({kind:'today',id:i===2?'volume':'mover',t:r.t})}</p>`).join('')||'<p>Not available: no usable observations.</p>'}</div>`).join('')}</div><p class="small dim">Volume ratios available for ${rows.filter(r=>r.st?.vol_ratio_20d==='ok'&&isNum(r.vr)&&r.vr>=0).length}/${rows.length} matched-session names. Missing volume remains unassessed.</p>`;
   }
+  function nowSlot() {
+    const quote=q('SPY'),now=Date.now(),key=[quote?.asof_utc||quote?.ts,quote?.price,quote?.delivery_state,Math.floor(now/60000),S.brief?.generated_at].join('|');
+    if(S.nowKey===key)return S.nowHtml;
+    const pre=nowVsClose(S.brief,quote,now,null),n=pre.state==='current'?nowVsClose(S.brief,quote,now,(S.nowBreadth&&now-S.nowBreadth.at<15000&&S.nowBreadth.gen===S.generation?S.nowBreadth:(S.nowBreadth={at:now,gen:S.generation,v:liveBreadth(S.core.rows,q)})).v):pre;
+    if(n.state==='closed'){const c=sessionComparison(S.brief,S.core,'spy_1d');if(c.available)n.last={pct:c.pct,prior:c.x.prior.date};}
+    if(n.state==='current')n.marketOpen=Live.marketClock?Live.marketClock(now).open:undefined;
+    const pending=!quote&&!Live._state?.file&&!Live._state?.fileState?.error;
+    S.nowKey=key;S.nowHtml=pending?'<span data-now-state="pending">Now: checking the current SPY quote…</span>':`<span data-now-state="${n.state}">${esc(nowText(n,S.brief))}</span>`;return S.nowHtml;
+  }
+  function firstReasons(model) {
+    const rs=model.reasons;if(rs.length<=4)return rs;
+    return [...rs.slice(0,3),rs.find(r=>r.ev.id==='trust')||rs[3]];
+  }
+  function implicationsHtml(model) {
+    const b=S.brief;return `${objectiveModel(model,b,horizonEvents(S.horizon||7),S.core).map(x=>`<button type="button" class="impl" data-jump="${x.target}" data-tone="${objectiveTone(x,model)}"><span class="impl-t">${x.title}</span><span class="impl-w">${cue(objectiveTone(x,model))}${esc(x.word)}</span></button>`).join('')}<button type="button" class="impl impl-more" data-jump="deep-dive"><span class="impl-t">Deep dive</span><span class="impl-w">Companies, macro, compare →</span></button>`;
+  }
+  function nextRisk() {
+    const h=horizonEvents(S.horizon||7),x=h.items.find(e=>e.kind==='macro'&&e.major===true||e.kind==='earnings'&&e.entered)||h.relevant[0];
+    return x?`<span class="lbl">Next</span> <b>${esc(x.title)}</b> <span class="dim">${when(x.when)}</span> <button type="button" class="text" data-jump="my-risk">Upcoming risks →</button>`:`<span class="lbl">Next</span> No listed release in ${h.days} days. ${h.complete?'':'Calendar coverage is incomplete. '}<button type="button" class="text" data-jump="my-risk">Upcoming risks →</button>`;
+  }
   function renderBrief(main,legacy) {
-    const b=S.brief,pos=b.positioning||{},short=(b.shortlist||[]).slice(0,8),model=todayModel(b,S.core),conc=pos.concentration||{},rotation=pos.rotation||{};
+    const b=S.brief,pos=b.positioning||{},short=(b.shortlist||[]).slice(0,8),model=todayModel(b,S.core),tk=takeaway(model,b),conc=pos.concentration||{},rotation=pos.rotation||{};
     Live.watch('index',['SPY','RSP']);Live.watch('research',short.map(x=>x.t));Live.watch('company',[]);
     const gap=changeItem(b,'eq_cap_gap_5d');
     main.innerHTML=`${legacy?`<p class="note">That view lives in the <a href="backup.html${esc(legacy)}">expanded edition</a>.</p>`:''}
       <div class="cockpit"><section class="read" id="market" aria-labelledby="read-h"><h1 id="read-h" class="page-label">Today’s market</h1>
-        <p class="trust"><span>Completed session ${esc(model.session)}</span><span>Updated ${esc(model.updated)}</span><span>${esc(model.coverage)}</span> ${evBtn({kind:'today',id:'trust'},'Data and sources','text')}</p>
-        <div class="opening"><div class="opening-read"><h2 class="headline" data-tone="${postureTone(model)}">${cue(postureTone(model))}<span class="headline-copy">${esc(model.label)}</span></h2><p class="small dim">Dated completed-session assessment. Live quotes do not refresh these signals.</p><p>${evBtn({kind:'today',id:'posture'},'How this reading is formed','text')}</p></div>
-        <ul class="market-reasons">${model.reasons.map(x=>`<li><button type="button" class="ev reason" data-ev="${evAttr(x.ev)}">${cue(model.signals.find(s=>s.id===x.ev.id)?.tone||'neutral')}<span class="reason-copy">${esc(x.text)}</span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul></div>
-        <nav class="today-jumps" aria-label="Today sections">${[['market','Market'],['my-risk','My risk'],['income','Income'],['opportunity','Opportunity'],['deep-dive','Deep dive']].map(([id,label])=>`<button type="button" class="text" data-jump="${id}">${label}</button>`).join('')}</nav></section>
+        <p class="trust"><span>${esc(shortDate(model.session))} close · updated ${esc(model.updated)}</span> ${evBtn({kind:'today',id:'trust'},'Data and sources','text')}</p>
+        <div class="opening"><div class="opening-read"><h2 class="headline" data-tone="${postureTone(model)}">${cue(postureTone(model))}<span class="headline-copy">${esc(model.label)}</span></h2>
+          <p class="tk-so"><span class="lbl">So what</span> ${esc(tk.so)} ${evBtn({kind:'today',id:'posture'},'Why','text')}</p>
+          <p class="now-strip">${slot('now',nowSlot)}</p></div>
+        <ul class="market-reasons">${firstReasons(model).map(x=>`<li><button type="button" class="ev reason" data-ev="${evAttr(x.ev)}">${cue(model.signals.find(s=>s.id===x.ev.id)?.tone||'neutral')}<span class="reason-copy">${esc(shortReason(x,b,model))}</span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul></div>
+        </section>
       <section id="since"><h2>Since previous session</h2><p class="dim small">${esc(model.comparisons[0].x?.prior?.date||'Prior date unavailable')} → ${esc(b.asof_session)}. Five-session and monthly changes remain separate.</p><div class="comparison-grid">${model.comparisons.map(c=>`<article data-comparison="${c.id}"><h3>${CHANGE_NAMES[c.id]}</h3><p class="comparison-value">${esc(comparisonText(c))}</p>${c.available&&(c.x.prior.date!==model.comparisons[0].x?.prior?.date||c.x.current.date!==b.asof_session)?`<p class="small">${esc(c.x.prior.date)} → ${esc(c.x.current.date)}</p>`:''}<p>${esc(comparisonMeaning(c))}</p>${evBtn({kind:'today-change',id:c.id})}</article>`).join('')}</div></section>
+      <section class="next-steps" aria-label="What this means"><nav class="implications" aria-label="What this means">${implicationsHtml(model)}</nav>
+        <p class="next-risk" id="next-risk">${nextRisk()}</p></section>
       <section><h2>Four signals</h2><div class="assess">${model.signals.map(tile).join('')}</div><details><summary>Detailed macro observations</summary><p><a href="#/macro">Open all eight macro groups, histories and sources</a></p>${(b.macro?.detail||[]).map(d=>`<p><b>${esc(GROUPS[d.group]||d.group)}:</b> ${esc(d.line)}</p>`).join('')}</details></section>
       <section id="developments"><h2>Recent developments</h2><p class="dim small">Dated developments from market desks, official releases and matched companies. A headline is context to check; it is not a measured cause of any price move.</p><details class="news-depth"><summary>Show dated headlines and their sources</summary><div id="news-list"><p class="dim">Opens on request so the first view stays fast.</p></div></details></section>
       <section id="positioning"><h2>S&P positioning</h2><p>${esc(model.signals[1].word)}. ${esc(conc.line||'Provider-cap concentration unavailable.')} ${esc(rotation.line||'Leadership unavailable.')}</p><p class="dim small">Provider capitalization is a proxy, not official index contribution. ${gap?.status==='ok'?`RSP minus SPY 20-session price gap ${pp(gap.prior.value)} → ${pp(gap.current.value)}, ${gap.prior.date} → ${gap.current.date} (five sessions apart).`: 'Equal versus cap-weight comparison unavailable.'}</p><p>${evBtn({kind:'today',id:'positioning'})} <a href="${esc(W.encodeHash({s:[{id:'eq:RSP'},{id:'eq:SPY'}],r:'6m',m:'index'}))}">Compare RSP and SPY</a></p>
@@ -841,7 +951,7 @@
       return {title:CHANGE_NAMES[ev.id]+' · previous session',html:`<p class="lead">${esc(comparisonText(c))}</p><p>${esc(comparisonMeaning(c))}</p>${c.available?'':'<p>Retained observation below is not a valid previous-session comparison.</p>'}${changeHtml(c.x)}<p>Source observation: ${esc(c.x?.current?.date||'unavailable')} · last refreshed: ${esc(c.x?.retrieved_at||'not supplied')}. Yield percentage-point changes ×100 = basis points. DXY points and percent changes are separate.</p><p><a href="${esc(href)}">Open exact historical comparison</a>${macroId?' · <a href="#/macro">Macro observations and sources</a>':''}</p>`};
     }
     if(ev.kind==='today'){
-      if(ev.id==='posture')return {title:'How the market read is formed',html:`<p class="lead">${esc(model.label)}</p><p>Completed session ${esc(model.session)}. A decision table, not a score or forecast.</p><p>High measured risk takes precedence, then adverse price with narrowing participation. A supportive reading requires all four complete signals. Missing price or comparable breadth means incomplete; missing macro/risk limits the broader reading.</p>${model.signals.map(s=>`<p><b>${esc(s.title)}: ${esc(s.word)}</b> · ${esc(s.qty)} ${evBtn({kind:'assessment',id:s.id})}</p>`).join('')}<a href="#/macro">Open detailed Macro evidence</a>`};
+      if(ev.id==='posture')return {title:'How the market read is formed',html:`<p class="lead">${esc(model.label)}</p>${(()=>{const tk=takeaway(model,S.brief);return (tk.supports.length?`<p><b>Supports:</b> ${esc(listJoin(tk.supports))}.</p>`:'')+(tk.challenges.length?`<p><b>Challenges:</b> ${esc(listJoin(tk.challenges))}.</p>`:'')+`<p><b>So what:</b> ${esc(tk.so)}</p>`;})()}<p>Completed session ${esc(model.session)}. A decision table, not a score or forecast.</p><p>High measured risk takes precedence, then adverse price with narrowing participation. A supportive reading requires all four complete signals. Missing price or comparable breadth means incomplete; missing macro/risk limits the broader reading.</p>${model.signals.map(s=>`<p><b>${esc(s.title)}: ${esc(s.word)}</b> · ${esc(s.qty)} ${evBtn({kind:'assessment',id:s.id})}</p>`).join('')}<a href="#/macro">Open detailed Macro evidence</a>`};
       if(ev.id==='trust')return {title:'Data coverage and clocks',html:`<p>Brief assembled ${esc(model.updated)} from retained inputs; this is not a provider observation time. Market assessment: ${esc(model.session)}.</p><h3>Prices</h3><p>Each canonical quote shows its own observation, provider, delay and session. Live prices do not update completed-session signals.</p><a href="${learnHref('Price · SPY')}">Inspect SPY quote and method</a><h3>Macro</h3>${(b.macro?.detail||[]).map(d=>`<h4>${esc(GROUPS[d.group]||d.group)}</h4>${metricTable(d.metrics,true)}`).join('')}<h3>Fundamentals</h3><p>Retained statements keep actual provider fiscal periods. Own-history valuation and revisions are not universally available. Assembly time does not make them current.</p><a href="#/companies?mode=shortlist">Exact company periods and evidence</a><h3>Events</h3>${(b.calendar_coverage?.sources||[]).map(s=>`<p>${esc(s.source)} · ${esc(s.status)} · retrieved ${esc(s.retrieved_at||'unavailable')}. ${esc(s.note)}</p>`).join('')||'<p>Coverage unavailable; no deeper coverage observation exists.</p>'}<p>${esc((b.calendar_coverage?.gaps||[]).join('; '))}</p><a href="#/macro">Release observations and sources</a>`};
       if(ev.id==='mover'||ev.id==='volume'){const r=row(ev.t),volume=ev.id==='volume';return {title:ev.t+(volume?' · volume ratio':' · session mover'),html:`<p>${esc(ev.t)} ${volume?r.vr.toFixed(2)+'×':pct(r?.d1)} at ${esc(b.asof_session)}. Source: retained Yahoo ${volume?'volume':'closes'}; refreshed ${esc(S.core.gen?.equities||'unavailable')}. Method: ${volume?'session volume / retained 20-session average volume':'close/prior close minus one, ×100'}. ${volume?'A ratio measures activity, not buying versus selling flow or a volatility forecast.':'Movement is not an investment thesis.'}</p><p><a href="#/company/${esc(ev.t)}/drivers">${esc(ev.t)} Chart & drivers</a> · <a href="#/company/${esc(ev.t)}/fundamentals">${esc(ev.t)} Fundamentals</a></p>`};}
       if(ev.id==='positioning')return {title:'S&P positioning evidence',html:`<p>Participation is directional only over the labeled five-session same cohort. Provider-cap share is not actual index attribution.</p>${changeHtml(changeItem(b,'breadth_50_5d'))}${changeHtml(changeItem(b,'eq_cap_gap_5d'))}${metricTable([...(b.positioning?.concentration?.metrics||[]),...(b.positioning?.rotation?.metrics||[])],true)}<a href="${esc(W.encodeHash({s:[{id:'eq:RSP'},{id:'eq:SPY'}],r:'6m',m:'index'}))}">Compare RSP and SPY</a>`};
@@ -1776,14 +1886,87 @@
     pending = null;const ch=changedSince;changedSince=new Set();
     // A new market-relative sentence can wrap above the reader's research panel.
     // Retain that panel's viewport position while still displaying the new evidence.
-    const panel=S.view==='company'&&root.scrollY>0?doc.querySelector('.co-panel:not([hidden])'):null;
+    // Today: the current-price strip sits above the reader, so anchor whatever is at the top of the viewport.
+    const topAnchor=()=>{const y=(parseFloat(root.getComputedStyle(doc.documentElement).getPropertyValue('--hdr-h'))||60)+8;return doc.elementFromPoint?.(root.innerWidth/2,y)?.closest('article,li,section>p,section>h2,section')||null;};
+    const panel=root.scrollY>0?(S.view==='company'?doc.querySelector('.co-panel:not([hidden])'):S.view==='brief'?topAnchor():null):null;
     const before=panel?.getBoundingClientRect().top,anchored=before!=null&&before<root.innerHeight;
     paintSlots();if(S.onQuote)S.onQuote(ch);
     if(anchored&&panel.isConnected){const delta=panel.getBoundingClientRect().top-before;if(Math.abs(delta)>.5)root.scrollBy(0,delta);}
   },120); }
+  // Foreground data generations: an open tab adopts a newer completed-session core+brief pair without a reload.
+  // Only a coherent pair (same asof_session, export clocks within 30 minutes, strictly newer than shown) is adopted;
+  // older, mixed, failed or superseded reads leave the shown pair in place. The quote engine keeps its quotes and
+  // budgets (rows only), and private state, chat drafts and saved rooms are untouched.
+  const GEN_POLL=10*60e3;   // coherentPair allows export clocks up to 30 minutes apart
+  function genClock(core,brief){return Math.max(Date.parse(core?.exported_at)||0,Date.parse(brief?.generated_at)||0);}
+  // Same inputs, proven by provenance the export already carries: core.gen.<component> must equal the brief's
+  // health.sources[<component>].asof (timezone-normalised; both null allowed). A newer pair must not carry any older
+  // component than the shown pair, and at least one component must be strictly newer. Future clocks are invalid.
+
+  function receipts(core,brief,now) {
+    const src=Object.fromEntries((brief?.health?.sources||[]).filter(x=>x&&x.id).map(x=>[x.id,x.asof])),out={};
+    for(const k of ['macro','equities','relations','crosscheck']){const a=core?.gen?.[k],b=src[k];
+      if(a==null&&b==null){out[k]=null;continue;}
+      const ta=Date.parse(a),tb=Date.parse(b);
+      if(!isFinite(ta)||!isFinite(tb))return {error:'invalid: '+k+' receipt missing or unreadable'};
+      // A device clock can run hours behind; only receipts a day ahead of it are treated as invalid future clocks.
+      if(ta>now+864e5||tb>now+864e5)return {error:'invalid: '+k+' receipt in the future'};
+      if(ta!==tb)return {error:'mixed generations: '+k+' inputs differ'};
+      out[k]=ta;}
+    if(out.macro==null||out.equities==null)return {error:'invalid: macro and equities receipts required'};
+    return {clocks:out};
+  }
+  function coherentPair(core,brief,cur,now=Date.now()) {
+    if(!core||!brief||!Array.isArray(core.rows)||!core.rows.length||!/^\d{4}-\d{2}-\d{2}$/.test(brief.asof_session||''))return 'invalid';
+    if(core.asof_session!==brief.asof_session)return 'mixed sessions';
+    const r=receipts(core,brief,now);if(r.error)return r.error;
+    if(cur){const c=receipts(cur.core,cur.brief,now).clocks||{};
+      if(brief.asof_session<cur.brief.asof_session)return 'not newer';
+      for(const k of ['macro','equities','relations','crosscheck'])if(c[k]!=null&&(r.clocks[k]==null||r.clocks[k]<c[k]))return 'not newer: older '+k;
+      if(!['macro','equities','relations','crosscheck'].some(k=>r.clocks[k]!=null&&(c[k]==null||r.clocks[k]>c[k])))return 'not newer';}
+    return 'ok';
+  }
+  async function revalidate(url){const r=await fetch(url,{cache:'no-cache'});if(!r.ok)throw new Error(url+' HTTP '+r.status);return r.json();}
+  let genBusy=null,genSerial=0,genLast=Date.now();
+  function refreshGeneration(force) {
+    if(doc.hidden||genBusy||!S.brief||(!force&&Date.now()-genLast<GEN_POLL))return genBusy;
+    genLast=Date.now();const serial=++genSerial;
+    genBusy=(async()=>{try{
+      const brief=await revalidate('data/brief.json');
+      if(!(Date.parse(brief?.generated_at)>Date.parse(S.brief.generated_at))||brief.asof_session<S.brief.asof_session)return 'not newer';
+      const core=await revalidate('data/core.json'),verdict=coherentPair(core,brief,{core:S.core,brief:S.brief});
+      if(verdict!=='ok'){S.genNote=verdict;console.warn('[brief] newer data not adopted:',verdict);return verdict;}
+      if(serial!==genSerial)return 'superseded';
+      S.genPending={core,brief};
+      if(S.view==='brief'&&!sheetOpen())adoptInPlace();else if(S.view==='room'){adoptPending();root.SmartOptionsMyDashboard?.refresh?.();}
+      return 'adopted';
+    }catch(e){S.genNote=e.message;console.warn('[brief] data refresh unavailable',e.message);return 'error';}finally{genBusy=null;}})();
+    return genBusy;
+  }
+  function adoptPending() {
+    const p=S.genPending;S.genPending=null;if(!p||coherentPair(p.core,p.brief,{core:S.core,brief:S.brief})!=='ok')return false;
+    S.core=p.core;S.brief=p.brief;S.rowMap.clear();p.core.rows.forEach(r=>S.rowMap.set(r.t,r));S.company={};S.metricEvidence=new Map();S.nowKey=null;S.generation=(S.generation||0)+1;
+    revalidate('data/relationships.json').then(x=>{if(x?.schema!=='brief.relationships.v1')throw new Error('unexpected schema');if(!(Date.parse(x.generated_at||x.asof||0)<Date.parse(S.rel?.generated_at||S.rel?.asof||0))){S.rel=x;S.relError=null;}}).catch(e=>{S.relError=e.message+(S.rel?' (last good relationships retained)':'');console.warn('[brief] relationships not refreshed',e.message);});
+    Live.setRows(p.core.rows);root.dispatchEvent(new CustomEvent('so:generation',{detail:{asof_session:p.brief.asof_session,generated_at:p.brief.generated_at}}));
+    return true;
+  }
+  function adoptInPlace() {
+    const main=$('#view'),y=root.scrollY,open=[...main.querySelectorAll('details')].map(d=>d.open),af=doc.activeElement,key=n=>n&&(n.dataset?.ev||n.dataset?.jump||n.id||n.getAttribute?.('href')),fk=main.contains(af)?key(af):null;
+    if(!adoptPending())return;
+    S.personal?.suspend?.();S.news?.destroy?.();S.slots=[];S.onQuote=null;
+    renderBrief(main);Live.paint(doc,null);
+    const ds=[...main.querySelectorAll('details')];if(ds.length===open.length)ds.forEach((d,i)=>{if(open[i]&&!d.open)d.open=true;});
+    if(fk)[...main.querySelectorAll('[data-ev],[data-jump],[id],a')].find(n=>key(n)===fk)?.focus({preventScroll:true});
+    root.scrollTo(0,y);
+  }
   async function boot() {
     try {
-      const [core, brief] = await Promise.all([json('data/core.json'), json('data/brief.json')]);
+      let core,brief,verdict='invalid';
+      for(let attempt=0;attempt<3&&verdict!=='ok';attempt++){
+        if(attempt)await new Promise(r=>setTimeout(r,1500*attempt));
+        [core,brief]=await Promise.all([attempt?revalidate('data/core.json'):json('data/core.json'),attempt?revalidate('data/brief.json'):json('data/brief.json')]);
+        verdict=coherentPair(core,brief);if(verdict!=='ok')console.warn('[brief] published core/brief pair rejected:',verdict);}
+      if(verdict!=='ok')throw new Error('the published market files are from different builds ('+verdict+'); reload in a minute');
       S.core = core; S.brief = brief; core.rows.forEach(r => S.rowMap.set(r.t, r));
       // Relationship catalog and sector baskets are optional: without them the drilldowns say so and the brief still draws.
       try { S.rel = await json('data/relationships.json'); if (!S.rel || S.rel.schema !== 'brief.relationships.v1') throw new Error('unexpected schema'); } catch (e) { S.rel = null; S.relError = e.message; console.warn('[brief] relationships unavailable', e.message); }
@@ -1804,7 +1987,7 @@
       const st = e.target.closest('[data-star]'); if (st) { toggleStar(st.dataset.star); if (S.coDraw && S.co && S.co.mode === 'saved') S.coDraw(); return; }
       const hz = e.target.closest('[data-horizon]');
       if (hz) { UI.horizon = S.horizon = +hz.dataset.horizon;
-        if (S.view === 'brief' && $('#ahead')) {$('#ahead').innerHTML = aheadHtml();$('#objectives').innerHTML=objectivesHtml();doc.querySelectorAll('[data-short-category]').forEach(el=>{const x=S.brief.shortlist.find(x=>x.t===el.dataset.shortCategory),s=shortSetup(x);el.innerHTML=researchBadges(s);const caution=doc.querySelector(`[data-short-caution="${x.t}"]`);if(caution)caution.innerHTML=shortCaution(s);});S.personal?.refresh();}
+        if (S.view === 'brief' && $('#ahead')) {$('#ahead').innerHTML = aheadHtml();$('#objectives').innerHTML=objectivesHtml();if($('#next-risk'))$('#next-risk').innerHTML=nextRisk();if($('.implications'))$('.implications').innerHTML=implicationsHtml(todayModel(S.brief,S.core));doc.querySelectorAll('[data-short-category]').forEach(el=>{const x=S.brief.shortlist.find(x=>x.t===el.dataset.shortCategory),s=shortSetup(x);el.innerHTML=researchBadges(s);const caution=doc.querySelector(`[data-short-caution="${x.t}"]`);if(caution)caution.innerHTML=shortCaution(s);});S.personal?.refresh();}
         else if (S.view === 'company' && $('#co-events')) { const t = route(root.location.hash).t; $('#co-events').innerHTML = eventsHtml(t, S.company[t]); }
         else if (S.view === 'macro') renderMacro($('#view'));
         const again = doc.querySelector(`[data-horizon="${S.horizon}"]`); if (again) again.focus({preventScroll: true}); }
@@ -1815,6 +1998,9 @@
     root.addEventListener('hashchange', render);
     render();
     Live.start();
+    const wakeGen=()=>{if(!doc.hidden)refreshGeneration();};
+    doc.addEventListener('visibilitychange',wakeGen);root.addEventListener('pageshow',wakeGen);root.addEventListener('focus',wakeGen);setInterval(wakeGen,60e3);
+    S.refreshGeneration=refreshGeneration;
     // Chat modules (~150 KB) wait until the first view has rendered and the main thread is idle (phone-first).
     const later = root.requestIdleCallback ? fn => root.requestIdleCallback(fn, {timeout: 4000}) : fn => setTimeout(fn, 1500);
     later(loadChat);
@@ -1850,6 +2036,15 @@
     const apply = v => { if (v === 'dark' || v === 'light') doc.documentElement.dataset.theme = v; else delete doc.documentElement.dataset.theme; if (b) { b.setAttribute('aria-pressed', String(isDark())); b.textContent = isDark() ? 'Light' : 'Dark'; } S.fv?.updateTheme?.(); };
     apply(t);
     if (b) b.addEventListener('click', () => { const v = isDark() ? 'light' : 'dark'; try { root.localStorage.setItem('so-brief-theme', v); } catch (e) { console.warn('[brief] theme not saved'); } apply(v); if (S.view === 'brief' && $('#heat')) $('#heat').innerHTML = heatSlot(); });
+  }
+  // Saved rooms reuse the device-local dashboard store and renderer, loaded only when this route opens.
+  function renderRoom(main) {
+    main.innerHTML = '<div class="room-mount"><p class="dim">Loading saved rooms…</p></div>';
+    const el = main.querySelector('.room-mount');
+    Promise.all(['my-dashboard.css', 'my-dashboard.js'].map(loadAsset)).then(() => { if (el.isConnected) return root.SmartOptionsMyDashboard.mount(el); }).catch(e => {
+      console.warn('[brief] saved rooms unavailable', e.message);
+      if (el.isConnected) el.innerHTML = '<p role="alert">Saved rooms could not load: ' + esc(e.message) + '. Saved layouts stay in this browser.</p>';
+    });
   }
   // Popup chat: deterministic answers from the same published data; optional rephrasing never replaces them.
   function loadChat() {

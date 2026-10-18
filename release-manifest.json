@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261018-r25-clear-responsive",
-  "built_at": "2026-10-18T20:44:32.035292+00:00",
-  "source_base": "903b5ea1b47dd2966feb9e59c86c865b5661dfef",
+  "release_id": "brief-client-20261018-r26-adaptive-brief-rooms",
+  "built_at": "2026-10-18T23:59:15.331131+00:00",
+  "source_base": "8b03d0031fe31d28867217db18bb48e11a1a429c",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -16,8 +16,8 @@
       "bytes": 56196
     },
     "backup.html": {
-      "sha256": "cd0f8b7cf76ada690187d744ac5c5d3318a7a7f688137ac0972a2656cccfd551",
-      "bytes": 6382
+      "sha256": "7b8763c4876c217834039a05ab93af30761dc4185fe3b0b43192eecbc656281f",
+      "bytes": 6814
     },
     "brief.css": {
       "sha256": "2dc63a07d3a99b62b52c646c0e4571ec71adb11416eec35cbd3d5a9d25745d8a",
@@ -28,12 +28,12 @@
       "bytes": 80146
     },
     "chat-popup.css": {
-      "sha256": "4e1618d9c6933a29420fcabe93f731cd2372e03512b36346b1029fd9a1fc7911",
-      "bytes": 8355
+      "sha256": "2cb2313f2438389f4b384642b5ff724948418ad99a7da18c44497f7895eedd76",
+      "bytes": 10290
     },
     "chat-popup.js": {
-      "sha256": "24339ffea0aed39f2cb12a685b3a79576a58d74d373f2d7b48d76e6ef085c9b7",
-      "bytes": 24035
+      "sha256": "98d5cc43541ea003de708accffcf4bef22ebdab6502e51b7186fe0c38415e3e2",
+      "bytes": 25441
     },
     "chat/actions.js": {
       "sha256": "590c07c5b33cf3512ac496f9ee685cf1e075b18ce1ab981b3f1947cd0ba9a5b2",
@@ -52,28 +52,28 @@
       "bytes": 72141
     },
     "chat/dashboard.js": {
-      "sha256": "fb5256d9bc32d4a5bb34949a2b654cdd8f3bd51fe9e650a714dd2aab15b2cda4",
-      "bytes": 20811
+      "sha256": "e3f675d952344233af02088d1b00fc088f74a02dfca76ca67014594ea628659e",
+      "bytes": 43466
     },
     "chat/facts.js": {
-      "sha256": "d28331d5381a03d708e56f24de11ff878897e8859bb1e13e7eedd87c9aa547af",
-      "bytes": 45891
+      "sha256": "db94be3d8e1d6a5534fdf5cfa33e170e055f831c84e982a199533e92b69fc8ea",
+      "bytes": 45936
     },
     "chat/intents.js": {
       "sha256": "21fc7a1ccb529a2048747747a86dbe80aea8f759a49149839e89bfde9ea3f886",
       "bytes": 30560
     },
     "chat/polish.js": {
-      "sha256": "8de612f0acc3374c46d06ef47cad1d1d56fa9dc73768d2d27d8d3da67eb8ce73",
-      "bytes": 2998
+      "sha256": "8de0e573ab63073647f39b5387f5ee2b35955864d70fd4e64cdfae696035e616",
+      "bytes": 5507
     },
     "chat/relationships.js": {
       "sha256": "1ee36e79d103bac617c217242dfb36d4a9a7e58ccfeb71a8af2285f6f92951d8",
       "bytes": 2416
     },
     "chat/runtime.js": {
-      "sha256": "aea2964289a0be29233b227bda7b66e965a9f5c51541259ecb934da68020dd87",
-      "bytes": 5624
+      "sha256": "5e5ad622c28b9975aa2b8452044afb9c8ee399786778e07663215ec9c8ddfe72",
+      "bytes": 13977
     },
     "chat/universe.js": {
       "sha256": "b7c2ee0134e9eb2041e4833db1df993f61c2ac39b8d55cb9b11af5e7a3e3444d",
@@ -176,8 +176,8 @@
       "bytes": 11704
     },
     "index.html": {
-      "sha256": "8751dda5b094b1d38fdd53544ca96f00bbe88dc96ed8d12575e31474e4fdcd91",
-      "bytes": 2127
+      "sha256": "9afeb5faabf86e63e5713152133d25610ea732463a390cfb1081641f622aff6f",
+      "bytes": 2207
     },
     "intelligence.css": {
       "sha256": "adc81cb529dfa2a34c95bbcc0d09e64411552bc274a3c7c5a3a946c8f81ceeff",
@@ -212,12 +212,12 @@
       "bytes": 6484
     },
     "main.css": {
-      "sha256": "a933f3505e99e44e1a99e15c7954e7bb570d37f8a00c80d4ac708f3b844c88a3",
-      "bytes": 31614
+      "sha256": "383c8514f3c3926dbbbf3519791b5c3d373b9e0ce81b774969ce5775d26c2902",
+      "bytes": 35823
     },
     "main.js": {
-      "sha256": "54a2929382d416f9f6104dc1a90935ea6b32ebe7f6a446a3f0c0aecb2a0bc1ab",
-      "bytes": 218130
+      "sha256": "770a787830935a523144105a48879b20f6571a2f7a529dab6b4ab81ec3d01497",
+      "bytes": 238574
     },
     "money-flow.css": {
       "sha256": "ddef742bb34f0216e5ecfbdcb9b3116ddbdc99abe8cfe13072fd7ad503c5e737",
@@ -228,16 +228,16 @@
       "bytes": 6461
     },
     "my-dashboard.css": {
-      "sha256": "c30f63304badc474731123d9fd9b824597e0209eb840221a490a26d184d63fbc",
-      "bytes": 4982
+      "sha256": "23bb08537c6384a7bbedce996ed7924cd6f23e6f0ade362a7301c362339e5716",
+      "bytes": 8321
     },
     "my-dashboard.js": {
-      "sha256": "9223b31573638a2423b339f5f26b64f2a199413003c84107710a3bc6dbdec659",
-      "bytes": 19930
+      "sha256": "57fb20ef811845fb940eb49a98b0e49b7de041cb973894a1086f89aee1ef5e5e",
+      "bytes": 41197
     },
     "news.js": {
-      "sha256": "2bea16b1231aec940a75aeefa179a9fc24246b26d05214a80701c464f566efaf",
-      "bytes": 8950
+      "sha256": "375472641a609763b00a58bb154ff86127554cd5865f4c5bb75f8c29dcc313fa",
+      "bytes": 18388
     },
     "overview.css": {
       "sha256": "4e347a69023fd77efc18ab12189358f144ba89b2cbb6bc49848314d46d42a039",
@@ -254,6 +254,10 @@
     "patterns.js": {
       "sha256": "dfe7643b2b70ec08523f46ef578feb57c8aa0693cbb17875efb61499a7a5fa69",
       "bytes": 42958
+    },
+    "release.json": {
+      "sha256": "c43593fc44ea22fa73cecb1a7fa7b602256e5b1b4c7b8de68c566087d2be147b",
+      "bytes": 5633
     },
     "shocks.css": {
       "sha256": "95f20f08ee93c25ca625520dd8e881ca8b1c074955f25f7d67f96f41890aa778",
@@ -298,10 +302,6 @@
     "workspace.js": {
       "sha256": "0020f1263635ca0682589ad6079af66d8ba33b52d967624cab55e96faf7b20b4",
       "bytes": 21553
-    },
-    "release.json": {
-      "sha256": "3b974a7868780a2786f96d8e9c397faee909edb85f03a7d9837bd4e72fe78902",
-      "bytes": 6566
     }
   },
   "data_at_publication": {
@@ -385,6 +385,6 @@
   "dynamic_files": {
     "data/quotes.json": "Scheduled shared observations; excluded from static hash gate, compare per-symbol observations across hosts and never regress source times."
   },
-  "note": "Exact immutable UI and source snapshot hashes at metadata build. The publisher preserves newer hosted news and quotes; coordinated current payload hashes and installed runtime are verified separately.",
+  "note": "Exact UI Git-blob hashes. data_at_publication is retained historical source snapshot only; independently newer hosted data is protected and verified separately.",
   "publication_encoding": "Canonical Git blob bytes (GitHub Pages), not Windows worktree CRLF bytes"
 }

@@ -200,3 +200,35 @@ td.up{color:var(--up)}td.dn{color:var(--dn)}
 
 /* Dated chain evidence: retain the desktop comparison; readable labeled legs on phones. */
 @media(max-width:599px){.iv-context thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.iv-context tbody{display:grid;gap:12px}.iv-context tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 16px;border-top:1px solid var(--line);padding:12px 0}.iv-context td{display:block;border:0;padding:0;text-align:left;font-size:15px;overflow-wrap:normal}.iv-context td::before{content:attr(data-label);display:block;color:var(--dim);font-size:13px}.iv-context td:first-child{grid-column:1/-1;font-weight:600;text-transform:capitalize}.iv-context td:first-child::before{display:none}.iv-context td:last-child{grid-column:1/-1}}
+/* Today first view (A pass): synthesis, current-vs-close, implications and next risk. Large and readable, not denser. */
+.cockpit .takeaway{margin:6px 0 10px;display:grid;gap:4px;font-size:15px;line-height:1.45}.cockpit .takeaway p{margin:0}
+.cockpit .takeaway .lbl{display:inline-block;min-width:5.6em;font-size:12px;font-weight:650;letter-spacing:.02em;text-transform:uppercase;color:var(--dim)}
+.cockpit .takeaway [data-tone=good] .lbl{color:var(--up)}.cockpit .takeaway [data-tone=bad] .lbl{color:var(--dn)}.cockpit .takeaway .tk-so{font-weight:600}
+.cockpit .now-strip{margin:8px 0 4px;padding:8px 10px;border-left:3px solid var(--acc);background:var(--card);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cockpit .read-basis{margin:6px 0 10px}
+.cockpit .implications{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 6px}
+.cockpit .impl{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:58px;padding:8px 10px;text-align:left;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);font:inherit;cursor:pointer}
+.cockpit .impl-t{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.02em;color:var(--dim)}.cockpit .impl-w{font-size:15px;font-weight:600;line-height:1.3}
+.cockpit .impl[data-tone=bad] .impl-w{color:var(--dn)}.cockpit .impl[data-tone=good] .impl-w{color:var(--up)}.cockpit .impl-more .impl-w{font-weight:500;font-size:14px}
+.cockpit .next-risk{margin:6px 0 0;font-size:14px}.cockpit .next-risk .lbl{font-size:12px;font-weight:650;text-transform:uppercase;color:var(--dim);margin-right:4px}
+@media(max-width:599px){.cockpit .now-strip{min-height:64px}.cockpit .implications{grid-template-columns:1fr 1fr}.cockpit .takeaway{font-size:15px}.cockpit .takeaway .lbl{min-width:0;margin-right:6px}}
+
+/* Restrained interaction motion adapted from the owner's Tailnet dashboard (command-center motion.css springs,
+   generated 2026-09-28): snappy = response .30s, damping .82; smooth = critically damped .36s.
+   Compositor properties only (translate, scale, opacity). Content is visible by default: without @starting-style
+   support or with reduced motion, everything simply appears. No loops, blur, parallax or translucency. */
+:root{--mo-snappy:linear(0,.0283,.0984,.1923,.2968,.4028,.5041,.5971,.6796,.7508,.8109,.8604,.9004,.932,.9564,.9747,.9881,.9976,1.0039,1.0079,1.0101,1.011,1.011,1.0104,1.0095,1.0084,1.0072,1.0061,1.005,1.004,1.0031,1.0024,1);
+  --mo-smooth:linear(0,.0294,.0992,.189,.2857,.3814,.4712,.5527,.6249,.6878,.7417,.7874,.8259,.8579,.8845,.9064,.9244,.9391,.951,.9607,.9686,.9749,.9799,.984,.9873,.9899,.992,.9937,.995,.996,.9969,.9975,1)}
+@supports not (transition-timing-function:linear(0,1)){:root{--mo-snappy:cubic-bezier(.2,.8,.2,1);--mo-smooth:cubic-bezier(.32,.72,0,1)}}
+@media (prefers-reduced-motion:no-preference){
+  .cockpit .impl,.cockpit button.ev.reason,.tabs a,.tabs button,#hdr button,.map-period button,.horizon button{transition:scale .3s var(--mo-snappy),background-color .2s ease,border-color .2s ease}
+  .cockpit .impl:active,.cockpit button.ev.reason:active,#hdr button:active,.map-period button:active,.horizon button:active{scale:.97}
+  .cockpit .reason .chev{transition:translate .3s var(--mo-snappy)}.cockpit .reason:hover .chev,.cockpit .reason:focus-visible .chev{translate:3px 0}
+  .cockpit .read .headline,.cockpit .read .tk-so,.cockpit .read .now-strip{transition:opacity .36s var(--mo-smooth),translate .36s var(--mo-smooth)}
+  @starting-style{.cockpit .read .headline,.cockpit .read .tk-so,.cockpit .read .now-strip{opacity:0;translate:0 6px}}
+  #sheet{transition:translate .36s var(--mo-smooth),opacity .2s ease}
+  @starting-style{#sheet{translate:0 12px;opacity:0}}
+  details>summary::marker{transition:none}
+}
+.cockpit .tk-so{margin:6px 0 8px;font-size:15px;line-height:1.45;font-weight:600}.cockpit .tk-so .lbl{font-size:12px;font-weight:650;letter-spacing:.02em;text-transform:uppercase;color:var(--dim);margin-right:6px}.cockpit .tk-so button.ev{font-weight:400;display:inline-flex;align-items:center;min-height:44px;padding:0 4px;margin:-12px 0;vertical-align:middle}
+.cockpit .next-steps{padding-top:12px}

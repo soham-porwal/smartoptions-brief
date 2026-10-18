@@ -176,7 +176,7 @@
     [['growth', 'Growth', ['growth', 'labor']], ['inflation', 'Inflation', ['inflation']], ['policy', 'Policy', ['policy']]].forEach(([k, lab, gs]) => {
       const d = bd[k]; if (!d) return;
       const ms = [].concat(...gs.map(det)).slice(0, 2);
-      P.line(lab + ' is ' + (d.available===false?'incomplete':DIR_WORD[d.direction] || d.direction || 'unclear') + ': ' + (d.line || ''), P.addAll(ms, 2));
+      P.line(lab + ' is ' + (d.available===false?'incomplete':Today?.macroWords?.(ctx.brief)?.[k]?.word || DIR_WORD[d.direction] || d.direction || 'unclear') + ': ' + (d.line || ''), P.addAll(ms, 2));
     });
     return P.out({intent: 'macro', title: 'Macro backdrop: ' + word, followups: [['risk_conditions'], ['expand_macro'], ['risks']]});
   };

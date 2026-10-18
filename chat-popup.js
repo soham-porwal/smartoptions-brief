@@ -12,6 +12,10 @@
   const LS_KEY = 'smartoptions.chat.apiKey';          // same key slot the chat module reads
   const LS_PROV = 'so-brief-chat-provider';
   const LS_MODEL = 'smartoptions.chat.model';
+  const SS_DRAFT = 'so-brief-chat-draft';             // unsent typing survives close/reopen and reloads in this tab
+  // Main does not load the docked chat module, so the supported model list lives here too.
+  const MODELS = [{id: 'claude-sonnet-5-5', label: 'Sonnet 5.5'}, {id: 'claude-opus-5-5', label: 'Opus 5.5'}, {id: 'claude-haiku-5-5', label: 'Haiku 5.5'}];
+  const models = () => (C() && Array.isArray(C().MODELS) && C().MODELS.length ? C().MODELS : MODELS);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
 
@@ -90,6 +94,7 @@
     return {mobile,top:top+8,height:Math.max(100,h-16),keyboard:h<(height||root.innerHeight||h)-100};
   }
   function syncViewport(){const p=doc.getElementById('cp-panel');if(!p)return;const g=viewportGeometry(root.visualViewport,root.innerWidth,root.innerHeight);p.style.setProperty('--cp-vtop',g.top+'px');p.style.setProperty('--cp-vheight',g.height+'px');p.classList.toggle('cp-keyboard',g.keyboard);}
+  function saveDraft(v){try{if(v)root.sessionStorage?.setItem(SS_DRAFT,String(v).slice(0,2000));else root.sessionStorage?.removeItem(SS_DRAFT);}catch(e){root.SmartOptionsBriefChat?.record('WARN','storage','Draft not saved.');}}
   function scrollLog(){const log=doc.querySelector('#cp-panel .cp-body');if(log)log.scrollTop=log.scrollHeight;}
   function proxyUrl() {
     // The relay serves the published sites. Local development keeps deterministic
@@ -116,17 +121,17 @@
       </div>
       <div class="cp-provnote"></div>
       <form class="cp-key" hidden onsubmit="return false"><label>Anthropic API key<input type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..."></label>
-        <label>Model for your own key<select class="cp-model" aria-label="Your paid model"><option value="">Choose a model (your provider pricing)</option>${(C()?.MODELS||[]).map(m=>`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('')}</select></label>
+        <label>Model for your own key<select class="cp-model" aria-label="Your paid model"><option value="">Choose a model (your provider pricing)</option>${models().map(m=>`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('')}</select></label>
         <div class="cp-row"><button type="button" class="cp-save">Save key</button><button type="button" class="cp-forget">Forget key</button></div>
         <p class="cp-small">Kept only in this browser and sent only to api.anthropic.com. Avoid on a shared computer.</p></form>
       <div class="cp-log" aria-live="polite"></div>
-      <div class="cp-dash-tools"><button type="button" class="cp-dash-example">Create my dashboard</button></div>
+      <div class="cp-dash-tools"><button type="button" class="cp-dash-example">Create a war room</button><a class="cp-rooms" href="${root.SmartOptionsMain ? '#/room' : '#/my-dash'}">Saved rooms</a></div>
       <div class="cp-chips" aria-label="Quick questions">${['pulse','risks','shortlist','breadth','sectors','freshness'].map(id => `<button type="button" data-intent="${id}">${esc(root.SmartOptionsIntents.chipText(id))}</button>`).join('')}</div></div>
       <form class="cp-in"><textarea rows="1" aria-label="Your question" placeholder="Ask a question"></textarea><button type="submit" class="cp-send" aria-label="Send">Send</button></form>
       <button type="button" class="cp-cancel" hidden>Cancel</button><p class="cp-disc">Research tool, not advice. Answers cite the data on this site.</p>`;
     doc.body.append(btn, p);
     root.visualViewport?.addEventListener('resize',syncViewport);root.visualViewport?.addEventListener('scroll',syncViewport);root.addEventListener('resize',syncViewport);syncViewport();
-    p.querySelector('.cp-dash-example').addEventListener('click',()=>{const ta=p.querySelector('.cp-in textarea');ta.value='Create dashboard named My research with AAPL price and operating margin';ta.focus();});
+    p.querySelector('.cp-dash-example').addEventListener('click',()=>{const ta=p.querySelector('.cp-in textarea');ta.value='Create a war room for NVDA';saveDraft(ta.value);ta.focus();});
     btn.addEventListener('click', () => toggle());
     p.querySelector('.cp-x').addEventListener('click', () => toggle(false));
     p.querySelector('.cp-prov').addEventListener('click', e => { const b = e.target.closest('[data-prov]'); if (b && !b.disabled) setProvider(b.dataset.prov, true); });
@@ -138,7 +143,8 @@
     p.querySelector('.cp-in').addEventListener('submit', e => { e.preventDefault(); submit(); });
     const ta = p.querySelector('.cp-in textarea');
     ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } });
-    ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; });
+    ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; saveDraft(ta.value); });
+    try { const d = root.sessionStorage?.getItem(SS_DRAFT); if (d) ta.value = d.slice(0, 2000); } catch (e) { root.SmartOptionsBriefChat?.record('WARN', 'storage', 'Draft could not be restored.'); }
     doc.addEventListener('keydown', e => {
       if (e.key === 'Escape' && ST.open) { toggle(false); return; }
       const typing = /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '') || (e.target && e.target.isContentEditable);
@@ -207,13 +213,14 @@
   async function submit(question, direct) {
     const p=doc.getElementById('cp-panel'),ta=p.querySelector('.cp-in textarea');
     const q=typeof question==='string'?question:ta.value.trim(); if(!q||ST.busy)return;
-    ta.value=''; ta.style.height=''; const a=turn(q), controller=new AbortController();
+    const typed=typeof question!=='string';if(typed){ta.value='';saveDraft('');} ta.style.height=''; const a=turn(q), controller=new AbortController();
     ST.controller=controller;ST.busy=true;p.classList.add('busy');p.querySelector('.cp-cancel').hidden=false;
     const timeout=setTimeout(()=>controller.abort(),20000);
     const cfg=()=>({url:ST.provider==='shared'?proxyUrl():'',apiKey:ST.provider==='key'&&p.querySelector('.cp-model').value?getKey():'',model:p.querySelector('.cp-model').value,universe:new Set(root.SmartOptionsUniverse.rows.map(r=>r[0]))});
     try {
       const {result:r}=await root.SmartOptionsBriefChat.answer(q,direct,controller.signal,{...cfg(),signal:controller.signal});
       a.innerHTML=packHTML(r);
+      if(r.intent==='dashboard'){const l=doc.createElement('p');l.className='cp-foot';l.innerHTML=r.receipt?.status==='OK'?'<a href="'+(root.SmartOptionsMain?'#/room':'#/my-dash')+'">Open saved rooms</a> · Saved only in this browser.':'Nothing was changed.';a.appendChild(l);}
       if(r.facts.length&&!r.action&&!r.na&&!r.noPolish){
         const simple=doc.createElement('button');simple.type='button';simple.className='cp-simple';simple.textContent='Say it more simply';a.appendChild(simple);
         const polish=async(signal)=>{
@@ -231,7 +238,7 @@
         });
         if(cfg().url||cfg().apiKey)try{await polish(controller.signal);}catch(e){const n=doc.createElement('p');n.className='cp-foot';n.textContent=e.name==='AbortError'?'Rephrasing cancelled. Dashboard answer retained.':e.message+' Dashboard answer retained.';a.appendChild(n);root.SmartOptionsBriefChat.record('WARN','rewrite',e.name==='AbortError'?'Cancelled':e.message);}
       }
-    }catch(e){a.innerHTML=`<p class="cp-na">${esc(e.name==='AbortError'?'Cancelled. No answer was applied.':e.message)}</p>`;root.SmartOptionsBriefChat.record('FAIL','question',e.name==='AbortError'?'Cancelled':e.message);}
+    }catch(e){a.innerHTML=`<p class="cp-na cp-err">${esc(e.name==='AbortError'?'Cancelled. No answer was applied.':e.message)}</p>`;if(typed&&e.name==='AbortError'&&!ta.value){ta.value=q;saveDraft(q);}root.SmartOptionsBriefChat.record('FAIL','question',e.name==='AbortError'?'Cancelled':e.message);}
     finally{clearTimeout(timeout);ST.controller=null;ST.busy=false;p.classList.remove('busy');p.querySelector('.cp-cancel').hidden=true;scrollLog();}
   }
   function installContextChips(){
@@ -243,7 +250,7 @@
   }
   async function loadModules(){
     for(const [file,key]of [['universe','SmartOptionsUniverse'],['intents','SmartOptionsIntents'],['facts','SmartOptionsFacts'],['verify','SmartOptionsVerify'],['polish','SmartOptionsPolish'],['actions','SmartOptionsActions'],['dashboard','SmartOptionsDashboardSpec'],['relationships','SmartOptionsRelationships'],['runtime','SmartOptionsBriefChat']]){
-      if(root[key])continue;await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js?v=client-20261018-classy3';s.onload=resolve;s.onerror=()=>reject(new Error('Chat module failed to load: '+file));doc.head.appendChild(s);});
+      if(root[key])continue;await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js?v=client-20261018-adaptive-rooms1';s.onload=resolve;s.onerror=()=>reject(new Error('Chat module failed to load: '+file));doc.head.appendChild(s);});
     }
   }
   function _start() {
@@ -261,6 +268,6 @@
     };
     if (doc.body) go(); else doc.addEventListener('DOMContentLoaded', go);
   }
-  return {PRESETS, answerPreset, answerHTML, viewportGeometry, _start, open: () => toggle(true), close: () => toggle(false)};
+  return {PRESETS, MODELS, answerPreset, answerHTML, viewportGeometry, _start, open: () => toggle(true), close: () => toggle(false)};
 });
 
