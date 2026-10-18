@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261018-r22-clear-responsive",
-  "built_at": "2026-10-18T20:06:31.696807+00:00",
-  "source_base": "9b97c37724bb7284a581e5a5ab7e73112699c73d",
+  "release_id": "brief-client-20261018-r23-clear-responsive",
+  "built_at": "2026-10-18T20:14:55.629609+00:00",
+  "source_base": "f2100123331a7520ecc136aa074d949ec8cfd25f",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -300,8 +300,8 @@
       "bytes": 21553
     },
     "release.json": {
-      "sha256": "03d38b7aa907197ebe006f2c522fe7e628a0f995019801ec31593a78c9a64e5d",
-      "bytes": 5335
+      "sha256": "7c67cf9dee7af91ef887f01490032ef64a046eb4f44c48c5d5f8373a547deca0",
+      "bytes": 5660
     }
   },
   "data_at_publication": {
