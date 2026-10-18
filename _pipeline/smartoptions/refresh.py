@@ -179,7 +179,50 @@ def retain_macro_observations(stage_root, old_core):
     return dict(status='degraded' if retained else 'ok', retained=retained, observation_dates_preserved=True)
 
 
+class CoverageValidationError(ValueError):
+    """Only allowlisted validation categories reach the public refresh receipt."""
+
+    def __init__(self, message, code='COVERAGE_VALIDATION_FAILED', context=None):
+        super().__init__(message)
+        self.code = code
+        self.context = context or {}
+
+
 def coverage_guard(old_data, new_data):
+    try:
+        return _coverage_guard(old_data, new_data)
+    except ValueError as exc:
+        # Do not publish arbitrary loader/provider exception strings. Known
+        # invariants get safe stable identifiers; the financial guard stays intact.
+        known = {
+            'SUSPECT: zero company rows': 'COVERAGE_ZERO_COMPANIES',
+            'Refresh lost retained research names': 'COVERAGE_RESEARCH_NAMES_LOST',
+            'Refresh session moved backward': 'COVERAGE_SESSION_REGRESSION',
+            'Refresh lost previously available prices': 'COVERAGE_PRICE_LOSS',
+            'S&P membership fetch is missing or incomplete': 'COVERAGE_MEMBERSHIP_INCOMPLETE',
+            'Refresh lost a previously available macro observation': 'COVERAGE_MACRO_LOSS',
+            'SUSPECT: zero macro observations': 'COVERAGE_ZERO_MACRO',
+            'Refresh price history round-trip is incomplete': 'COVERAGE_PRICE_HISTORY_MISSING',
+            'Refresh shock and core sessions disagree': 'COVERAGE_SHOCK_SESSION_MISMATCH',
+            'Refresh shock constituent round-trip is incomplete': 'COVERAGE_SHOCK_MEMBERS_MISMATCH',
+            'Refresh intelligence does not contain the validated shock build': 'COVERAGE_SHOCK_OVERLAY_MISMATCH',
+            'Refresh capital provenance is missing or invalid': 'COVERAGE_CAPITAL_INVALID',
+            'Refresh relationship catalog is missing': 'COVERAGE_RELATIONSHIPS_MISSING',
+            'Refresh relationship catalog session moved backward': 'COVERAGE_RELATIONSHIPS_REGRESSION',
+        }
+        text = str(exc)
+        code = known.get(text, 'COVERAGE_VALIDATION_FAILED')
+        context = {}
+        prefix, suffix = 'Refresh lost ', ' previously available fundamental assessments'
+        if text.startswith(prefix) and text.endswith(suffix):
+            number = text[len(prefix):-len(suffix)]
+            if number.isascii() and number.isdigit() and len(number) < 8:
+                code = 'COVERAGE_FUNDAMENTAL_LOSS'
+                context = {'assessment_count': int(number)}
+        raise CoverageValidationError(text, code, context) from exc
+
+
+def _coverage_guard(old_data, new_data):
     old_core = load_json(old_data / 'core.json', {})
     core = load_json(new_data / 'core.json', required=True)
     old_rows = {r['t']: r for r in old_core.get('rows') or []}
