@@ -38,7 +38,7 @@ OPINION_SOURCES = {'motley fool', '24/7 wall st.', 'investorplace', 'zacks', 'se
 EVERGREEN = re.compile(r"\?\s*$|\bshould you\b|\bbest\b.{0,30}\b(stocks?|etfs?|funds?)\b|\bmillion(aire)?\b|\bretire|\bforget\b|"
                        r"\bmissed out\b|\bdon'?t miss\b|\bis it time\b|\bhow (to|these)\b|\btop \d+\b|\bwhat we want to see\b|"
                        r"\bfacts to know\b|\btrending stock\b|\bcomparing\b|\bindustry comparison\b|\bset to retire\b|\bwhy i\b|\bwe'?re watching\b", re.I)
-OPINION_URL = re.compile(r'investingclub|/opinion/|/commentary/|/personal-finance/', re.I)
+OPINION_URL = re.compile(r'investingclub|/opinion/|/commentary/|/personal-finance/|/make-it/', re.I)
 STOP = {'The', 'A', 'An', 'In', 'On', 'At', 'For', 'To', 'Of', 'And', 'As', 'After', 'Before', 'Why', 'How', 'What', 'New', 'More',
         'Says', 'Its', 'With', 'From', 'By', 'Over', 'Amid', 'Into', 'Than', 'This', 'That', 'Is', 'Are', 'Be', 'Will', 'Could', 'May',
         'First', 'Since', 'Reuters', 'January', 'February', 'March', 'April', 'June', 'July', 'August', 'September', 'October', 'November',
