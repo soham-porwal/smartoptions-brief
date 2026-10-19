@@ -1,5 +1,8 @@
 /* Unified shell: Today (bounded), Markets grid + inspector, Workspace tool rail, Developing now. Uses main.css tokens. */
 :root{--mk-na:rgba(128,128,128,.28)}
+:root{--layer-nav:5;--layer-inspector:10;--layer-search:15;--layer-evidence-backdrop:20;--layer-evidence:21}
+#hdr{z-index:var(--layer-nav)}#hdr.search-open,#hdr:focus-within{z-index:var(--layer-search)}
+#sheet-bg{z-index:var(--layer-evidence-backdrop)}#sheet{z-index:var(--layer-evidence)}
 .investigation{padding:.6rem .8rem;margin:.4rem 0;border:1px solid var(--line);border-radius:8px;font-size:16px}
 .focus-chip,.focus-controls{display:flex;flex-wrap:wrap;gap:.4rem .8rem;align-items:center}
 .focus-chip>span{flex:1;min-width:180px;overflow-wrap:anywhere}
@@ -93,7 +96,7 @@
 .mk-facts li .small{grid-column:1/-1}
 .mk-insp-act{display:flex;flex-wrap:wrap;gap:.4rem;margin:.5rem 0}
 .mk-insp-act button,.mk-insp-act a{display:inline-flex;align-items:center;min-height:40px;padding:0 .7rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);font:inherit;font-size:.92rem;text-decoration:none;cursor:pointer}
-@media(max-width:899px){.mk-insp:not([hidden]){position:fixed;left:0;right:0;bottom:0;top:var(--hdr-h,56px);z-index:40;border-radius:0;max-height:none;padding:1rem}}
+@media(max-width:899px){.mk-insp:not([hidden]){position:fixed;left:0;right:0;bottom:0;top:var(--hdr-h,56px);z-index:var(--layer-inspector);border-radius:0;max-height:none;padding:1rem}}
 /* Workspace */
 .ws{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
 @media(min-width:900px){.ws{grid-template-columns:210px minmax(0,1fr)}}
@@ -221,4 +224,7 @@
 #view .md-sub,#view .md-mode,#view .md-meta{font-size:14px}
 #view .ws-head{padding-bottom:.75rem;border-bottom:1px solid var(--line)}
 #view .ws-panel{padding-top:1rem}#view .ws-rail a{border-radius:4px}
+.mk-shock{padding:.8rem 0;border-block:1px solid var(--line);margin:.75rem 0}.mk-shock-inputs{display:flex;flex-wrap:wrap;gap:.7rem;align-items:end}.mk-shock label,.mk-trend{display:grid;gap:.25rem;font-size:14px}.mk-shock select,.mk-shock input,.mk-trend select{font:inherit;font-size:16px;min-height:44px;background:var(--card);color:var(--fg);border:1px solid var(--line);padding:.4rem .6rem;border-radius:5px}.mk-shock input{width:8rem}.mk-shock summary,.mk-impact summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--acc)}
+.mk-impact{padding:.7rem 0;border-block:1px solid var(--line);margin:.5rem 0}.mk-impact-value b{font-size:24px;font-variant-numeric:tabular-nums}.mk-impact p{margin:.5rem 0}.mk-impact h3{font-size:17px}.mk-chart-legend{display:flex;flex-wrap:wrap;gap:.5rem 1rem;font-size:13px;margin:.5rem 0}.mk-chart-legend span{display:flex;align-items:center;gap:.4rem}.mk-chart-legend i{display:inline-block;width:20px;height:3px}.mk-trend{margin:.6rem 0}.mk-funds{margin-top:1rem}.mk-funds h3{font-size:18px}
+.mk-basket{padding:1rem 0;border-top:1px solid var(--line)}.mk-basket h3{font-size:20px}.mk-basket table{width:100%;font-variant-numeric:tabular-nums}.mk-basket th,.mk-basket td{padding:.6rem;text-align:right;border-bottom:1px solid var(--line)}.mk-basket th:first-child,.mk-basket td:first-child{text-align:left}.mk-basket input{width:6rem}.mk-basket input,.mk-basket select{font:inherit;font-size:16px;min-height:44px;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--fg);padding:.35rem}.mk-basket-result b{font-size:24px}.mk-ranking,.mk-suggestions{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.6rem 0}.mk-ranking>.small,.mk-suggestions>.small{flex-basis:100%}.mk-suggestions details{flex-basis:100%}.mk-ranking .chip,.mk-suggestions .chip{min-height:44px}
 @media(max-width:599px){#sheet{padding-left:16px;padding-right:16px}#view .md-grid{grid-template-columns:1fr}#view .md-full{grid-column:auto}#view .md-widget{padding:1rem}#view .co-tabs button{padding:.5rem .75rem}}

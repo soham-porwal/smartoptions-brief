@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261019-r28-decision-desk",
-  "built_at": "2026-10-19T06:59:54.497430+00:00",
-  "source_base": "06159b0088ac0462f501923e5bea009c79ff4461",
+  "release_id": "brief-client-20261019-r33-client-composition",
+  "built_at": "2026-10-19T11:39:53.194784+00:00",
+  "source_base": "b7882d244c3f06f93bb62a3ed35181aedee8ea00",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -32,7 +32,7 @@
       "bytes": 10290
     },
     "chat-popup.js": {
-      "sha256": "c2a45ae6e3774547d444629b1a516e8b3f7f0ef4eb13867ed2471452219597ad",
+      "sha256": "fc9c29d98e0fabc500d2d4c8b22d6239fb42ff8b6c7fb864a34aa67850967cc2",
       "bytes": 25639
     },
     "chat/actions.js": {
@@ -82,6 +82,14 @@
     "chat/verify.js": {
       "sha256": "ce3bbfa08f1f223739b8930facb0646a8135ff0552c6ea5bfd309c29bc7fb520",
       "bytes": 6088
+    },
+    "cockpit.css": {
+      "sha256": "6369523ba527e8b5002920dc5b63ab4a6a90724617346a43c1cd588dfa500e8c",
+      "bytes": 18467
+    },
+    "cockpit.js": {
+      "sha256": "b35a2b65c8d1d906dcb504c19a2718c83190ce56126a614099e934431be1e9cd",
+      "bytes": 9128
     },
     "company.css": {
       "sha256": "c609d67c2473e2862b329188883536858d68d1fd4bfaf33bfb9b3a3077aea447",
@@ -176,8 +184,8 @@
       "bytes": 11704
     },
     "index.html": {
-      "sha256": "c4e5a386c9e60c04e4c7a6eae72c83b097aa6d9c417bb66ad245d9ec5ffb3db3",
-      "bytes": 2245
+      "sha256": "c4108823e1b37ef042765d86b1b5ae18f2f10d5ff74668dc3ddfac4fd6ae381f",
+      "bytes": 2377
     },
     "instruments.js": {
       "sha256": "a437e960ab717760a64c557eb10f185103571035a29a6add4ffe823ade237473",
@@ -192,8 +200,8 @@
       "bytes": 13895
     },
     "investor.js": {
-      "sha256": "629101ce24dd9d8b3c9568ef845f6c057bf9783e561cd8d0d117fb57ebcbddcd",
-      "bytes": 39137
+      "sha256": "7ecee3553a8042009e7d4816a610aea5698acca1e2856cce79f49b3e39d815ee",
+      "bytes": 39173
     },
     "legacy/index.html": {
       "sha256": "21c5be195686fed2cca21a8e5361cdaef44c0ddea9602eca26e0f54c070a2dde",
@@ -220,12 +228,12 @@
       "bytes": 35823
     },
     "main.js": {
-      "sha256": "90d92c2180dd709d7013f93420c1191ace8605d11a64ed6472bd958b3b7e0ac6",
-      "bytes": 300929
+      "sha256": "3a1eb90185160874d807fd44387762f52d26e6920c572f0490bde234c7f6a8a3",
+      "bytes": 309765
     },
     "markets.js": {
-      "sha256": "beeaa61a4ba388f4dd11d7e59054a3b785242048101a4451e74ebe22f4f79566",
-      "bytes": 47331
+      "sha256": "3b81ed918a517db2c98da956cdf36fe57f00a4b60a5d6238b299333cf1da4a9a",
+      "bytes": 63818
     },
     "money-flow.css": {
       "sha256": "ddef742bb34f0216e5ecfbdcb9b3116ddbdc99abe8cfe13072fd7ad503c5e737",
@@ -240,7 +248,7 @@
       "bytes": 8321
     },
     "my-dashboard.js": {
-      "sha256": "9cc81eb33c77b0aa1408db21925d8341336a1868cf16f0043b7e763b7cb334cf",
+      "sha256": "965149e083a503f62ed6674d239c722b4dee23de41408b3dd4fb0c3aac98e94e",
       "bytes": 42646
     },
     "news.js": {
@@ -264,8 +272,8 @@
       "bytes": 42958
     },
     "release.json": {
-      "sha256": "b7a28a8e1ea34cfc9dee46bc71e7c0e0b85248021059b8da06c17b0e57599388",
-      "bytes": 2920
+      "sha256": "94217038d966f912ee9d549c3810f329cbbf9af23696761ad2a00f2cdc7dc59c",
+      "bytes": 2381
     },
     "shocks.css": {
       "sha256": "95f20f08ee93c25ca625520dd8e881ca8b1c074955f25f7d67f96f41890aa778",
@@ -300,8 +308,8 @@
       "bytes": 8328
     },
     "unified.css": {
-      "sha256": "7851f6e5ee14c5aa2d8909b20e8a5784f4bcfb94c2060bdd01f664d01c7b1831",
-      "bytes": 23848
+      "sha256": "4ccf35e575ccafad1ccead352a248cd272ab92342d124e66877f1c869000f0fc",
+      "bytes": 26025
     },
     "vendor/LICENSE": {
       "sha256": "70c9d5382506dd184465425c08a99ad9bd6d9ac1313c252968ba0b585e5ef823",

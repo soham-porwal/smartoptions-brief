@@ -1,0 +1,92 @@
+/* A single research-desk language: clear hierarchy, shared surfaces and meaningful
+   colour. Desktop composition is not the mobile layout squeezed smaller. */
+:root{--frame:1400px;--desk-radius:8px;--desk-shadow:0 2px 10px #17251d04}
+.decision-desk{max-width:var(--frame);font-size:16px;line-height:1.45}
+.desk-date{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0}
+.desk-date h1{font-size:18px;font-weight:650;letter-spacing:-.025em;margin:0}
+.desk-date p{font-size:12px;color:var(--dim);margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+.decision-desk .desk-panel{background:var(--card);border:1px solid var(--line)!important;border-radius:var(--desk-radius);padding:16px!important;box-shadow:var(--desk-shadow);min-width:0}
+.desk-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.desk-heading h2,.desk-fold>summary{font:650 15px/1.4 system-ui,sans-serif;letter-spacing:-.02em;margin:0}
+.desk-heading h2>span:not(.desk-symbol),.desk-fold>summary>span{font-weight:400;color:var(--dim);font-size:12px;letter-spacing:0;margin-left:6px}
+.desk-heading h2>a{color:var(--fg)}.desk-heading h2>a>span{font-size:12px;color:var(--dim);font-weight:400;margin-left:7px}
+.decision-desk .desk-heading button.text,.desk-action{font-size:12px!important;min-height:32px;display:inline-flex;align-items:center;flex-shrink:0;white-space:nowrap}
+.desk-symbol{display:inline-flex;justify-content:center;align-items:center;width:21px;height:21px;font:700 20px/1 system-ui;color:var(--acc)}.risk-symbol{color:var(--dn);border:1px solid currentColor;border-radius:50%;font-size:14px}
+.decision-desk>#market{padding:0;border:0}.decision-desk .market-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch}
+.decision-desk .headline{font:650 clamp(24px,2.1vw,31px)/1.18 system-ui,sans-serif;letter-spacing:-.04em;max-width:none;margin:7px 0 9px}
+.decision-desk .headline .signal-icon{font-size:19px}.decision-desk .tk-so{font-size:14px;line-height:1.5;max-width:72ch;margin:0 0 12px}
+.regime-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.decision-desk .assessment-grid{display:flex;flex-direction:column;gap:0;margin:0;list-style:none;padding:0}
+.decision-desk .assessment-grid li{margin:0;border-bottom:1px solid var(--line)}
+.decision-desk .assessment-grid .reason{min-height:49px;width:100%;padding:6px 0;gap:8px}
+.decision-desk .assessment-grid .reason-copy{display:flex;flex:1;justify-content:space-between;gap:8px;align-items:center}
+.decision-desk .assessment-grid .signal-name{font-size:12px}.decision-desk .assessment-grid b{font-size:12px;font-weight:650}
+.decision-desk .assessment-grid .signal-icon{font-size:13px}.decision-desk .assessment-grid .chev{font-size:16px}
+.regime-triggers{font-size:12px}.regime-triggers>div{padding:9px 11px;margin:0 0 8px;border-radius:4px;border-left:2px solid}
+.trigger-positive{background:var(--upbg);border-color:var(--up)!important}.trigger-positive>b{color:var(--up)}
+.trigger-negative{background:var(--dnbg);border-color:var(--dn)!important}.trigger-negative>b{color:var(--dn)}
+.regime-triggers ul{padding-left:14px;margin:5px 0 0}.regime-triggers li{margin:4px 0}.regime-triggers .small{font-size:11px}.regime-triggers .text{font-size:11px}
+.session-changes{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
+.session-changes h3{font-size:12px;font-weight:600;color:var(--dim);margin:0}
+.decision-desk .prev-row{margin:7px 0 0}.decision-desk .prev-row .prev{padding:3px 10px;min-height:52px}.decision-desk .prev-row .prev b{font-size:21px}.decision-desk .prev-row .lbl{font-size:11px}.decision-desk .prev-row .prev small{font-size:11px}
+.decision-desk .prev-row li:last-child .text{font-size:11px;min-height:25px}.decision-desk .prev-row li:last-child{margin-top:3px}
+.desk-price{display:flex;align-items:baseline;gap:14px;font-variant-numeric:tabular-nums;margin:-4px 0 0}.desk-price strong{font-size:29px;letter-spacing:-.04em}.desk-price>a,.desk-price strong>a{color:var(--fg)}.desk-price>span{font-size:15px;font-weight:650}
+.desk-quote-clock{font-size:11px;color:var(--dim);min-height:16px;margin:0 0 5px}.desk-chart-body{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:14px}.desk-chart-main{min-width:0}
+[data-desk-chart]{height:240px;overflow:hidden}.desk-segment{display:flex;gap:3px;align-items:center}
+.desk-segment button{border:1px solid transparent;border-radius:4px;background:transparent;color:var(--dim);font:500 12px/1 system-ui;min-width:39px;min-height:32px;padding:6px 10px;cursor:pointer}
+.desk-segment button:hover{background:var(--upbg);color:var(--fg)}.desk-segment button[aria-pressed=true]{background:var(--acc);color:var(--card)}
+.desk-chart-legend{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:10px;font-variant-numeric:tabular-nums;margin-top:6px}.desk-chart-legend span{display:flex;gap:5px;align-items:center}.desk-chart-legend i{width:13px;height:3px;display:inline-block}.desk-chart-legend b{font-weight:500}
+.decision-desk [data-chart-basis]{font-size:10px;min-height:15px;margin:5px 0}.trend-levels{border-left:1px solid var(--line);padding-left:12px;font-size:11px}.trend-levels h3{font-size:12px;margin:0 0 12px}.trend-levels>div{background:var(--bg);padding:9px;margin-bottom:9px;border-radius:4px}.trend-levels span{display:block;color:var(--dim)}.trend-levels b{display:block;font-size:18px;font-variant-numeric:tabular-nums;margin-top:4px}.trend-levels>p{line-height:1.5;margin-top:14px}.trend-levels .text{font-size:11px}.trend-levels>.desk-action{white-space:normal;margin-top:12px;line-height:1.4}
+.chart-provenance{font-size:11px;color:var(--dim);border-top:1px solid var(--line);margin-top:6px;padding-top:4px}.chart-provenance summary{min-height:24px}
+.decision-desk .situation:empty{display:none}.decision-desk .situation{margin:10px 0}.decision-desk .dev{border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:4px;padding:9px 14px;margin:0;background:var(--card)}.decision-desk .dev-list{display:flex;flex-wrap:wrap;gap:6px 24px}.decision-desk .dev-list li{flex:1 1 240px}.decision-desk .dev-row{min-height:32px;font-size:13px}.decision-desk .dev h2{font-size:11px}.decision-desk .dev-meaning,.decision-desk .dev-clock{font-size:12px}
+.decision-desk .today-blocks{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;padding:0;border:0;align-items:start}
+.decision-desk .today-blocks>#opportunity{grid-column:1/-1}
+.desk-table-wrap{overflow-x:auto;max-width:100%;scrollbar-width:thin}
+.desk-table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums;line-height:1.45}
+.desk-table th{text-align:left;font-size:10px;font-weight:500;color:var(--dim);padding:6px 7px;border-bottom:1px solid var(--line);white-space:nowrap}
+.desk-table td{padding:8px 7px;border-bottom:1px solid var(--line);vertical-align:middle}.desk-table tr:last-child td{border-bottom:0}.desk-table .n{text-align:right;white-space:nowrap}
+.desk-table td:first-child,.desk-table th:first-child{padding-left:0}.desk-table td:last-child,.desk-table th:last-child{padding-right:0}.desk-table small{display:block;color:var(--dim);font-size:10px;white-space:normal}.desk-table a{font-weight:500}
+.attention-table td:nth-child(2){max-width:240px}.attention-table .desk-action{font-size:11px!important}.desk-empty{padding:12px 0 18px;font-size:14px}.desk-empty p{color:var(--dim);max-width:52ch}.desk-empty .btn{font-size:13px;margin:8px 10px 0 0}
+.attention-context,.decision-desk .more{font-size:12px;color:var(--dim);border-top:1px solid var(--line);margin-top:8px;padding-top:5px}.attention-context>p{color:var(--fg)}.attention-context summary,.decision-desk .more>summary{min-height:28px}.decision-desk .more .for-you{color:var(--fg)}
+.desk-fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;min-height:24px}.desk-fold>summary::-webkit-details-marker{display:none}.desk-fold>summary:after{content:'+';margin-left:auto;color:var(--acc);font-size:20px;font-weight:400}.desk-fold[open]>summary:after{content:'−'}
+.rotation-heading{margin:7px 0}.rotation-table td{padding-top:5px;padding-bottom:5px;font-size:11px}.rotation-table td:nth-child(4){font-size:10px;white-space:nowrap}.rotation-table td:nth-child(4) a{display:inline-block;margin-right:7px}.rotation-table th{font-size:10px}
+.rotation-foot{display:flex;align-items:center;gap:20px;border-top:1px solid var(--line);margin-top:7px;padding-top:7px}.rotation-foot .slot{flex:1}.decision-desk .rotation-foot .map-health{min-height:34px;gap:12px;padding:0}.decision-desk .rotation-foot .map-health-number{font-size:11px;gap:7px}.decision-desk .rotation-foot .map-health b{font-size:26px}.decision-desk .rotation-foot .map-health b span{font-size:15px}.rotation-foot .map-health-date{font-size:10px;padding-left:12px}.rotation-foot .map-leaders{display:none}.rotation-foot .text{font-size:11px}
+.decision-desk .market-map-detail{margin:7px 0 0}.decision-desk .market-map-detail>summary{font-size:12px;min-height:30px;border-top:0;font-weight:500}.decision-desk .map-preview .market-map svg{max-height:240px}
+.event-filters{margin:9px 0}.events-table td:first-child{max-width:108px}.events-table td:nth-child(3){font-size:11px;color:var(--dim)}.events-table button.text{font-size:12px;text-align:left;min-height:32px!important;text-decoration:none!important;padding:0!important;color:var(--fg)}
+.decision-desk #income .decision-label{background:var(--upbg);border-radius:4px;padding:7px 10px;margin:0;font-size:15px}.decision-desk #income .decision-label[data-tone=mixed]{background:var(--ambg)}.decision-desk #income .decision-label[data-tone=bad]{background:var(--dnbg)}
+.decision-desk #income>p:not(.decision-label){font-size:13px;line-height:1.5;margin:8px 0}.decision-desk #income>p.small{font-size:11px}.decision-desk #income .actions{display:none}.income-approaches{margin-top:9px;font-size:12px}.income-approaches>summary{min-height:30px}.playbook-table td{padding-top:7px;padding-bottom:7px}.playbook-table td:first-child{white-space:nowrap}
+.decision-desk #opportunity .short-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 24px;padding:0}.decision-desk #opportunity .short-list li{border:0;border-left:2px solid var(--line);padding:3px 0 4px 14px}.decision-desk .short-name a{font-size:20px}.decision-desk .short-name .dim{font-size:12px}.decision-desk .short-why{font-size:13px;line-height:1.5}.decision-desk .short-actions summary,.decision-desk .short-actions>button{font-size:12px}.decision-desk .short-risk p{font-size:13px}
+.decision-desk .deep-strip{font-size:12px;border-bottom:0;padding:14px 0}.decision-desk .deep-strip>details{margin-top:8px;color:var(--dim)}
+/* Details retain the same material, spacing, numeric alignment and action grammar. */
+#view .co,#view .macro,#view .ws-panel,#view .md,#view .mk-insp{line-height:1.5}
+#view .co-head h1,#view .ws-head h1,#view .macro>h1,#view .md h1,#view .mk-head h1,#sheet .sheet-hd h2{font-family:system-ui,sans-serif;font-weight:650;letter-spacing:-.035em}
+#view .co .card,#view .macro-groups>.src,#view .md-widget,#view .mk-insp{background:var(--card);border-radius:var(--desk-radius);box-shadow:var(--desk-shadow)}
+#view .co-tabs,#view .ws-tabs{border-bottom:1px solid var(--line);gap:4px}#view .co-tabs button[aria-selected=true]{background:var(--upbg);border-radius:4px 4px 0 0}
+#sheet{background:var(--card);box-shadow:-10px 0 40px #0002}#sheet .sheet-body table{line-height:1.5}#sheet .sheet-hd{border-bottom:1px solid var(--line)}
+@media(min-width:1700px){.decision-desk .headline{font-size:34px}.regime-triggers,.decision-desk .tk-so{font-size:14px}.rotation-table td{font-size:12px}.desk-table{font-size:13px}}
+@media(max-width:1199px) and (min-width:1000px){.regime-body{grid-template-columns:1fr}.regime-triggers{display:grid;grid-template-columns:1fr 1fr;gap:8px}.regime-triggers>p{grid-column:1/-1}.desk-chart-body{grid-template-columns:1fr}.trend-levels{display:none}.rotation-table td:nth-child(4),.rotation-table th:nth-child(4){display:none}}
+@media(max-width:999px){
+ :root{--gut:16px}.desk-date{display:block;margin:8px 0}.desk-date h1{font-size:18px}.desk-date p{font-size:11px;margin-top:3px;line-height:1.6}
+ .decision-desk .today-decisions{margin:0 0 10px;gap:0;border-bottom:1px solid var(--line)}.decision-desk .today-decisions button{min-height:52px;padding:7px 4px}.decision-desk .today-decisions b{font-size:14px}.decision-desk .today-decisions span{font-size:10px}
+ .decision-desk .market-grid{display:block}.decision-desk .desk-panel{padding:14px!important;margin-bottom:12px;box-shadow:none}.decision-desk .headline{font-size:27px;max-width:none}.decision-desk .tk-so{font-size:15px}.decision-desk .desk-heading h2{font-size:15px}
+ .regime-body{gap:12px;grid-template-columns:1fr}.decision-desk .assessment-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.decision-desk .assessment-grid .reason{min-height:58px}.decision-desk .assessment-grid .reason-copy{display:grid;gap:3px}.decision-desk .assessment-grid .signal-name{font-size:12px}.decision-desk .assessment-grid b{font-size:14px}
+ .regime-triggers{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px}.regime-triggers>div{padding:8px;margin:0}.regime-triggers>p{grid-column:1/-1;margin:0}.regime-triggers li{margin:5px 0}.decision-desk .prev-row .prev b{font-size:21px}.decision-desk .prev-row .lbl{font-size:11px}
+ .desk-chart-body{grid-template-columns:1fr}.trend-levels{display:none}.desk-price strong{font-size:30px}.desk-segment button{min-height:40px;min-width:44px;font-size:13px}.desk-chart-legend{font-size:11px;gap:6px 10px}.desk-heading .desk-action{min-height:36px}.decision-desk [data-chart-basis]{font-size:11px}
+ .decision-desk .today-blocks{display:block;padding:0}.decision-desk[data-today-active=market]>.today-blocks{display:block}.decision-desk .today-blocks>section{display:none}.decision-desk[data-today-active=market] #rotation,.decision-desk[data-today-active=market] #desk-events{display:block}.decision-desk .today-blocks[data-active=my-risk]>#my-risk,.decision-desk .today-blocks[data-active=income]>#income,.decision-desk .today-blocks[data-active=opportunity]>#opportunity{display:block}
+ .desk-fold>summary{font-size:15px;min-height:38px}.desk-table{font-size:13px}.desk-table th{font-size:11px}.desk-table td{padding:9px 6px}.rotation-table td{font-size:12px}.rotation-table td:nth-child(4),.rotation-table th:nth-child(4){display:none}.rotation-table td:first-child{max-width:135px}.rotation-table a{display:inline-flex;align-items:center;min-height:34px}.rotation-foot{gap:8px}.rotation-foot .text{max-width:85px;line-height:1.4}.rotation-foot .map-health-date{font-size:10px}
+ .decision-desk .dev-list{display:block}.decision-desk .dev-row{min-height:38px}.decision-desk .dev-meaning{font-size:13px}.decision-desk .dev-clock{font-size:11px}
+ .decision-desk #opportunity .short-list{grid-template-columns:1fr;gap:16px}.decision-desk .short-why,.decision-desk .short-risk p{font-size:15px}.decision-desk .short-name .dim{font-size:13px}.decision-desk .short-actions summary{font-size:13px;min-height:40px}.decision-desk #income>p:not(.decision-label){font-size:15px}.decision-desk #income>p.small{font-size:12px}.playbook-table td:first-child{white-space:normal}.desk-empty{font-size:15px}.attention-table{font-size:12px}.attention-table td:nth-child(2){min-width:105px}.attention-table .desk-action{font-size:12px!important}.attention-context,.decision-desk .more{font-size:14px}.attention-context summary,.decision-desk .more>summary{min-height:44px}
+ .desk-table button.text{min-height:44px!important}.decision-desk .deep-strip nav{display:flex;flex-wrap:wrap;gap:0 18px}.decision-desk .deep-strip nav a{min-height:40px;display:inline-flex;align-items:center;font-size:13px}
+}
+@media(prefers-reduced-motion:no-preference){.desk-panel{animation:desk-arrive .18s ease-out both}.desk-segment button,.today-decisions button{transition:background-color .12s,color .12s}@keyframes desk-arrive{from{opacity:.5;transform:translateY(3px)}to{opacity:1;transform:none}}}
+
+.regime-watch>summary{font-size:12px;color:var(--acc);min-height:40px}.regime-watch{min-width:0}@media(min-width:1000px){.regime-watch[open]>summary{display:none}}
+@media(max-width:999px){.regime-watch{grid-column:1/-1;border-top:1px solid var(--line)}.regime-watch>.regime-triggers{margin-top:8px}.desk-date p .text{min-height:28px!important}.decision-desk .desk-date p{gap:3px 7px}.decision-desk .session-changes{margin-top:5px}.decision-desk .prev-row .prev{min-height:60px}}
+.decision-desk .prev-row .prev{text-decoration:none;color:var(--fg)}.decision-desk .prev-row .prev[data-tone=bad] b{color:var(--dn)}.decision-desk .prev-row .prev[data-tone=good] b{color:var(--up)}.decision-desk .prev-row .prev[data-tone=mixed] b{color:var(--amber)}
+
+/* Independent column stacks avoid a blank half-row when the user has no positions. */
+.decision-desk .today-blocks{align-items:start}.desk-column{display:flex;flex-direction:column;gap:14px;min-width:0}.decision-desk .desk-column>section{margin:0}.decision-desk .today-blocks>#opportunity{grid-column:1/-1}
+@media(min-width:1300px){.regime-layout{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.6fr);gap:14px}.decision-desk .regime-summary .headline{font-size:29px;margin:8px 0 12px}.decision-desk .regime-summary .tk-so{font-size:13px}.regime-body{gap:12px}.decision-desk .assessment-grid .reason-copy{display:grid;gap:2px}.decision-desk .assessment-grid .reason{min-height:53px}.decision-desk .regime-triggers{font-size:11px}.decision-desk .regime-triggers>div{padding:8px}.decision-desk .regime-triggers .small{font-size:10px}.decision-desk .regime-triggers .text{font-size:10px}}
+@media(max-width:999px){.decision-desk .desk-column{display:contents}.decision-desk .today-blocks>section,.decision-desk .desk-column>section{display:none}.decision-desk .today-blocks[data-active=my-risk] #my-risk,.decision-desk .today-blocks[data-active=income] #income,.decision-desk .today-blocks[data-active=opportunity]>#opportunity{display:block}.decision-desk[data-today-active=market] #rotation,.decision-desk[data-today-active=market] #desk-events{display:block}}
+
+@media(min-width:1000px){.decision-desk .events-table td{padding-top:4px;padding-bottom:4px}.decision-desk .events-table button.text{min-height:28px!important}}

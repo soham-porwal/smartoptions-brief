@@ -148,7 +148,7 @@
     const s=data();let quoteTask=null,rowObserver=null,page=0,expanded=false,scope=host.dataset.scope||(active(s.book.get().book).length?'positions':'saved');
     function notifyReview(res) {
       // Local-only presentation seam: ranking and private reads remain in this owner.
-      a.onReview?.({scope,text:res.items.slice(0,2).map(x=>x.t+': '+(x.why[0]?.startsWith('Latest-session ')?pct(x.p?.change)+' · '+(x.p?.session||'session unavailable'):x.why[0])).join(' · ')});
+      a.onReview?.({scope,items:res.items,summary:res.summary,text:res.items.slice(0,2).map(x=>x.t+': '+(x.why[0]?.startsWith('Latest-session ')?pct(x.p?.change)+' · '+(x.p?.session||'session unavailable'):x.why[0])).join(' · ')});
     }
     function draw() {
       if(!host.isConnected)return;
