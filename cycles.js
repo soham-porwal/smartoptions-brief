@@ -186,7 +186,9 @@ function register() {
   A.cycle_state = () => { const s = current(); return {label: s.label, asof: s.asof, overall: s.overall, pillars: s.pillars.concat(s.context).map(p => ({pillar: p.pillar, phase: p.phase, direction: p.direction, reason: p.reason, rule: p.rule, inputs: p.inputs})), missing: s.missing, note: s.note}; };
   return true;
 }
-const API = {DEFAULTS, LS_KEY, LABEL, state, loadTh, saveTh, mount, html, current: () => current()};
+// Same toggle/reset semantics as the standalone panel, for the main app's explicit mount.
+function ui(a) { if (a === 'open') open = !open; if (a === 'th') showRules = !showRules; if (a === 'reset') saveTh(Object.assign({}, DEFAULTS)); }
+const API = {DEFAULTS, LS_KEY, LABEL, state, loadTh, saveTh, mount, html, ui, current: () => current()};
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 root.SmartOptionsCycles = API;
 if (typeof document !== 'undefined') {

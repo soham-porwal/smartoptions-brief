@@ -36,7 +36,7 @@ def bundle_path_allowed(name):
     path = Path(name)
     if path.is_absolute() or '..' in path.parts or '\\' in name:
         return False
-    return name in {'core.json', 'brief.json', 'intelligence.json', 'shocks.json', 'refresh-status.json', 'money-flow.json', 'relationships.json', 'news-refresh-status.json'} or (
+    return name in {'core.json', 'brief.json', 'intelligence.json', 'shocks.json', 'refresh-status.json', 'money-flow.json', 'relationships.json', 'news-refresh-status.json', 'situation.json'} or (
         path.suffix == '.json' and (len(path.parts) == 2 and path.parts[0] == 'px' or
                                   len(path.parts) == 3 and path.parts[:2] == ('brief', 'company')))
 
@@ -518,7 +518,15 @@ def mirror(data_root, work_root, url, workspace=None):
                                     source_collection_at=previous_date, sources=incoming_capital['news_status']['sources'])
             news_receipt['money_flow_sha256'] = hashlib.sha256((candidate / 'money-flow.json').read_bytes()).hexdigest()
             write_json(candidate / 'news-refresh-status.json', news_receipt)
+        # Same monotonic rule for the situation file: an older (or absent) bundle member never replaces a newer local one.
+        from smartoptions.situation import newer_situation
+        incoming_situation = load_json(candidate / 'situation.json', None) if (candidate / 'situation.json').is_file() else None
+        kept_situation = newer_situation(load_json(data_root / 'situation.json', None) if (data_root / 'situation.json').is_file() else None, incoming_situation, now)
+        retained_situation = kept_situation is not None and kept_situation is not incoming_situation
+        if kept_situation is not None:
+            write_json(candidate / 'situation.json', kept_situation)
         receipt.update(status=canonical['status'], reasons=canonical.get('reasons') or [],
+                       retained_newer_local_situation=bool(retained_situation),
                        asof_session=manifest['asof_session'], canonical_generated_at=manifest['generated_at'],
                        model_asof=canonical.get('model_asof'), source_url=url,
                        shock_model_asof=canonical.get('shock_model_asof'),

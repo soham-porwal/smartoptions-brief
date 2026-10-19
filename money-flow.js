@@ -48,6 +48,9 @@
       try{root.localStorage?.setItem('so_capital_last_error',JSON.stringify({at:new Date().toISOString(),status:'context_unavailable'}));}catch{}
     }
   }
-  const api={mount,sectors,render};root.MoneyFlow=api;if(root.SO2)root.SO2.MoneyFlow=api;
+  // Explicit lifecycle for the main-app mount: the module-wide news controller is released or paused with its host view.
+  const destroy=()=>{try{liveNews?.destroy?.();}finally{liveNews=null;}};
+  const suspend=()=>liveNews?.suspend?.(),resume=()=>liveNews?.resume?.();
+  const api={mount,sectors,render,destroy,suspend,resume};root.MoneyFlow=api;if(root.SO2)root.SO2.MoneyFlow=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

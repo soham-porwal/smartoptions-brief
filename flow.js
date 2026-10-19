@@ -433,7 +433,7 @@
     fit();
   }
   // fill the viewport below header + tape (their heights vary with wrapping), desktop only
-  function fit() { if (!page || page.hidden) return; page.style.height = window.innerWidth > 820 ? Math.max(480, window.innerHeight - page.getBoundingClientRect().top) + 'px' : ''; }
+  function fit() { if (!page || page.hidden || embedded) return; page.style.height = window.innerWidth > 820 ? Math.max(480, window.innerHeight - page.getBoundingClientRect().top) + 'px' : ''; }
   function wire() {
     page.addEventListener('click', e => {
       const t = e.target;
@@ -455,7 +455,18 @@
     });
   }
   function sync() { if (!page || !btn) return; const on = btn.classList.contains('on'); if (page.hidden === on) { page.hidden = !on; if (on) { const ov = $('#pg-overview'); if (ov) ov.hidden = true; render(); } } }
-  function showFlow() { const wasOpen = btn.classList.contains('on'); A.showTab('flow'); ['#pg-markets', '#pg-macro', '#pg-overview'].forEach(s => { const el = $(s); if (el) el.hidden = true; }); sync(); if (wasOpen) render(); }
+  let embedded = false;
+  // Explicit main-app mount: same compute/render/rules, injected navigation, no tab button, observer or height fitting.
+  function mountIn(container, svc) {
+    embedded = true; A = svc.api; R = loadRules(localStorage); page = container; page.classList.add('fl-page', 'fl-embedded'); page.hidden = false;
+    if (svc.step) step = Math.min(4, Math.max(1, +svc.step));
+    wire(); render();
+    const onWatch = () => { if (page && page.isConnected) render(); };
+    root.addEventListener('so:watchlist', onWatch);
+    return {suspend() {}, resume() { render(); }, destroy() { root.removeEventListener('so:watchlist', onWatch); page = null; }, step: () => step};
+  }
+  root.SmartOptionsFlowMount = {mountIn, compute: () => { compute(); return M; }};
+  function showFlow() { if (embedded) { render(); return; } const wasOpen = btn.classList.contains('on'); A.showTab('flow'); ['#pg-markets', '#pg-macro', '#pg-overview'].forEach(s => { const el = $(s); if (el) el.hidden = true; }); sync(); if (wasOpen) render(); }
   function mount() {
     A = root.SO2; R = loadRules(localStorage);
     btn = document.createElement('button'); btn.dataset.tab = 'flow'; btn.id = 'fl-tab'; btn.textContent = 'Guide'; btn.title = 'Optional market-review template; use any view or task';
@@ -488,5 +499,5 @@
     root.dispatchEvent(new CustomEvent('so:flow-ready'));
   }
   let userMoved = false, tries = 0;
-  const timer = setInterval(() => { if (root.SO2_ready && root.SO2) { clearInterval(timer); try { mount(); } catch (e) { console.error('[R6 flow] mount failed', e); } } else if (++tries > 400) { clearInterval(timer); console.warn('[R6 flow] app data did not become ready'); } }, 20);
+  const timer = setInterval(() => { if (embedded || (root.SO2 && root.SO2.__mainFacade)) { clearInterval(timer); return; } if (root.SO2_ready && root.SO2) { clearInterval(timer); try { mount(); } catch (e) { console.error('[R6 flow] mount failed', e); } } else if (++tries > 400) { clearInterval(timer); console.warn('[R6 flow] app data did not become ready'); } }, 20);
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -95,6 +95,10 @@
       if (s.inv) parts.push(`${s.label} inverted (${mode === 'index' || mode === 'pct' || mode === 'log' ? 'reciprocal, 1 ÷ value' : '−1 × value'}).`);
       if (s.shift) parts.push(`${s.label} shifted ${s.shift > 0 ? '+' : ''}${s.shift} sessions for visual comparison only; statistics use unshifted dates.`);
     });
+    // Plain units so the chart can be read aloud without the methods page.
+    if (mode === 'index') parts.push(`100 = each series' value on ${base || 'its first date in range'}; 107.48 means +7.48% since then, not $107.48.`);
+    if (mode === 'pct') parts.push(`Price change in percent since ${base || 'each first date'}; the legend shows each series' change over the range. Price return only, dividends excluded.`);
+    if (mode === 'raw' && series.length === 1 && /^eq:/.test(series[0].id || '')) parts.push('Price in USD per share, daily closes (unadjusted for dividends).');
     return parts.join(' ');
   }
 

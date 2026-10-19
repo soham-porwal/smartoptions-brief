@@ -18,6 +18,7 @@ from smartoptions.brief.common import load_json, write_json
 from smartoptions.log import event
 from smartoptions.moneyflow import Collector, collect_news, NEWS_LIMITS
 from smartoptions.refresh import confined, fetch_bundle, read_bundle, write_bundle, promote
+from smartoptions import situation as situation_mod
 
 CANONICAL = 'https://soham-porwal.github.io/smartoptions-brief/data/snapshot.zip'
 NEWS_FIELDS = ('news', 'news_status', 'news_warnings')
@@ -55,10 +56,10 @@ def validate(data, now=None):
 
 def hashes(root):
     return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in root.rglob('*') if p.is_file() and p.name not in ('money-flow.json','news-refresh-status.json','snapshot.zip')}
+            for p in root.rglob('*') if p.is_file() and p.name not in ('money-flow.json','news-refresh-status.json','snapshot.zip','situation.json')}
 
 
-def refresh_news(data_root, work_root, cache_root, *, workspace=None, mirror_url=None, key=None, collector=None, now=None):
+def refresh_news(data_root, work_root, cache_root, *, workspace=None, mirror_url=None, key=None, collector=None, now=None, market_fetch=None, situation_builder=None):
     workspace=Path(workspace or Path.cwd()).resolve()
     data_root,work_root,cache_root=(confined(p,workspace) for p in (data_root,work_root,cache_root))
     if any(a.is_relative_to(b) for a,b in ((work_root,data_root),(data_root,work_root),(cache_root,data_root),(data_root,cache_root))):
@@ -81,7 +82,18 @@ def refresh_news(data_root, work_root, cache_root, *, workspace=None, mirror_url
                 raise ValueError('Canonical news would move collection backward')
             result={**previous,**{k:incoming.get(k,[]) if k!='news_status' else incoming[k] for k in NEWS_FIELDS}}
             receipt.update(source_url=mirror_url,source_sha256=manifest['files']['money-flow.json'])
+            # Mirror adopts the canonical situation file only when valid and not older; never re-acquires it.
+            situation_doc=None
+            if (remote/'situation.json').is_file():
+                try:
+                    cand=load_json(remote/'situation.json',required=True);situation_mod.validate_situation(cand,now)
+                    old=load_json(data_root/'situation.json') if (data_root/'situation.json').is_file() else None
+                    situation_doc=cand if not old or stamp(cand['generated_at'])>=stamp(old['generated_at']) else old
+                    receipt['situation']={'status':'mirrored' if situation_doc is cand else 'kept_newer_local','generated_at':situation_doc['generated_at']}
+                except Exception as exc:
+                    receipt['situation']={'status':'mirror_rejected','error_type':type(exc).__name__}
         else:
+            injected=collector is not None
             collector=collector or Collector(cache_root)
             key=key if key is not None else os.environ.get('FINNHUB_API_KEY','')
             if not key:
@@ -92,14 +104,34 @@ def refresh_news(data_root, work_root, cache_root, *, workspace=None, mirror_url
             result={**previous,'news':news,'news_status':status,'news_warnings':warnings}
             receipt.update(provider_calls=collector.calls,finnhub_calls=collector.finnhub_calls,
                            finnhub_start_spacing_seconds=31,finnhub_request_cap=12)
+            # Situation acquisition is isolated: its failure keeps the previous situation file and never blocks news.
+            situation_doc=None
+            try:
+                old=load_json(data_root/'situation.json') if (data_root/'situation.json').is_file() else None
+                core=load_json(data_root/'core.json') if (data_root/'core.json').is_file() else {}
+                build=situation_builder or situation_mod.build_situation
+                # An injected test collector without a market transport never reaches the network.
+                market=([],{'status':'not_attempted','calls':0,'at':now.isoformat(),'errors':{'all':'no market transport injected'}}) if injected and market_fetch is None else None
+                # Canonical producer invokes the existing Worker route (no Origin; existing reservation). Tests inject none.
+                synth=None if injected else (None if os.environ.get('SITUATION_SYNTHESIS','on')=='off' else situation_mod.worker_call)
+                situation_doc=build(now=now,baseline_session=core.get('asof_session'),news=news,previous=old,market_fetch=market_fetch,market=market,synth_call=synth)
+                mr=situation_doc['sources']['market_references']
+                receipt['situation']={'status':mr['status'],'market_calls':mr['calls'],'observations':len(situation_doc['observations']),
+                                      'reports':len(situation_doc['reports']),'synthesis':situation_doc['synthesis']['status'],'generated_at':situation_doc['generated_at']}
+            except Exception as exc:
+                receipt['situation']={'status':'failed','error_type':type(exc).__name__,'reason':str(exc)[:160]}
+                event('refresh.situation','news_only','FAIL',type(exc).__name__)
         count=validate(result,now)
         # Non-news fields (including manager filings, warnings and assembly date)
         # remain byte-equivalent JSON values. Collection status belongs to news.
         if {k:v for k,v in result.items() if k not in NEWS_FIELDS}!={k:v for k,v in previous.items() if k not in NEWS_FIELDS}:
             raise ValueError('News refresh changed non-news capital data')
         write_json(candidate/'money-flow.json',result)
+        if situation_doc is not None:
+            situation_mod.validate_situation(situation_doc,now);write_json(candidate/'situation.json',situation_doc)
         sources=result['news_status']['sources']
-        receipt.update(status='degraded' if any(s.get('status') not in ('ok','empty') for s in sources.values()) else 'ok' if count else 'suspect',
+        sit_bad=receipt.get('situation',{}).get('status') in ('failed','partial')
+        receipt.update(status='degraded' if sit_bad or any(s.get('status') not in ('ok','empty') for s in sources.values()) else 'ok' if count else 'suspect',
                        news_count=count,source_collection_at=result['news_status']['retrieved_at'],sources=sources,
                        finished_at=datetime.now(timezone.utc).isoformat(),preserved_files=len(protected),publication_changed=True)
         receipt['money_flow_sha256']=hashlib.sha256((candidate/'money-flow.json').read_bytes()).hexdigest()

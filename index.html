@@ -6,28 +6,31 @@
 <meta name="color-scheme" content="light dark">
 <title>Market Brief</title>
 <link rel="icon" href="favicon.ico">
-<link rel="stylesheet" href="main.css?v=client-20261018-adaptive-rooms2">
+<link rel="stylesheet" href="main.css?v=client-20261019-unified2">
+<link rel="stylesheet" href="unified.css?v=client-20261019-unified2">
 </head>
 <body>
 <header id="hdr">
   <a class="brand" href="#/">Market Brief</a>
-  <nav id="nav" aria-label="Main"><a href="#/" data-v="brief">Today</a><a href="#/companies" data-v="companies">Companies</a><a href="#/macro" data-v="macro">Macro</a><a href="#/explore" data-v="explore">Compare</a></nav>
+  <nav id="nav" aria-label="Main"><a href="#/" data-v="brief">Today</a><a href="#/markets" data-v="markets">Markets</a><a href="#/macro" data-v="macro">Macro</a><a href="#/workspace" data-v="workspace">Workspace</a></nav>
   <button type="button" id="gs-toggle" class="gs-toggle" aria-expanded="false" aria-controls="gsearch-box">Search</button>
-  <div class="gsearch" id="gsearch-box"><input id="gsearch" type="search" placeholder="Find a company" aria-label="Find a company" autocomplete="off" spellcheck="false" aria-controls="gs-hits"><ul id="gs-hits" class="gs-hits" role="listbox" hidden></ul></div>
+  <div class="gsearch" id="gsearch-box"><input id="gsearch" type="search" maxlength="64" placeholder="Find a stock or ETF" aria-label="Find a stock or ETF" autocomplete="off" spellcheck="false" aria-controls="gs-hits"><ul id="gs-hits" class="gs-hits" role="listbox" hidden></ul></div>
   <button type="button" id="theme" class="theme" aria-pressed="false">Dark</button>
 </header>
 <main id="view"><p class="dim">Loading…</p></main>
 <footer>
-  <p>Prices: Yahoo Finance stream, Finnhub and snapshot fallbacks, each with its source time. Statements and releases keep their periods; relationships are historical associations, not forecasts. Research tool, not advice. <a href="backup.html" id="backup-link">Expanded edition: strategies, capital flows, saved dashboards and imports</a></p>
+  <p>Prices: Yahoo Finance stream, Finnhub and snapshot fallbacks, each with its source time. Statements and releases keep their periods; relationships are historical associations, not forecasts. Research tool, not advice.</p>
 </footer>
-<script src="vendor/lightweight-charts.standalone.production.js?v=client-20261018-adaptive-rooms2"></script>
-<script src="live.js?v=client-20261018-adaptive-rooms2"></script>
-<script src="workspace.js?v=client-20261018-adaptive-rooms2"></script>
-<script src="heatmap.js?v=client-20261018-adaptive-rooms2"></script>
-<script src="watchlist.js?v=client-20261018-adaptive-rooms2"></script>
-<script src="local-data.js?v=client-20261018-adaptive-rooms2"></script>
-<script src="investor.js?v=client-20261018-adaptive-rooms2"></script>
-<script src="news.js?v=client-20261018-adaptive-rooms2"></script>
-<script src="main.js?v=client-20261018-adaptive-rooms2"></script>
+<script src="vendor/lightweight-charts.standalone.production.js?v=client-20261019-unified2"></script>
+<script src="live.js?v=client-20261019-unified2"></script>
+<script src="workspace.js?v=client-20261019-unified2"></script>
+<script src="heatmap.js?v=client-20261019-unified2"></script>
+<script src="watchlist.js?v=client-20261019-unified2"></script>
+<script src="local-data.js?v=client-20261019-unified2"></script>
+<script src="investor.js?v=client-20261019-unified2"></script>
+<script src="news.js?v=client-20261019-unified2"></script>
+<script src="instruments.js?v=client-20261019-unified2"></script>
+<script src="situation.js?v=client-20261019-unified2"></script>
+<script src="main.js?v=client-20261019-unified2"></script>
 </body>
 </html>

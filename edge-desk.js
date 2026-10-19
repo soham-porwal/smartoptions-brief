@@ -1007,6 +1007,7 @@
   }
 
   function show(on) {
+    if (embedded) { if (on) render(); return; }
     document.body.classList.toggle('so-edge', on);
     if (page) page.hidden = !on;
     const tab = $('#ed-tab');
@@ -1027,41 +1028,9 @@
     }
   }
 
-  function mount() {
-    api = root.SO2;
-    const d = api.D();
-    ST = loadState(d);
-
-    const tab = document.createElement('button');
-    tab.id = 'ed-tab';
-    tab.textContent = '★ Edge Desk';
-    tab.dataset.tab = 'edge';
-    tab.title = 'Lean interactive Options income + Alpha Finder + Portfolio scenarios Desk';
-    $('#tabs').appendChild(tab);
-
-    if (root.SmartOptionsLive) root.SmartOptionsLive.subscribe(() => {
-      for (const h of ST.hold) { const q = root.SmartOptionsLive.get(h.t); if(!h.customPx){h.price=q&&q.current_usable!==false&&finite(q.price)?q.price:null;h.quoteAsOf=q&&(q.asof_utc||q.ts);} }
-      if (!page.hidden) render();
-    });
-    const brand = $('#hdr .brand');
-    if (brand) brand.innerHTML = 'Market <span style="color:var(--ed-brass);font-weight:700">Brief</span>';
-
-    page = document.createElement('main');
-    page.id = 'pg-edge';
-    page.hidden = true;
-    $('#pg-markets').before(page);
-
-    $('#tabs').addEventListener('click', e => {
-      const b = e.target.closest('[data-tab]');
-      if (!b) return;
-      if (b.dataset.tab === 'edge') {
-        e.stopImmediatePropagation();
-        show(true);
-      } else {
-        show(false);
-      }
-    }, true);
-
+  // Page listeners shared by the standalone desk and the embedded main-app mount.
+  const onImport = () => { if (!page || !ST) return; pullFromMyBook(api.D()); if (!page.hidden && !suspended) render(); };
+  function wire() {
     page.addEventListener('click', e => {
       const pBtn = e.target.closest('[data-pillar]');
       if (pBtn) {
@@ -1322,10 +1291,76 @@
       }
     });
 
-    root.addEventListener('so:import', () => {
-      pullFromMyBook(api.D());
+    root.addEventListener('so:import', onImport);
+
+  }
+
+  /* Explicit main-app mount: no #tabs/#pg-markets, no brand rewrite, no body classes, no SO2_ready polling.
+     Navigation and shock state go through injected services; the shared private book stays the canonical store. */
+  let embedded = false, suspended = false, unsubQuotes = null;
+  function mountIn(container, svc) {
+    embedded = true; suspended = false; api = svc.api; page = container; page.classList.add('ed-embedded');
+    const d = api.D(); ST = loadState(d); if (svc.pillar) ST.pillar = svc.pillar;
+    pullFromMyBook(d);
+    const L = root.SmartOptionsLive;
+    L?.watch('edge', ST.hold.map(h => h.t));
+    // Same canonical-quote rule as the standalone desk, applied at mount and on every accepted quote.
+    const applyQuotes = () => { for (const h of ST.hold) { const q = L?.get(h.t); if (!h.customPx) { h.price = q && q.current_usable !== false && finite(q.price) ? q.price : null; h.quoteAsOf = q && (q.asof_utc || q.ts); } } };
+    applyQuotes();
+    unsubQuotes?.();
+    unsubQuotes = L?.subscribe(() => {
+      if (suspended || !page || !page.isConnected) return;
+      applyQuotes();
+      // A quote burst never redraws under an active edit (draft/focus preservation).
+      const a = document.activeElement; if (a && page.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;
+      render();
+    }) || null;
+    wire(); render();
+    return {
+      show(p) { if (p) ST.pillar = p; saveState(); render(); },
+      suspend() { suspended = true; L?.watch('edge', []); },
+      resume() { suspended = false; L?.watch('edge', ST.hold.map(h => h.t)); render(); },
+      destroy() { suspended = true; unsubQuotes?.(); unsubQuotes = null; L?.watch('edge', []); root.removeEventListener('so:import', onImport); page = null; }
+    };
+  }
+  root.SmartOptionsEdgeMount = {mountIn};
+
+  function mount() {
+    api = root.SO2;
+    const d = api.D();
+    ST = loadState(d);
+
+    const tab = document.createElement('button');
+    tab.id = 'ed-tab';
+    tab.textContent = '★ Edge Desk';
+    tab.dataset.tab = 'edge';
+    tab.title = 'Lean interactive Options income + Alpha Finder + Portfolio scenarios Desk';
+    $('#tabs').appendChild(tab);
+
+    if (root.SmartOptionsLive) root.SmartOptionsLive.subscribe(() => {
+      for (const h of ST.hold) { const q = root.SmartOptionsLive.get(h.t); if(!h.customPx){h.price=q&&q.current_usable!==false&&finite(q.price)?q.price:null;h.quoteAsOf=q&&(q.asof_utc||q.ts);} }
       if (!page.hidden) render();
     });
+    const brand = $('#hdr .brand');
+    if (brand) brand.innerHTML = 'Market <span style="color:var(--ed-brass);font-weight:700">Brief</span>';
+
+    page = document.createElement('main');
+    page.id = 'pg-edge';
+    page.hidden = true;
+    $('#pg-markets').before(page);
+
+    $('#tabs').addEventListener('click', e => {
+      const b = e.target.closest('[data-tab]');
+      if (!b) return;
+      if (b.dataset.tab === 'edge') {
+        e.stopImmediatePropagation();
+        show(true);
+      } else {
+        show(false);
+      }
+    }, true);
+
+    wire();
 
     root.SmartOptionsEdgeDesk = {
       show: (pillar) => {
@@ -1345,6 +1380,7 @@
 
   let tries = 0;
   const timer = setInterval(() => {
+    if (embedded || document.getElementById('tabs') == null && root.SO2 && root.SO2.__mainFacade) { clearInterval(timer); return; }
     if (root.SO2_ready && root.SO2 && root.SO2.D && root.SO2.D()) {
       clearInterval(timer);
       mount();

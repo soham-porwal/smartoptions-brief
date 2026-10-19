@@ -1,7 +1,7 @@
 {
-  "release_id": "brief-client-20261018-r26-adaptive-brief-rooms",
-  "built_at": "2026-10-19T00:31:10.489354+00:00",
-  "source_base": "c058996cb80c7617542c053c5ab8af36fcc07718",
+  "release_id": "brief-client-20261019-r27-unified",
+  "built_at": "2026-10-19T06:09:15.108620+00:00",
+  "source_base": "2810f51f57bdb551928d64a229625ba3ece9e5a3",
   "ui_assets": {
     "about.js": {
       "sha256": "8f0259de5c6d0ba9eba97125a8880f4a977d2ae70ef8a3508f2d23aac1436447",
@@ -32,8 +32,8 @@
       "bytes": 10290
     },
     "chat-popup.js": {
-      "sha256": "88290a843eceb4dc540220c734cb20a8d331caaa30f33622e2f91e144112d871",
-      "bytes": 25441
+      "sha256": "98eb3ab55586296012fef1256b8145a540a37d662fa11eb6de1e0d0f8715ee6f",
+      "bytes": 25639
     },
     "chat/actions.js": {
       "sha256": "590c07c5b33cf3512ac496f9ee685cf1e075b18ce1ab981b3f1947cd0ba9a5b2",
@@ -52,8 +52,8 @@
       "bytes": 72141
     },
     "chat/dashboard.js": {
-      "sha256": "5d8d2ef5d167d6d00fe7ee22b275073c96ea98221fd097a9d7d0dce30ae0add8",
-      "bytes": 45171
+      "sha256": "f8bed4c5edb06c54a04e7cf107a685921b8e1f2b3994f5ddd02a1be26686d0a8",
+      "bytes": 47182
     },
     "chat/facts.js": {
       "sha256": "db94be3d8e1d6a5534fdf5cfa33e170e055f831c84e982a199533e92b69fc8ea",
@@ -112,16 +112,16 @@
       "bytes": 2320
     },
     "cycles.js": {
-      "sha256": "9b515ae919ceb868499d67af3f239ca75e0000c1981bc896dd5226ad2f9efc0b",
-      "bytes": 20227
+      "sha256": "5abc5bca87583ffd09cd3dc0cf78ec2f1f80866d938df11ab026b485aaa79424",
+      "bytes": 20469
     },
     "edge-desk.css": {
       "sha256": "0c57121ee6586067b1c2dabfa66f303ad9e55d9056324b4548da7a896ad09fd8",
       "bytes": 16722
     },
     "edge-desk.js": {
-      "sha256": "2e24db18eaa4d2b81e762e6b9f7530adc44a31098ec87df52b23a4b1b7f36a0e",
-      "bytes": 70331
+      "sha256": "1b01e771d77e0a824a586e09ab0f10a82f973258724aa7c6ab6b69fdea56aa59",
+      "bytes": 72498
     },
     "explore.css": {
       "sha256": "41e12753586c4348a5e93ba3a43544c7d0f93e0166b675a3ce54de94936cab51",
@@ -140,8 +140,8 @@
       "bytes": 8144
     },
     "flow.js": {
-      "sha256": "1a94df89d40a92f6c6d82d58ebdcaf3d8d0f2233d48fdffe250d65d6756368f7",
-      "bytes": 54643
+      "sha256": "e4670439dd8a5c0bc74202b7aa87d3d524815ea4fe4a7c13e741987ded049b32",
+      "bytes": 55550
     },
     "fvchart.css": {
       "sha256": "d1380716b2abfde062c68d356beddd6665a3a5da8ab55301c6ed6dfbea89b989",
@@ -176,8 +176,12 @@
       "bytes": 11704
     },
     "index.html": {
-      "sha256": "228f4d0db62d924c04c959b94f82c42b13a2fe3a6f243893e99675e0ccd3bcab",
-      "bytes": 2207
+      "sha256": "5c370366956e3c021670232e93e9daa30b2c6921f6629c77def5797de0d1dbce",
+      "bytes": 2245
+    },
+    "instruments.js": {
+      "sha256": "a437e960ab717760a64c557eb10f185103571035a29a6add4ffe823ade237473",
+      "bytes": 12225
     },
     "intelligence.css": {
       "sha256": "adc81cb529dfa2a34c95bbcc0d09e64411552bc274a3c7c5a3a946c8f81ceeff",
@@ -188,8 +192,8 @@
       "bytes": 13895
     },
     "investor.js": {
-      "sha256": "88abbc23445104590771310629fc2c8f13e4e612862741a19f7ae64dd885fa78",
-      "bytes": 37524
+      "sha256": "3d96d2e7770d4f9a89209ac9337de0dab843ce29ef651433fd5b6bd68267c914",
+      "bytes": 38763
     },
     "legacy/index.html": {
       "sha256": "21c5be195686fed2cca21a8e5361cdaef44c0ddea9602eca26e0f54c070a2dde",
@@ -216,24 +220,28 @@
       "bytes": 35823
     },
     "main.js": {
-      "sha256": "23e082cc41e7c879fcace1282957e05b953466dc875f83dcc3be9ebcd4c117f6",
-      "bytes": 238574
+      "sha256": "125308583a77fe978aa4d342c215f335c453e21a320526df1e3f4d8a40cd21a1",
+      "bytes": 295588
+    },
+    "markets.js": {
+      "sha256": "beeaa61a4ba388f4dd11d7e59054a3b785242048101a4451e74ebe22f4f79566",
+      "bytes": 47331
     },
     "money-flow.css": {
       "sha256": "ddef742bb34f0216e5ecfbdcb9b3116ddbdc99abe8cfe13072fd7ad503c5e737",
       "bytes": 1806
     },
     "money-flow.js": {
-      "sha256": "3e83ae84b93b68340093a00678f0753ff87d9ee142caae4612af548fc99b0819",
-      "bytes": 6461
+      "sha256": "72f05ae27d9a716621010265e86c840381838d7be7309cf1afd2ee1463cc88da",
+      "bytes": 6755
     },
     "my-dashboard.css": {
       "sha256": "23bb08537c6384a7bbedce996ed7924cd6f23e6f0ade362a7301c362339e5716",
       "bytes": 8321
     },
     "my-dashboard.js": {
-      "sha256": "e1e3623da8e6bd59814c278a944c50d229c2f0683c846bb0ad441036bfa6f519",
-      "bytes": 41197
+      "sha256": "b4228e52e018709a080477f7dff2b42ec95abd0fc5448a1baed37f22c816924b",
+      "bytes": 42474
     },
     "news.js": {
       "sha256": "375472641a609763b00a58bb154ff86127554cd5865f4c5bb75f8c29dcc313fa",
@@ -256,8 +264,8 @@
       "bytes": 42958
     },
     "release.json": {
-      "sha256": "ad8c21d117f60e8ff4a1f3f2ca51a228692af61f911d68b08951d5359aba508c",
-      "bytes": 6114
+      "sha256": "73ca6e2ba95491b9402ba6704c94b4bc781aa4a435b26d3a2a117da8954e7c93",
+      "bytes": 2868
     },
     "shocks.css": {
       "sha256": "95f20f08ee93c25ca625520dd8e881ca8b1c074955f25f7d67f96f41890aa778",
@@ -267,13 +275,17 @@
       "sha256": "d1b68cbaf1534f20090b4e327a46ee500df6ccb9cc43cd3c7953518b7b8b3c86",
       "bytes": 23968
     },
+    "situation.js": {
+      "sha256": "ee4131855697a63ceac69041d22c344d2f8589cd0a7f6dd656b8e9d02d9da73f",
+      "bytes": 20656
+    },
     "strategies.css": {
       "sha256": "079855a198a68e4226b5b549b7a7f9a87287b2aa2259299e22e1486c3b6909a5",
       "bytes": 4607
     },
     "strategies.js": {
-      "sha256": "a7a88e353e57e254edbbe93f56a0307d6912d702cec0a0aa663627d9d5c3373f",
-      "bytes": 62276
+      "sha256": "5dcc28de0da0bcb9b3c3bd0726328a1aa9d452d1ecc3be889b154b03c03d627d",
+      "bytes": 62325
     },
     "technicals.css": {
       "sha256": "f7bd3abc8f2dd85b0bbb46c4e9043e2fc4903ec1dfee282b56c3d090e758142f",
@@ -286,6 +298,10 @@
     "ui.css": {
       "sha256": "621759ac9bb90ddc441aa824866554057abc012da82aaf62cf67b54ca5cf91c8",
       "bytes": 8328
+    },
+    "unified.css": {
+      "sha256": "5e8daad3dba18f4ced5ecdf8dff6564cf4dba87c3231eb8b392ce8cc3473d584",
+      "bytes": 12954
     },
     "vendor/LICENSE": {
       "sha256": "70c9d5382506dd184465425c08a99ad9bd6d9ac1313c252968ba0b585e5ef823",
@@ -300,8 +316,8 @@
       "bytes": 2984
     },
     "workspace.js": {
-      "sha256": "0020f1263635ca0682589ad6079af66d8ba33b52d967624cab55e96faf7b20b4",
-      "bytes": 21553
+      "sha256": "31474bea98101d6ef549d88315e456de6e0d32950a8a4b5f0776a28767060101",
+      "bytes": 22134
     }
   },
   "data_at_publication": {
@@ -385,6 +401,6 @@
   "dynamic_files": {
     "data/quotes.json": "Scheduled shared observations; excluded from static hash gate, compare per-symbol observations across hosts and never regress source times."
   },
-  "note": "Exact UI Git-blob hashes. data_at_publication is retained historical source snapshot only; independently newer hosted data is protected and verified separately.",
+  "note": "Immutable UI Git-blob hashes. Any data_at_publication field is historical source data, not a current hosted-data claim.",
   "publication_encoding": "Canonical Git blob bytes (GitHub Pages), not Windows worktree CRLF bytes"
 }

@@ -17,6 +17,18 @@
   const BENCHMARKS=['SPY'];
   const INDICATORS={sma50:'50-session simple moving average',sma200:'200-session simple moving average',rsi14:'14-session RSI (Wilder)'};
   const SHOCKS={wti:{unit:'%',max:50,default:10,label:'WTI oil'},us10y_bps:{unit:'bp',max:200,default:25,label:'10-year Treasury yield'},dxy:{unit:'%',max:15,default:2,label:'US dollar index'},vix:{unit:'points',max:40,default:5,label:'VIX'}};
+  // Optional public investigation carried by an explicit room save. No new store or automatic migration.
+  function focusContext(x,universe){
+    fields(x,['id','kind','label','at','source','source_url','assets','assumption'],'investigation');
+    if(!['observed','reported'].includes(x.kind))throw new Error('Investigation must identify an observation or report.');
+    const out={id:text(x.id,100,'Evidence id'),kind:x.kind,label:text(x.label,300,'Evidence label'),at:text(x.at,40,'Observation time'),source:text(x.source,100,'Source'),assets:[]};
+    if(!Number.isFinite(Date.parse(x.at)))throw new Error('Investigation needs a source date.');
+    if(x.source_url!==undefined){if(typeof x.source_url!=='string'||x.source_url.length>1000||!/^https:\/\/[^\s<>"']+$/.test(x.source_url))throw new Error('Invalid evidence URL.');const u=new URL(x.source_url);if(u.username||u.password)throw new Error('Evidence URL cannot contain credentials.');out.source_url=x.source_url;}
+    if(!Array.isArray(x.assets)||x.assets.length>4||new Set(x.assets).size!==x.assets.length||x.assets.some(t=>typeof t!=='string'||!universe.has(t)))throw new Error('Choose covered instrument identities for the investigation.');
+    out.assets=x.assets.slice();
+    if(x.assumption!==undefined)out.assumption=settings('sensitivity',x.assumption);
+    return out;
+  }
   function settings(type,x){
     if(type==='history'){fields(x,['window','benchmarks','indicators'],'chart settings');const o={};
       if(x.window!==undefined){if(!Object.hasOwn(WINDOWS,x.window))throw new Error('Chart window must be one of: '+Object.values(WINDOWS).join(', ')+'.');o.window=+x.window;}
@@ -45,7 +57,7 @@
     return {...(st?{settings:st}:{}),id:x.id,type:x.type,...(x.metric?{metric:x.metric}:{}),...(n?{tickers:ts.slice()}:{}),...(x.title!==undefined?{title:text(x.title,72,'Widget title')}:{}),width:x.width||(['market','comparison','relationships'].includes(x.type)?'full':'half')};
   }
   function layout(x,universe){
-    fields(x,['schema','id','name','widgets','updated_at','kind','assets','thesis','scenario'],'layout');
+    fields(x,['schema','id','name','widgets','updated_at','kind','assets','thesis','scenario','focus'],'layout');
     if(x.schema!==SCHEMA||!idOK(x.id))throw new Error('Unsupported dashboard schema or id.');
     if(!Array.isArray(x.widgets)||x.widgets.length>24)throw new Error('A dashboard supports up to 24 widgets.');
     const ws=x.widgets.map(w=>widget(w,universe));if(new Set(ws.map(w=>w.id)).size!==ws.length)throw new Error('Widget ids must be unique.');
@@ -53,24 +65,26 @@
     // Optional room fields; layouts saved before rooms existed have none and round-trip unchanged.
     return {schema:SCHEMA,id:x.id,name:text(x.name,48,'Dashboard name'),widgets:ws,updated_at:x.updated_at,...room(x,universe)};
   }
-  function assets(ts,universe){if(!Array.isArray(ts)||!ts.length||ts.length>4||new Set(ts).size!==ts.length||ts.some(t=>typeof t!=='string'||!universe.has(t)))throw new Error('A room tracks one to four distinct company tickers covered by this site.');return ts.slice();}
+  function assets(ts,universe){if(!Array.isArray(ts)||!ts.length||ts.length>4||new Set(ts).size!==ts.length||ts.some(t=>typeof t!=='string'||!universe.has(t)))throw new Error('A room tracks one to four distinct stocks or ETFs with a validated identity on this device.');return ts.slice();}
   function room(x,universe){
-    if(x.kind===undefined&&x.assets===undefined&&x.thesis===undefined&&x.scenario===undefined)return {};
+    if(x.kind===undefined&&x.assets===undefined&&x.thesis===undefined&&x.scenario===undefined&&x.focus===undefined)return {};
     if(x.kind!=='room')throw new Error('Unsupported layout kind.');
     if(x.scenario!==undefined&&!Object.hasOwn(SCENARIOS,x.scenario))throw new Error('Unsupported scenario. Available: '+Object.keys(SCENARIOS).join(', ')+'.');
-    return {kind:'room',assets:assets(x.assets,universe),...(x.thesis!==undefined?{thesis:text(x.thesis,280,'Monitoring thesis')}:{}),...(x.scenario!==undefined?{scenario:x.scenario}:{})};
+    return {kind:'room',assets:assets(x.assets,universe),...(x.thesis!==undefined?{thesis:text(x.thesis,280,'Monitoring thesis')}:{}),...(x.scenario!==undefined?{scenario:x.scenario}:{}),...(x.focus!==undefined?{focus:focusContext(x.focus,universe)}:{})};
   }
   // Useful default composition, one coherent workspace: prices, trend, case/counter, events, news, sensitivities.
-  function roomWidgets(ts,scenario){
-    const ws=[{id:'prices',type:'quote',tickers:ts,width:'full'},{id:'trend',type:'history',tickers:ts,width:'full'},{id:'case',type:'case',tickers:ts,width:'full'},{id:'events',type:'events',tickers:ts,width:'half'},{id:'news',type:'news',tickers:ts,width:'half'},{id:'sensitivity',type:'sensitivity',tickers:ts,width:'full'}];
-    if(scenario){const s=ws.splice(5,1)[0];ws.splice(1,0,s);}
+  // Funds get price, history and news only: company case, earnings events and fitted company sensitivities never apply to an ETF.
+  function roomWidgets(ts,scenario,funds){
+    const co=ts.filter(t=>!(funds&&funds.has(t)));
+    const ws=[{id:'prices',type:'quote',tickers:ts,width:'full'},{id:'trend',type:'history',tickers:ts,width:'full'},co.length&&{id:'case',type:'case',tickers:co,width:'full'},co.length&&{id:'events',type:'events',tickers:co,width:'half'},{id:'news',type:'news',tickers:ts,width:co.length?'half':'full'},co.length&&{id:'sensitivity',type:'sensitivity',tickers:co,width:'full'}].filter(Boolean);
+    if(scenario){const i=ws.findIndex(w=>w.type==='sensitivity');if(i>=0){const s=ws.splice(i,1)[0];ws.splice(1,0,s);}}
     return ws;
   }
-  const ACTION_FIELDS={configure:['widget_id','settings','tickers'],create:['name','widgets'],create_room:['name','assets','thesis','scenario'],set_thesis:['thesis'],add_widget:['widget'],move_widget:['widget_id','position'],resize_widget:['widget_id','width'],rename:['name'],save_as:['name'],open:['name'],list:[]};
+  const ACTION_FIELDS={configure:['widget_id','settings','tickers'],create:['name','widgets'],create_room:['name','assets','thesis','scenario','focus'],set_thesis:['thesis'],add_widget:['widget'],move_widget:['widget_id','position'],resize_widget:['widget_id','width'],rename:['name'],save_as:['name'],open:['name'],list:[]};
   function action(x,universe){
     if(!isObj(x)||!Object.hasOwn(ACTION_FIELDS,x.action))throw new Error('Unsupported dashboard action.');
     fields(x,['schema','action',...ACTION_FIELDS[x.action]],'action');
-    if(x.action==='create_room'){const r={schema:ACTION_SCHEMA,action:'create_room',name:text(x.name,48,'Room name'),...room({kind:'room',assets:x.assets,thesis:x.thesis,scenario:x.scenario},universe)};if(x.schema!==ACTION_SCHEMA)throw new Error('Unsupported action schema.');delete r.kind;return r;}
+    if(x.action==='create_room'){const r={schema:ACTION_SCHEMA,action:'create_room',name:text(x.name,48,'Room name'),...room({kind:'room',assets:x.assets,thesis:x.thesis,scenario:x.scenario,focus:x.focus},universe)};if(x.schema!==ACTION_SCHEMA)throw new Error('Unsupported action schema.');delete r.kind;return r;}
     if(x.action==='set_thesis'){if(x.schema!==ACTION_SCHEMA)throw new Error('Unsupported action schema.');return {schema:ACTION_SCHEMA,action:'set_thesis',thesis:text(x.thesis,280,'Monitoring thesis')};}if(x.schema!==ACTION_SCHEMA)throw new Error('Unsupported action schema.');
     const a={schema:ACTION_SCHEMA,action:x.action};
     if(['create','rename','save_as','open'].includes(x.action))a.name=text(x.name,48,'Dashboard name');
@@ -106,7 +120,7 @@
         const a=action(input,universe),next=read();let cur=next.layouts.find(l=>l.id===next.active),message='';
         if(a.action==='list')return {status:'OK',text:next.layouts.length?'Saved on this device: '+next.layouts.map(l=>l.name).join(', ')+'.':'No saved dashboards on this device yet.',state:read(),layout:active()};
         if(['create','rename','save_as'].includes(a.action)&&next.layouts.some(l=>l.name.toLowerCase()===a.name.toLowerCase()&&!(a.action==='rename'&&l.id===next.active)))throw new Error('A dashboard with that name already exists. Choose another name.');
-        if(a.action==='create_room'){if(next.layouts.length>=30)throw new Error('The device-local limit is 30 saved views. Export existing views first.');cur={schema:SCHEMA,id:freshId(),name:a.name,widgets:roomWidgets(a.assets,a.scenario),updated_at:new Date().toISOString(),kind:'room',assets:a.assets,...(a.thesis?{thesis:a.thesis}:{}),...(a.scenario?{scenario:a.scenario}:{})};next.layouts.push(cur);next.active=cur.id;message='Created room “'+cur.name+'” for '+a.assets.join(', ')+(a.scenario?' ('+SCENARIOS[a.scenario].label.toLowerCase()+' scenario)':'')+' with '+cur.widgets.length+' modules.';}
+        if(a.action==='create_room'){if(next.layouts.length>=30)throw new Error('The device-local limit is 30 saved views. Export existing views first.');cur={schema:SCHEMA,id:freshId(),name:a.name,widgets:roomWidgets(a.assets,a.scenario,universe&&universe.funds),updated_at:new Date().toISOString(),kind:'room',assets:a.assets,...(a.thesis?{thesis:a.thesis}:{}),...(a.scenario?{scenario:a.scenario}:{}),...(a.focus?{focus:a.focus}:{})};next.layouts.push(cur);next.active=cur.id;message='Created room “'+cur.name+'” for '+a.assets.join(', ')+(a.scenario?' ('+SCENARIOS[a.scenario].label.toLowerCase()+' scenario)':'')+' with '+cur.widgets.length+' modules.';}
         else if(a.action==='create'){if(next.layouts.length>=30)throw new Error('The device-local limit is 30 dashboards. Export existing views first.');cur={schema:SCHEMA,id:freshId(),name:a.name,widgets:a.widgets,updated_at:new Date().toISOString()};next.layouts.push(cur);next.active=cur.id;message='Created “'+cur.name+'” with '+cur.widgets.length+' widgets.';}
         else if(a.action==='open'){cur=next.layouts.find(l=>l.name.toLowerCase()===a.name.toLowerCase());if(!cur)throw new Error('No saved dashboard named “'+a.name+'” on this device.');next.active=cur.id;message='Opened “'+cur.name+'”.';}
         else{
@@ -190,7 +204,7 @@
       if(ts.length>4)return {unresolved:true,question:true,reason:'Which four companies matter most? A room tracks up to four so every module stays readable.'};
       let name=named?named[1].trim():(sc?SCENARIOS[sc].label+': ':'')+ts.join(', ')+(sc?'':' war room');
       for(let i=2,b=name;(ctx.names||[]).some(n=>n.toLowerCase()===name.toLowerCase());i++)name=(b.slice(0,44)+' '+i);
-      const thesis=(thesisText||(sc?SCENARIOS[sc].label+' scenario: watch how '+ts.join(', ')+' respond to '+{wti:'WTI oil',us10y_bps:'10-year yield',dxy:'dollar',vix:'VIX'}[SCENARIOS[sc].factor]+' moves using historical sensitivities, not forecasts.':'Monitor '+ts.join(', ')+': price versus history, fundamental case and counterargument, upcoming events and dated news.')).replace(/[<>{}\x00-\x1f]/g,'').slice(0,280);
+      const thesis=(thesisText||(sc?SCENARIOS[sc].label+' scenario: watch how '+ts.join(', ')+' respond to '+{wti:'WTI oil',us10y_bps:'10-year yield',dxy:'dollar',vix:'VIX'}[SCENARIOS[sc].factor]+' moves using historical sensitivities, not forecasts.':(ts.every(t=>ctx?.universe?.funds?.has(t))?'Monitor '+ts.join(', ')+': fund price versus history and dated news; no company case or earnings apply.':'Monitor '+ts.join(', ')+': price versus history, fundamental case and counterargument, upcoming events and dated news.'))).replace(/[<>{}\x00-\x1f]/g,'').slice(0,280);
       return base('create_room',{name:name.slice(0,48),assets:ts,thesis,...(sc?{scenario:sc}:{})});
     }
     if(/^add\b/i.test(q)){
@@ -296,5 +310,5 @@
     }
     return a;
   }
-  return {SCHEMA,ACTION_SCHEMA,KEY,METRICS,TYPES,ROOM_TYPES,SCENARIOS,WINDOWS,BENCHMARKS,INDICATORS,SHOCKS,settings,followUp,describe,roomWidgets,widget,layout,action,envelope,createStore,parse,plan};
+  return {SCHEMA,ACTION_SCHEMA,KEY,METRICS,TYPES,ROOM_TYPES,SCENARIOS,WINDOWS,BENCHMARKS,INDICATORS,SHOCKS,focusContext,settings,followUp,describe,roomWidgets,widget,layout,action,envelope,createStore,parse,plan};
 });

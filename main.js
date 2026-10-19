@@ -3,7 +3,8 @@
    published quote file). Every price-dependent number and sentence is a "slot" that re-renders when an
    accepted quote changes; statements and macro releases keep their own reporting dates.
    Relationships are historical associations (core.json rel: OLS over <=252 sessions), never forecasts.
-   The expanded workstation lives at backup.html and is not linked from navigation, only from the footer. */
+   One shell: Today, Markets, Macro and Workspace. Legacy tools mount natively inside Workspace through explicit
+   lifecycle handles; backup.html remains a standalone recovery artifact and is not the integration path. */
 'use strict';
 (function (root) {
   const isNum = v => typeof v === 'number' && isFinite(v);
@@ -11,6 +12,29 @@
   const pct = (v, d) => isNum(v) ? (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d == null ? 2 : d) + '%' : 'n/a';
   const px = v => isNum(v) ? '$' + (v >= 1000 ? v.toLocaleString('en-US', {maximumFractionDigits: 2, minimumFractionDigits: 2}) : v.toFixed(2)) : 'n/a';
   const big = v => !isNum(v) ? 'n/a' : Math.abs(v) >= 1e12 ? (v / 1e12).toFixed(2) + 'T' : Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(1) + 'bn' : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'm' : v.toLocaleString('en-US');
+  // Presentation only: provider values, histories and model inputs remain in their original units.
+  function unitValue(value, unit = '') {
+    if (value == null) return 'n/a';
+    if (!isNum(value)) return String(value);
+    unit = typeof unit === 'string' ? unit : '';
+    const scale = /^(millions?|billions?|trillions?) USD$/i.exec(unit);
+    if (scale) {
+      const dollars = value * (/^million/i.test(scale[1]) ? 1e6 : /^billion/i.test(scale[1]) ? 1e9 : 1e12);
+      return '$' + (Math.abs(dollars) >= 1e12 ? (dollars / 1e12).toFixed(2) + 'T' : Math.abs(dollars) >= 1e9 ? (dollars / 1e9).toFixed(2) + 'bn' : big(dollars));
+    }
+    return (Math.abs(value) >= 1e5 ? big(value) : String(+value.toFixed(2))) + (unit === '%' ? '%' : unit ? ' ' + unit : '');
+  }
+  function macroGroupLine(core, group, fallback = '') {
+    if (!['volatility', 'credit_funding'].includes(group)) return fallback;
+    const ids = group === 'volatility' ? ['vix', 'vix9d', 'vix3m'] : ['hy_oas'];
+    const obs = (core.macro?.[group] || []).filter(o => ids.includes(o.id) && isNum(o.v));
+    return obs.length ? obs.map(o => `${o.label || o.id}: ${unitValue(o.v, o.unit)} (${o.date || o.period || 'date unavailable'}${o.status && o.status !== 'ok' ? ', ' + o.status : ''})`).join('; ') + '.' : 'Group observations are unavailable.';
+  }
+  function focusImpact(core, ticker, factor, shock) {
+    const r = (core?.rows || []).find(r => r.t === ticker), fit = r?.rel, unit = core?.rel?.units?.[factor];
+    if (!fit || !(fit.n >= 120) || !isNum(fit.c?.[factor]) || !isNum(shock) || !unit) return {ok: false, reason: 'No covered fitted response for this instrument and factor. Follow the source and observed prices qualitatively.'};
+    return {ok: true, ticker, factor, shock, coefficient: fit.c[factor], response_pct: fit.c[factor] * shock, t: fit.t?.[factor], r2: fit.r2, n: fit.n, unit, window: core.rel.window, observed_return_pct: r.d1, session: r.pxd || core.asof_session};
+  }
   const dir = v => isNum(v) ? (v >= 0 ? 'up' : 'dn') : '';
   const listJoin = xs => xs.length <= 1 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
 
@@ -100,9 +124,13 @@
     let m;
     if (!h || h === '/' || h === '/brief') return {view: 'brief'};
     if (h === '/positions') return {view:'positions'};
+    if (/^\/markets(\?|$)/.test(h)) return {view:'markets', query: h.replace(/^\/markets\??/, '')};
+    if ((m = h.match(/^\/instrument\/([A-Za-z0-9.\-]{1,10})$/))) return {view:'markets', query: 'u=all&sel=' + m[1].toUpperCase().replace('.', '-')};
+    if ((m = h.match(/^\/workspace(?:\/([a-z-]{2,20}))?(?:\?(.*))?$/))) return {view:'workspace', tool: m[1] || '', query: m[2] || ''};
     if (h === '/room' || h === '/my-dash') return {view:'room'};
     if (/^\/explore(\?|$)/.test(h)) return {view: 'explore', hash: '#' + h};
-    if ((m = h.match(/^\/sector\/(.+)$/))) { try { return {view:'sector', sector:decodeURIComponent(m[1])}; } catch(e) { return {view:'brief', invalid:true}; } }
+    if ((m = h.match(/^\/sector-detail\/(.+)$/))) { try { return {view:'sector', sector:decodeURIComponent(m[1])}; } catch(e) { return {view:'brief', invalid:true}; } }
+    if ((m = h.match(/^\/sector\/(.+)$/))) { try { const sec=decodeURIComponent(m[1]); return {view:'markets', query:'sec='+encodeURIComponent(sec), sector:sec}; } catch(e) { return {view:'brief', invalid:true}; } }
     if ((m = h.match(/^\/learn\/(.+)$/))) { try { return {view:'learn', label:decodeURIComponent(m[1])}; } catch(e) { return {view:'brief',invalid:true}; } }
     if ((m = h.match(/^\/company\/([A-Za-z0-9.\-]{1,10})$/))) return {view: 'company', t: m[1].toUpperCase().replace('.', '-')};
     if ((m = h.match(/^\/company\/([A-Za-z0-9.\-]{1,10})\/(overview|fundamentals|drivers|events|options)$/))) return {view: 'company', t: m[1].toUpperCase().replace('.', '-'), tab: m[2]};
@@ -576,13 +604,13 @@
     return hi > lo ? {pos: 100 * (cur.px - lo) / (hi - lo), lo, hi} : null;
   }
 
-  const API = {macroWords,takeaway,nowVsClose,nowText,coherentPair,delayedIv,signalCue,postureTone,objectiveTone,researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
+  const API = {focusImpact,unitValue,macroGroupLine,macroWords,takeaway,nowVsClose,nowText,coherentPair,delayedIv,signalCue,postureTone,objectiveTone,researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
   if (typeof module !== 'undefined' && module.exports) { module.exports = API; return; }
   root.SmartOptionsMain = API;
   const doc = root.document; if (!doc) return;
 
   /* ------------------------------------------------------------ page */
-  const ASSET_V = 'client-20261018-adaptive-rooms2';
+  const ASSET_V = 'client-20261019-unified2';
   const Live = root.SmartOptionsLive;
   const S = root.__soMainState = {core: null, brief: null, rel: null, rowMap: new Map(), slots: [], view: null, chart: null, company: {}, onQuote: null};
   const $ = s => doc.querySelector(s);
@@ -607,6 +635,7 @@
   function metricValue(m) {
     if (!m || m.value == null) return 'n/a';
     const v = m.value, u = m.unit || '';
+    if (/^(millions?|billions?|trillions?) USD$/i.test(u)) return esc(unitValue(v, u)) + `<small class="dim"> (raw ${esc(v.toLocaleString('en-US'))} ${esc(u)})</small>`;
     if (!isNum(v)) return esc(v);
     if (u === '%' || /^% /.test(u)) return pct(v, 1).replace(/^\+/, v > 0 && /growth|change|vs|versus/i.test(m.label) ? '+' : '');
     if (u === 'pp') return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + ' pp';
@@ -624,34 +653,38 @@
     const table = `<table>${ms.map(m => {const o=Object.values(S.core?.macro||{}).flat().find(o=>o.label===m.label),observation=m.observation_date||o?.date,refresh=m.retrieved_at||o?.retrieved_at;return `<tr><td>${learnLink(key(m),m.label)}</td><td class="n">${metricValue(m)}</td><td class="dim">Observation/period: ${esc(observation||m.period||'unavailable')}<br>Last refreshed: ${esc(refresh||'not supplied separately')}${!refresh&&m.asof?`<br>Published as-of (clock unspecified): ${esc(m.asof)}`:''}</td><td class="dim">${source(m)}<br>Method: ${esc(m.note||'Retained provider measurement; formula not separately supplied')}</td></tr>`;}).join('')}</table>`;
     return bare ? table : `<details class="src"><summary>Inputs and sources</summary>${table}</details>`;
   }
+  const NAV_OF = {company: 'markets', companies: 'markets', sector: 'markets', markets: 'markets', explore: 'workspace', room: 'workspace', positions: 'workspace', workspace: 'workspace', macro: 'macro', brief: 'brief'};
   function setView(name) {
-    doc.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === name));
+    name = NAV_OF[name] || name;
+    doc.querySelectorAll('#nav a').forEach(a => { a.classList.toggle('on', a.dataset.v === name); if (a.dataset.v === name) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   }
   // Bounded session back stack. Detaching actual DOM preserves controls, chart
   // instances and their internal zoom/crosshair state, including unsaved typing.
   const frames = new Map(); const frameEpoch = Date.now().toString(36) + Math.random().toString(36).slice(2, 9); let frameId = null, frameSerial = 0;
-  const persistentKeys = new Set(['core','brief','rel','relError','rowMap','company','metricEvidence','generation','genPending','genNote','refreshGeneration']);
+  const persistentKeys = new Set(['focus','focusDraft','sitCtl','sitModel','ensureChat','patResult','patScan','wsLast','wsTool','scanSort','core','brief','rel','relError','rowMap','company','metricEvidence','generation','genPending','genNote','refreshGeneration']);
   function saveFrame() {
     if (!frameId || !$('#view').firstChild) return;
     const frame = {gen:S.generation||0, nodes:[...$('#view').childNodes], state:{}, y:root.scrollY, focus:doc.activeElement,
       watch:Object.fromEntries(['explore','company','research','index','investor','dashboard'].map(k=>[k,[...(Live._state.owners[k]||[])]]))};
     Object.keys(S).filter(k=>!persistentKeys.has(k)).forEach(k=>{frame.state[k]=S[k];});
     frames.delete(frameId);frames.set(frameId,frame);
+    try{S.mod?.suspend?.();}catch(e){console.warn('[brief] tool suspend failed',e.message);}
     frame.nodes.forEach(n=>n.remove());
     while (frames.size>12) {
       const k=frames.keys().next().value, old=frames.get(k); frames.delete(k);
-      ['chart','exChart','exRc'].forEach(c=>{try {old.state[c]?.remove();} catch(e) { console.warn('Discarded chart could not be released'); }});try{old.state.news?.destroy();old.state.fv?.destroy();}catch(e){console.warn('Discarded company chart could not be released');}
+      ['chart','exChart','exRc'].forEach(c=>{try {old.state[c]?.remove();} catch(e) { console.warn('Discarded chart could not be released'); }});try{old.state.news?.destroy();old.state.fv?.destroy();old.state.mod?.destroy?.();}catch(e){console.warn('Discarded company chart could not be released');}
     }
   }
   function backControl(main) {
-    if (S.view==='brief') return;
+    if (['brief','markets','workspace','macro'].includes(S.view)) return;
     const el=doc.createElement('div');el.className='depth-nav';
-    el.innerHTML='<button type="button" data-depth-back>← Back</button><a href="#/">Today</a><span class="dim"> / '+esc(S.view==='company' ? 'Company' : S.view==='sector' ? 'Sector' : S.view==='explore' ? 'Compare' : S.view==='companies' ? 'Companies' : S.view==='macro' ? 'Macro' : S.view==='room' ? 'Saved rooms' : S.view)+'</span>';
+    el.innerHTML='<button type="button" data-depth-back>← Back</button><a href="#/">Today</a><span class="dim"> / '+esc(S.view==='company' ? 'Company' : S.view==='sector' ? 'Sector' : S.view==='explore' ? 'Compare' : S.view==='companies' ? 'Companies' : S.view==='macro' ? 'Macro' : S.view==='room' ? 'Saved rooms' : S.view==='positions' ? 'Positions' : S.view)+'</span>';
     main.prepend(el);
     el.querySelector('button').onclick=()=>{if(root.history.state?.soParent)root.history.back();else root.location.hash='#/';};
   }
   function render() {
     closeSheet();
+    S.sitCtl?.stop?.();
     if(S.view==='brief'){S.personal?.suspend();S.news?.suspend();}
     const previous=frameId;
     saveFrame();
@@ -660,18 +693,18 @@
     if(S.genPending)adoptPending();
     let cached=frames.get(frameId);
     // A view saved under an older data generation is redrawn from the adopted one instead of restored.
-    if(cached&&cached.gen!==(S.generation||0)){frames.delete(frameId);try{['chart','exChart','exRc'].forEach(c=>cached.state[c]?.remove());cached.state.news?.destroy();cached.state.fv?.destroy();}catch(e){console.warn('Older-generation view could not be released');}cached=null;}
+    if(cached&&cached.gen!==(S.generation||0)){frames.delete(frameId);try{['chart','exChart','exRc'].forEach(c=>cached.state[c]?.remove());cached.state.news?.destroy();cached.state.fv?.destroy();cached.state.mod?.destroy?.();}catch(e){console.warn('Older-generation view could not be released');}cached=null;}
     if(cached) {
       frames.delete(frameId);
       Object.keys(S).filter(k=>!persistentKeys.has(k)).forEach(k=>{delete S[k];});Object.assign(S,cached.state);
       if(S.horizon)UI.horizon=S.horizon;   // the restored view's visible horizon is the selected one
       $('#view').replaceChildren(...cached.nodes);setView(S.view==='company'?'companies':S.view);
-      S.fv?.updateTheme?.();
+      S.fv?.updateTheme?.();try{S.mod?.resume?.();}catch(e){console.warn('[brief] tool resume failed',e.message);}
       const personalFocus=cached.focus?.closest?.('[data-personal-t]')?.dataset.personalT,personalHref=cached.focus?.getAttribute?.('href'),personalControl=cached.focus?.dataset?.personal;
       if(S.view==='brief'){S.personal?.refresh();S.news?.resume();}
       Object.entries(cached.watch).forEach(([owner,names])=>{if(owner!=='investor'||S.view!=='brief')Live.watch(owner,names);});
       if(S.view==='explore')updateExploreQuotes();
-      Live.paint(doc,null);paintSlots();
+      Live.paint(doc,null);paintSlots();syncSituation();paintFocus();
       requestAnimationFrame(()=>{root.dispatchEvent(new Event('resize'));let focus=cached.focus;
         if(!focus?.isConnected&&personalFocus)focus=[...doc.querySelectorAll('[data-personal-t]')].find(n=>n.dataset.personalT===personalFocus)?.querySelectorAll('a');
         if(focus&&typeof focus.focus!=='function')focus=[...focus].find(n=>n.getAttribute('href')===personalHref);
@@ -681,10 +714,12 @@
       return;
     }
     const r = route(root.location.hash);
-    S.slots = []; S.onQuote = null; S.exToken = (S.exToken || 0) + 1; S.exChart=null;S.exRc=null;S.chart=null;S.exSeries=[];S.jointChart=null;S.jointBand=[];S.coTab=null;S.co=null;S.fv=null;S.drv=null;S.coDraw=null;S.news=null;S.horizon=UI.horizon;S.lastEvents={};
+    S.slots = []; S.onQuote = null; S.exToken = (S.exToken || 0) + 1; S.exChart=null;S.exRc=null;S.chart=null;S.exSeries=[];S.jointChart=null;S.jointBand=[];S.coTab=null;S.co=null;S.fv=null;S.drv=null;S.coDraw=null;S.news=null;S.mod=null;S.horizon=UI.horizon;S.lastEvents={};
     if (r.view !== 'brief') Live.watch('investor', []);
     if (r.view !== 'explore') Live.watch('explore', []);
     if (r.view !== 'room') Live.watch('dashboard', []);
+    if (r.view !== 'markets') Live.watch('markets', []);
+    if (r.view !== 'workspace') Live.watch('strategy', []);
     S.view = r.view; setView(r.view === 'company' ? 'companies' : r.view);
     const main = $('#view');
     try {
@@ -694,13 +729,331 @@
       else if (r.view === 'macro') renderMacro(main);
       else if (r.view === 'explore') renderExplore(main, r.hash);
       else if (r.view === 'sector') renderSector(main,r.sector);
+      else if (r.view === 'markets') renderMarkets(main,r.query,r.sector);
+      else if (r.view === 'workspace') renderWorkspace(main,r.tool,r.query);
       else if (r.view === 'learn') renderLearn(main,r.label);
       else if (r.view === 'room') renderRoom(main);
       else renderBrief(main, r.legacy);
-    } catch (e) { main.innerHTML = `<p>This view could not be drawn from the published data. <a href="backup.html">Expanded dashboard (backup)</a></p>`; console.error(e); }
+    } catch (e) { main.innerHTML = `<p role="alert">This view could not be drawn from the published data (${esc(e.message)}). <a href="#/">Return to Today</a> or reload.</p>`; console.error(e); }
+    if (['explore','room','positions'].includes(r.view)) main.prepend(wsRail(r.view === 'explore' ? 'compare' : r.view === 'room' ? 'rooms' : 'positions', S.wsLast || ''));
     Live.paint(doc, null);
     backControl(main);
     root.scrollTo(0, 0);
+    syncSituation();paintFocus();
+  }
+
+  /* ------------------------------------------------------------ unified shell: services, Markets, Workspace, situation */
+  // Shared public history service: published px files first, then the public instrument relay. Deduped, two at a time.
+  const histQueue = []; let histActive = 0;
+  function histSlot(fn) { return new Promise((resolve, reject) => { histQueue.push({fn, resolve, reject}); pumpHist(); }); }
+  function pumpHist() { while (histActive < 2 && histQueue.length) { const j = histQueue.shift(); histActive++; j.fn().then(j.resolve, j.reject).finally(() => { histActive--; pumpHist(); }); } }
+  const histMemo = new Map();
+  function historyFor(t) {
+    t = String(t || '').toUpperCase();
+    if (histMemo.has(t)) return histMemo.get(t);
+    const known = row(t) || root.SmartOptionsInstruments?.RETAINED?.[t];
+    const pr = histSlot(async () => {
+      if (known) { const p = await pxJson(t); return {bars: p.bars, source: 'Published daily bars (' + (p.prov || 'Yahoo Finance via yfinance') + ')', basis: 'published daily closes'}; }
+      const I = root.SmartOptionsInstruments; if (!I) throw new Error('instrument service unavailable');
+      const d = await I.history(t); return {bars: d.bars, source: 'Yahoo Finance chart via the public instrument relay, retrieved ' + (d.retrieved_at || 'time unavailable') + (d.status === 'stale' ? ' (retained after a failed refresh)' : ''), basis: d.basis};
+    });
+    histMemo.set(t, pr); pr.catch(() => histMemo.delete(t));
+    while (histMemo.size > 80) histMemo.delete(histMemo.keys().next().value);
+    return pr;
+  }
+  async function identify(t) {
+    t = String(t || '').toUpperCase(); const r = row(t);
+    if (r) return {symbol: t, name: r.n, type: 'EQUITY', sector: r.sec, category: r.sec, mcap: r.mcap, ret: {d1: r.d1, d5: r.d5, m1: r.m1}, date: r.pxd, source: 'Published core rows'};
+    const I = root.SmartOptionsInstruments; if (!I) throw new Error('instrument service unavailable');
+    const a = await I.resolve(t);
+    if (a.source === 'published') return {symbol: t, name: a.name, type: 'ETF', category: 'Unclassified', mcap: null, ret: {}, date: null, source: 'Published daily closes'};
+    return {symbol: a.symbol, name: a.name, type: a.type, sector: a.type === 'EQUITY' ? 'Unclassified' : null, category: 'Unclassified', mcap: null, ret: {}, date: null, source: 'Yahoo Finance search via the public instrument relay (' + (a.exchange || 'US') + ')'};
+  }
+  const compareHash = ids => W.encodeHash({s: [...new Set(ids)].slice(0, 6).map(id => ({id})), r: '6m', m: ids.length > 1 ? 'pct' : 'raw'});
+  function roomStore() {
+    // Rebuilt per save so newly pinned fund identities are part of the validation universe.
+    const p = Promise.all(['chat/universe.js', 'chat/dashboard.js'].map(loadAsset)).then(() => root.SmartOptionsDashboardSpec.createStore(root.localStorage, root.SmartOptionsInstruments.roomUniverse(root.SmartOptionsUniverse.rows.map(r => r[0])), (st, stage, detail) => console.warn('[rooms ' + st + '] ' + detail)));
+    return p;
+  }
+  // Explicit save: typed create_room, no AI call. Room widgets are company-shaped, so funds are refused honestly.
+  // Funds are pinned to the device identity store first (readback-verified), then the typed room is created.
+  // Fund rooms get price, history and news widgets; company case/events/sensitivity apply only to companies.
+  function saveRoom(ids, opts) {
+    const I = root.SmartOptionsInstruments, ts = [...new Set(ids.map(t => I.symbol(t)))].filter(Boolean);
+    if (!ts.length) return {ok: false, error: 'Select at least one asset.'};
+    if (ts.length > 4) return {ok: false, error: 'A room holds up to four assets. Remove ' + (ts.length - 4) + '.'};
+    const unknown = ts.filter(t => !row(t) && !I.get(t));
+    if (unknown.length) return {ok: false, error: `${unknown.join(', ')} has no validated identity on this device yet; open it from search first.`};
+    try { ts.filter(t => !row(t)).forEach(t => I.pin(I.get(t))); } catch (e) { return {ok: false, error: 'Room not saved: ' + e.message}; }
+    const name = ts.join(' · ') + ' ' + new Date().toISOString().slice(5, 16).replace('T', ' ');
+    const out = {ok: true, name, pending: roomStore().then(st => st.execute({schema: 'smartoptions.dashboard-action.v1', action: 'create_room', name, assets: ts, ...(opts?.focus ? {focus: opts.focus} : {})}))};
+    out.pending.catch(e => { const n = doc.querySelector('.mk-tray-note,.mk-insp-note'); if (n) n.textContent = 'Room not saved: ' + e.message; });
+    return out;
+  }
+  function roomAssets() { try { const d = JSON.parse(root.localStorage.getItem('so-brief-dashboards-v1') || 'null'); return [...new Set((d?.layouts || []).flatMap(l => l.assets || (l.widgets || []).flatMap(w => w.tickers || [])))]; } catch (e) { return []; } }
+  function marketServices() { return {core: () => S.core, rel: () => S.rel, Live, row, history: historyFor, identify, saved: () => WL().get(), roomAssets, saveRoom, compareHash, paintFocus, followTrend: t => followEvidence({dataset: {followTrend: t}}).catch(focusError), navigate: h => { root.location.hash = h; }}; }
+  function renderMarkets(main, query, sector) {
+    main.innerHTML = '<div class="page-head"><h1 class="page-label">Markets</h1><p class="dim small">Grid research over the published universe. <a href="#/companies">Screener with shortlist and saved modes</a></p></div><div id="mk-root"></div>';
+    // Markets code loads on first visit only; Today's startup path does not carry it.
+    const el = $('#mk-root'), gen = S.exToken;
+    loadAsset('markets.js').then(() => {
+      if (!el.isConnected || S.exToken !== gen) return;
+      const M = root.SmartOptionsMarkets;
+      if (sector) root.history.replaceState(root.history.state, '', M.encodeState({...M.parseState(query), sec: sector}));
+      S.mod = M.mount(el, marketServices(), {query: query || ''});
+    }).catch(e => { if (el.isConnected) el.innerHTML = `<p role="alert">Markets could not load: ${esc(e.message)}. <button type="button" onclick="location.reload()">Reload</button></p>`; });
+  }
+  /* Workspace: one tool rail; every tool receives the selected asset and the same accepted core. */
+  const TOOLS = [['compare', 'Compare', '#/explore'], ['strategies', 'Strategies and income'], ['technicals', 'Technicals'], ['flows', 'Flows'], ['risk', 'Risk scenarios'], ['rooms', 'Saved rooms', '#/room'], ['positions', 'Positions and imports', '#/positions'], ['methods', 'Methods and audit']];
+  const TOOL_TABS = {strategies: [['builder', 'Strategy builder'], ['pocket', 'Options income'], ['income', 'Event and IV check']], technicals: [['indicators', 'Indicators'], ['patterns', 'Patterns'], ['scan', 'Pattern scanner'], ['confidence', 'Agreement score']], flows: [['guide', 'Daily review'], ['checklists', 'Checklists'], ['capital', 'Capital and news'], ['alpha', 'Company comparisons'], ['scanner', 'Residual scanner']], risk: [['stress', 'Portfolio scenarios'], ['shocks', 'Shock scenarios'], ['cycle', 'Macro cycle'], ['joint', 'Joint what-if']], methods: [['methods', 'Methods'], ['audit', 'Formula audit'], ['sources', 'Data and sources']]};
+  const toolHref = (id, t) => { const x = TOOLS.find(x => x[0] === id); return x && x[2] ? x[2] : '#/workspace/' + id + (t ? '?t=' + encodeURIComponent(t) : ''); };
+  function wsRail(active, t) {
+    const el = doc.createElement('nav'); el.className = 'ws-rail'; el.setAttribute('aria-label', 'Workspace tools');
+    el.innerHTML = `<label class="ws-pick"><span>Tool</span><select data-ws-tool>${TOOLS.map(([id, label]) => `<option value="${id}"${id === active ? ' selected' : ''}>${esc(label)}</option>`).join('')}</select></label><ul>${TOOLS.map(([id, label]) => `<li><a href="${esc(toolHref(id, t))}"${id === active ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`).join('')}</ul>`;
+    el.querySelector('[data-ws-tool]').onchange = e => { root.location.hash = toolHref(e.target.value, t); };
+    return el;
+  }
+  // Legacy calculation modules read a narrow facade over the SAME accepted core; SO2_ready is never set, so no legacy boot runs.
+  // Legacy shock/settings live in so2-settings. Only .shock is written back; other fields and unreadable bytes are kept.
+  const SHOCK0 = {spy: 0, us10y_bps: 0, dxy: 0, wti: 0, vix: 0};
+  const legacySettings = (() => { let blocked = false, obj = {shock: {...SHOCK0}}; try { const raw = root.localStorage.getItem('so2-settings'); if (raw != null) { const p = JSON.parse(raw); if (!p || typeof p !== 'object' || Array.isArray(p)) throw Error('shape'); obj = p; obj.shock = {...SHOCK0, ...(p.shock && typeof p.shock === 'object' ? p.shock : {})}; } } catch (e) { blocked = true; }
+    return {get: () => obj, blocked: () => blocked, save() { if (blocked) return false; try { const raw = JSON.stringify(obj); root.localStorage.setItem('so2-settings', raw); return root.localStorage.getItem('so2-settings') === raw; } catch (e) { return false; } }}; })();
+  // Legacy navigation verbs translate to main-owned routes; legacy hash writes never run.
+  function legacyNav(target, sym) {
+    const map = {markets: sym ? '#/markets?sel=' + encodeURIComponent(sym) : '#/markets', macro: '#/macro', flow: '#/workspace/flows?tab=guide', patterns: '#/workspace/technicals?tab=scan', overview: '#/positions', strategies: '#/workspace/strategies' + (sym ? '?t=' + encodeURIComponent(sym) : ''), cycles: '#/workspace/risk?tab=cycle', edge: '#/workspace/strategies?tab=pocket'};
+    root.location.hash = map[target] || '#/workspace';
+  }
+  function legacyApi() { let pendingSym = null; const api = {__mainFacade: true, D: () => S.core, S: () => legacySettings.get(), save: () => legacySettings.save(), renderTable() {}, renderAll() {}, V: {}, FACTORS: Object.keys(FACTORS),
+    select(kind, id) { if (kind === 't') legacyNav('markets', id); else legacyNav('markets'); }, showTab(t) { legacyNav(t, pendingSym); }}; return api; }
+  function legacyFacade() { const cur = root.SO2; if (cur && !cur.__mainFacade) return; root.SO2 = legacyApi();
+    // Narrow importer facade over the canonical shared book (same key/readback guards as Positions); legacy import.js is not booted.
+    if (!root.SmartOptionsImport && root.SmartOptionsLocalData?.sharedStore) { const st = root.SmartOptionsLocalData.sharedStore(root.localStorage); root.SmartOptionsImport = {__mainFacade: true, getData: () => { st.reload(); return st.get(); }, putData: v => { const r = st.put(v); root.dispatchEvent(new Event('so:investor')); return r; }, status: () => st.status()}; }
+    root.SmartOptionsAPI = Object.assign(root.SmartOptionsAPI || {}, {open_ticker_tab: (t, tab) => { root.location.hash = tab === 'strategies' ? '#/workspace/strategies?t=' + encodeURIComponent(t) : '#/company/' + encodeURIComponent(t); }, apply_preset: id => { root.location.hash = '#/markets?u=sp&v=list&preset=' + encodeURIComponent(String(id || 'all')); return {preset: id}; }}); }
+  function wsAsset(query) { const p = new URLSearchParams(query || ''), t = String(p.get('t') || '').toUpperCase(); if (/^[A-Z][A-Z0-9.\-]{0,9}$/.test(t)) S.wsLast = t; return S.wsLast || (S.brief.shortlist || [])[0]?.t || 'AAPL'; }
+  async function renderWorkspace(main, tool, query) {
+    if (!tool) tool = S.wsTool || 'compare';
+    const meta = TOOLS.find(x => x[0] === tool); if (!meta) { main.innerHTML = '<p>Unknown tool. Choose one from the list.</p>'; main.prepend(wsRail('', '')); return; }
+    if (meta[2]) { root.history.replaceState(root.history.state, '', meta[2]); return render(); }
+    S.wsTool = tool;
+    const p = new URLSearchParams(query || ''), t = wsAsset(query), tabs = TOOL_TABS[tool] || [], tab = tabs.find(x => x[0] === p.get('tab'))?.[0] || tabs[0]?.[0], r = row(t);
+    main.innerHTML = `<div class="ws"><div class="ws-body"><header class="ws-head"><h1 class="page-label">${esc(meta[1])}</h1>
+      <form class="ws-asset" data-ws-asset><label>Asset <input name="t" value="${esc(t)}" maxlength="10" autocomplete="off" spellcheck="false" aria-describedby="ws-asset-note"></label><button type="submit">Use</button><span id="ws-asset-note" class="dim small">${r ? esc(r.n) + ' · ' + esc(r.sec) : root.SmartOptionsInstruments?.get(t) ? esc(root.SmartOptionsInstruments.get(t).name) + ' · ' + esc(root.SmartOptionsInstruments.get(t).type === 'ETF' ? 'ETF' : 'stock') : 'no validated identity yet; find it with Search'}</span></form>
+      ${tabs.length ? `<div class="ws-tabs" role="tablist">${tabs.map(([id, label]) => `<a role="tab" href="#/workspace/${tool}?t=${encodeURIComponent(t)}&tab=${id}" aria-selected="${id === tab}">${esc(label)}</a>`).join('')}</div>` : ''}</header><div id="ws-panel" class="ws-panel"><p class="dim">Loading…</p></div></div></div>`;
+    main.querySelector('.ws').prepend(wsRail(tool, t));
+    main.querySelector('[data-ws-asset]').onsubmit = e => { e.preventDefault(); const v = String(new FormData(e.target).get('t') || '').trim().toUpperCase(); if (v) root.location.hash = '#/workspace/' + tool + '?t=' + encodeURIComponent(v) + (tab ? '&tab=' + tab : ''); };
+    const el = $('#ws-panel'), gen = S.exToken;
+    const live = () => el.isConnected && S.exToken === gen;
+    const fail = e => { if (live()) el.innerHTML = `<p role="alert">This tool could not load: ${esc(e.message)}. <button type="button" data-ws-retry>Retry</button></p>`; const b = el.querySelector('[data-ws-retry]'); if (b) b.onclick = () => render(); };
+    legacyFacade();
+    try {
+      if (tool === 'strategies' && tab === 'builder') {
+        await Promise.all(['strategies.css', 'strategies.js'].map(loadAsset)); if (!live()) return;
+        if (!r) { el.innerHTML = `<p>The strategy builder needs company inputs (IV, realized volatility, events). ${esc(t)} has none in the published data.</p>`; return; }
+        await root.SmartOptionsStrategies.mount(el, t);
+        S.mod = {suspend() { Live.watch('strategy', []); }, resume() { Live.watch('strategy', [t]); }, destroy() { Live.watch('strategy', []); el._stUnsub?.(); }};
+      } else if (['pocket', 'stress', 'audit', 'alpha'].includes(tab)) {
+        await Promise.all(['edge-desk.css', 'edge-desk.js'].map(loadAsset)); if (!live()) return;
+        const pillar = {pocket: 'pocket', stress: 'stress', audit: 'diff', alpha: 'alpha'}[tab];
+        S.mod = root.SmartOptionsEdgeMount.mountIn(el, {api: root.SO2, pillar});
+      } else if (tool === 'strategies') {
+        S.incomeTicker = r ? t : S.incomeTicker; el.innerHTML = `<section id="income">${incomeHtml()}</section>`; $('#income-company').onchange = e => { S.incomeTicker = e.target.value; $('#income-context').innerHTML = incomeContext(); };
+      } else if (tool === 'technicals' && tab === 'indicators') {
+        await Promise.all(['technicals.css', 'technicals.js'].map(loadAsset)); if (!live()) return; await root.SmartOptionsTech.mount(el, t);
+      } else if (tool === 'technicals' && tab === 'scan') {
+        el.innerHTML = patternScanHtml(); S.mod = {destroy: () => { S.patScan?.abort(); }, suspend: () => { S.patScan?.abort(); }, resume() {}};
+      } else if (tool === 'technicals' && tab === 'patterns') {
+        await Promise.all(['patterns.css', 'technicals.js', 'patterns.js'].map(loadAsset)); if (!live()) return;
+        const res = await root.SmartOptionsPatterns.scan(t); if (!live()) return;
+        el.innerHTML = `<h2>${esc(t)} pattern evidence</h2><p class="dim small">${esc(root.SmartOptionsPatterns.SOURCE || 'Daily bars')} · as of ${esc(res.asof || 'unavailable')} · rule detections on past bars, not forecasts.</p><table class="tc-tbl"><thead><tr><th>Pattern</th><th>State</th><th>What the rule saw</th></tr></thead><tbody>${(res.detections || []).map(d => `<tr><td>${esc(d.pattern)}</td><td>${esc(d.state)}</td><td>${esc(d.plain || '')}</td></tr>`).join('') || '<tr><td colspan="3">No detections.</td></tr>'}</tbody></table>`;
+      } else if (tool === 'technicals') {
+        await Promise.all(['technicals.js', 'patterns.js', 'confidence.js'].map(loadAsset)); if (!live()) return;
+        const x = await root.SmartOptionsConfidence.score(t); if (!live()) return; let why = false;
+        const draw = () => { el.innerHTML = `<h2>${esc(t)} agreement score</h2><p class="dim small">Agreement and data quality across technical, pattern, flow and event evidence; not a probability of profit.</p><div class="cf">${root.SmartOptionsConfidence.boxHtml(x, why)}</div>`; };
+        draw(); el.onclick = e => { if (e.target.closest('[data-cf="why"]')) { why = !why; draw(); el.querySelector('[data-cf="why"]')?.focus(); } };
+      } else if (tool === 'flows' && tab === 'guide') {
+        await Promise.all(['flow.css', 'strategies.js', 'flow.js'].map(loadAsset)); if (!live()) return;
+        S.mod = root.SmartOptionsFlowMount.mountIn(el, {api: root.SO2});
+      } else if (tool === 'flows' && tab === 'checklists') {
+        el.innerHTML = checklistHtml(); S.mod = null;
+      } else if (tool === 'flows' && tab === 'capital') {
+        await Promise.all(['money-flow.css', 'news.js', 'money-flow.js'].map(loadAsset)); if (!live()) return; await root.MoneyFlow.mount(el);
+        S.mod = {suspend: () => root.MoneyFlow.suspend?.(), resume: () => root.MoneyFlow.resume?.(), destroy: () => root.MoneyFlow.destroy?.()};
+      } else if (tool === 'flows') {
+        el.innerHTML = scannerHtml();
+      } else if (tool === 'risk' && tab === 'shocks') {
+        await Promise.all(['shocks.css', 'shocks.js'].map(loadAsset)); if (!live()) return; await root.SmartOptionsShocks.mount(el, r ? 'company' : 'grid', r ? t : undefined);
+      } else if (tool === 'risk' && tab === 'cycle') {
+        await loadAsset('cycles.js'); if (!live()) return; const C = root.SmartOptionsCycles, redraw = () => { el.innerHTML = C.html(C.state(S.core, C.loadTh())); };
+        redraw(); el.onclick = e => { const b = e.target.closest('[data-cy]'); if (!b) return; C.ui(b.dataset.cy); redraw(); el.querySelector(`[data-cy="${b.dataset.cy}"]`)?.focus(); };
+        el.onchange = e => { const x = e.target; if (x.dataset.cyth) { const th = C.loadTh(), v = parseFloat(x.value); if (isFinite(v)) { th[x.dataset.cyth] = v; C.saveTh(th); } redraw(); } };
+      } else if (tool === 'risk') {
+        el.innerHTML = `<p>The joint what-if applies the published dated joint regression to chosen changes. It stays off until you choose <b>Test a scenario</b> below the Compare chart; Reset closes it and the observed series are never altered.</p><p><a class="go" href="${esc(W.encodeHash({s: [{id: 'eq:' + (r ? t : 'SPY')}], r: '1y', m: 'raw'}))}">Open ${esc(r ? t : 'SPY')} in Compare</a></p>`;
+      } else if (tool === 'methods' && tab === 'sources') {
+        const ev = evidence({kind: 'today', id: 'trust'}); el.innerHTML = `<h2>${esc(ev.title)}</h2>${ev.html}`;
+      } else {
+        const m = S.core.methods || {}; el.innerHTML = `<h2>Methods</h2>${Object.entries(m).map(([k, v]) => `<details><summary>${esc(k.replace(/_/g, ' '))}</summary><p>${esc(typeof v === 'string' ? v : JSON.stringify(v))}</p></details>`).join('')}<details><summary>Historical score definitions</summary><pre class="small">${esc(S.core.docs?.score_defs ? JSON.stringify(S.core.docs.score_defs, null, 1) : 'unavailable')}</pre></details>`;
+      }
+    } catch (e) { fail(e); }
+  }
+  // Four review checklists (legacy WORKFLOWS) with native step targets; ticks persist per New York date on this device.
+  const CHECKLISTS = [
+    {id: 'morning', h: 'Morning macro check', steps: [['Market posture and developing situation', '#/'], ['10-year yield and VIX change', '#/macro'], ['Stale or failed macro sources', '#/workspace/methods?tab=sources'], ['Next scheduled release', '#/macro'], ['Sector map 1D', '#/markets?p=1D']]},
+    {id: 'csp', h: 'Cash-secured put review', steps: [['Company case and valuation', '#/markets?u=sp&v=list&preset=garpmacro'], ['Earnings date versus expiry', '#/markets?u=sp&v=list&preset=earn7'], ['IV versus realized volatility', '#/markets?u=sp&v=list&preset=volrich'], ['Payoff and assignment in the strategy builder', '#/workspace/strategies?tab=builder'], ['Income goal against assignment odds', '#/workspace/strategies?tab=pocket']]},
+    {id: 'earnings', h: 'Earnings week', steps: [['Companies reporting within 7 days', '#/markets?u=sp&v=list&preset=earn7'], ['Implied move context', '#/workspace/strategies?tab=income'], ['Followed names with events', '#/'], ['Pattern state into the report', '#/workspace/technicals?tab=patterns']]},
+    {id: 'rates', h: 'Rate-shock review', steps: [['Rate-sensitive companies', '#/markets?u=sp&v=list&preset=rate'], ['Portfolio scenario with a +25bp shock', '#/workspace/risk?tab=stress'], ['Shock scenario evidence', '#/workspace/risk?tab=shocks'], ['Macro cycle phase', '#/workspace/risk?tab=cycle']]}];
+  const CHK_KEY = 'so-workflow-checks-v1';
+  function readChecks() { try { const raw = root.localStorage.getItem(CHK_KEY); if (raw == null) return {ok: true, v: {}}; const v = JSON.parse(raw); if (!v || typeof v !== 'object' || Array.isArray(v)) throw Error('shape'); return {ok: true, v}; } catch (e) { return {ok: false, v: {}}; } }
+  function checklistHtml() {
+    const day = new Date().toLocaleDateString('en-CA', {timeZone: 'America/New_York'}), c = readChecks(), done = c.v[day] || {};
+    return `<h2>Review checklists</h2><p class="dim small">Ticks are saved on this device for ${esc(day)} (New York date) and reset each day. Each step opens the native tool.${c.ok ? '' : ' <b>Saved checklist data could not be read; it was kept unchanged and ticks will not be saved.</b>'}</p>${CHECKLISTS.map(w => `<section class="chk" data-chk-wf="${w.id}"><h3>${esc(w.h)} <span class="dim small">${w.steps.filter((x, i) => done[w.id + ':' + i]).length}/${w.steps.length}</span></h3><ul>${w.steps.map(([label, href], i) => `<li><label><input type="checkbox" data-chk="${w.id}:${i}" ${done[w.id + ':' + i] ? 'checked' : ''} ${c.ok ? '' : 'disabled'}> ${esc(label)}</label> <a href="${esc(href)}">Open</a></li>`).join('')}</ul></section>`).join('')}`;
+  }
+  doc.addEventListener('change', e => { const k = e.target.dataset?.chk; if (!k) return; const c = readChecks(); if (!c.ok) return; const day = new Date().toLocaleDateString('en-CA', {timeZone: 'America/New_York'}), v = c.v; v[day] = {...(v[day] || {}), [k]: e.target.checked}; Object.keys(v).sort().slice(0, -14).forEach(d => delete v[d]); try { root.localStorage.setItem(CHK_KEY, JSON.stringify(v)); } catch (er) { e.target.checked = !e.target.checked; } const h = e.target.closest('.chk')?.querySelector('h3 span'); if (h) { const wf = CHECKLISTS.find(w => w.id === e.target.closest('.chk').dataset.chkWf); h.textContent = wf.steps.filter((x, i) => v[day][wf.id + ':' + i]).length + '/' + wf.steps.length; } });
+  // Universe pattern scan: only on explicit request, two histories at a time, cancellable, results kept per generation.
+  function patternScanHtml() {
+    const r = S.patResult;
+    return `<h2>Pattern scanner</h2><p class="dim small">Runs the published rule detectors over every covered company's daily bars (${S.core.rows.filter(x => x.sp500_member !== false).length} histories, two at a time). Starts only when you ask; leaving the tool cancels it. Rule detections on past bars, not forecasts.</p><p><button type="button" class="btn" data-pat="start" ${S.patScan ? 'disabled' : ''}>Scan covered companies</button> <button type="button" class="btn" data-pat="stop" ${S.patScan ? '' : 'disabled'}>Cancel</button> <span id="pat-prog" role="status">${r ? `${r.done}/${r.total} scanned${r.cancelled ? ' (cancelled)' : ''}${r.failed ? ` · ${r.failed} histories unavailable` : ''}` : ''}</span></p>${r && r.hits.length ? `<div class="tablewrap"><table class="mk-list"><thead><tr><th>Company</th><th>Confirmed patterns</th><th>As of</th></tr></thead><tbody>${r.hits.slice(0, 200).map(h => `<tr><td><a href="#/workspace/technicals?t=${esc(h.t)}&tab=patterns"><b>${esc(h.t)}</b></a></td><td>${esc(h.confirmed.join(', '))}</td><td>${esc(h.asof || '')}</td></tr>`).join('')}</tbody></table></div>` : r ? '<p>No confirmed patterns in the scanned histories.</p>' : ''}`;
+  }
+  async function runPatternScan() {
+    await Promise.all(['technicals.js', 'patterns.js'].map(loadAsset));
+    const P = root.SmartOptionsPatterns, ts = S.core.rows.filter(x => x.sp500_member !== false).map(x => x.t), job = {aborted: false, abort() { this.aborted = true; }}, res = {done: 0, total: ts.length, failed: 0, hits: [], gen: S.generation || 0};
+    S.patScan = job; S.patResult = res; const paint = () => { const p = $('#ws-panel'); if (p && S.view === 'workspace') p.innerHTML = patternScanHtml(); };
+    paint(); let i = 0;
+    const worker = async () => { while (!job.aborted && i < ts.length) { const t = ts[i++]; try { const x = await P.scan(t); const c = (x.detections || []).filter(d => d.state === 'confirmed').map(d => d.pattern); if (c.length) res.hits.push({t, confirmed: c, asof: x.asof}); } catch (e) { res.failed++; } res.done++; if (res.done % 10 === 0) paint(); } };
+    await Promise.all([worker(), worker()]);
+    res.cancelled = job.aborted; res.hits.sort((a, b) => b.confirmed.length - a.confirmed.length || a.t.localeCompare(b.t)); if (S.patScan === job) S.patScan = null; paint();
+  }
+  doc.addEventListener('click', e => { const b = e.target.closest('[data-pat]'); if (!b) return; if (b.dataset.pat === 'start' && !S.patScan) runPatternScan().catch(er => { S.patScan = null; const p = $('#pat-prog'); if (p) p.textContent = 'Scan could not start: ' + er.message; }); if (b.dataset.pat === 'stop') { S.patScan?.abort(); } });
+  // Edge scanner rows from the same accepted core: residual moves, IV/RV and 60d-vs-252d beta shifts. Measured columns only.
+  function scannerHtml() {
+    const rows = S.core.rows.filter(r => r.sp500_member !== false && r.pxd === S.core.asof_session), sort = S.scanSort || 'res20d';
+    const xs = rows.filter(r => isNum(r[sort])).sort((a, b) => Math.abs(b[sort]) - Math.abs(a[sort])).slice(0, 40);
+    const cols = [['res1d', 'Residual 1d'], ['res5d', 'Residual 5d'], ['res20d', 'Residual 20d'], ['ivrv_eff', 'IV/RV'], ['pef_sec_rel', 'Fwd P/E vs sector']];
+    return `<h2>Edge scanner</h2><p class="dim small">Completed session ${esc(S.core.asof_session)} · residual = return not explained by the published factor fit (percent); largest absolute values first. Measured screens, not recommendations.</p><div class="mk-seg" role="group" aria-label="Scanner column">${cols.map(([k, l]) => `<button type="button" data-scan="${k}" aria-pressed="${k === sort}">${l}</button>`).join('')}</div><div class="tablewrap"><table class="mk-list"><thead><tr><th>Company</th>${cols.map(([, l]) => `<th class="n">${l}</th>`).join('')}</tr></thead><tbody>${xs.map(r => `<tr><td><a href="#/markets?sel=${esc(r.t)}"><b>${esc(r.t)}</b></a> <span class="dim small">${esc(r.sec)}</span></td>${cols.map(([k]) => `<td class="n">${isNum(r[k]) ? (k.startsWith('res') ? pct(r[k]) : r[k].toFixed(2)) : '<span class="dim">n/a</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="dim small">${xs.length} of ${rows.length} matched-session names have ${esc(cols.find(c => c[0] === sort)[1])}.</p>`;
+  }
+  /* Automatic developing situation: loaded after the core reading draws; patches only its own slot. */
+  function situationBaseline() { const c = sessionComparison(S.brief, S.core, 'spy_1d'); return {session: S.brief.asof_session, spy_1d: c.available ? c.pct : null, posture: todayModel(S.brief, S.core).label}; }
+  function sitExposure(kind) {
+    if (!kind) return null;
+    if (kind === 'equity') return {text: 'broad US equities (SPY and the sector map)', basis: 'index futures map to the broad equity market'};
+    const f = {wti: 'wti', dxy: 'dxy', vix: 'vix'}[kind]; if (!f) return null;
+    const xs = sectorSensitivity(S.core.rows, f); if (!xs.length) return null;
+    const hi = xs[xs.length - 1], lo = xs[0], w = S.core.rel?.window;
+    return {text: `${hi.sector} (most positive) and ${lo.sector} (most negative) by fitted ${FACTORS[f]?.name || f} sensitivity`, basis: `median member coefficient, dated OLS window ${w ? JSON.stringify(w) : 'as published'}; association, not a forecast`};
+  }
+  function situationModelNow() {
+    const SIT = root.SmartOptionsSituation; if (!SIT) return null;
+    const snap = S.sitCtl?.get(), h = horizonEvents(1);
+    return SIT.situationModel(situationBaseline(), snap, Date.now(), {exposure: sitExposure, entered: enteredNames(), events: (h.items || []).filter(e => e.kind === 'macro').map(e => ({title: e.title, when: e.when, importance: e.importance, major: e.major}))});
+  }
+  function situationHtml() {
+    const SIT = root.SmartOptionsSituation, chk = S.sitCtl?.lastCheck();
+    if (!SIT || !S.sitCtl) return '';
+    if (!S.sitCtl.get()) return chk ? `<p class="dev-none" data-sit-state="unavailable"><span class="lbl">Developing now</span> Current developments could not be checked (${esc(chk.errors[0] || 'no situation file')}). The completed-session reading below still applies. <button type="button" class="text" data-sit-retry>Check again</button></p>` : '<p class="dev-none dim" data-sit-state="pending"><span class="lbl">Developing now</span> Checking current developments…</p>';
+    const m = situationModelNow(), checkFailed = chk?.ok === false; S.sitModel = m;
+    const clocks = `<p class="dim small dev-clock">As of ${esc(SIT.clock(m.generated_at))}${S.sitCtl.get()?.live ? ' · shared live check (scheduled file was stale)' : ''}${m.stale ? ' · <b>not updated for over two hours</b>' : ''}${m.degraded ? ` · <b>market: ${esc(m.marketStatus)}; reporting: ${esc(m.newsStatus)}</b>; retained evidence keeps its own clocks` : ''}${m.joinNote ? ' · ' + esc(m.joinNote) : ''}${checkFailed ? ' · <b>Latest current-context check failed; showing last good evidence</b>' : ''} ${evBtn({kind: 'situation', id: m.top[0]?.id || 'all'}, 'Evidence and sources', 'text')}</p>`;
+    if (m.state === 'unavailable') return `<p class="dev-none" data-sit-state="unavailable">${esc(m.reason)} ${evBtn({kind: 'situation', id: 'all'}, 'Evidence and sources', 'text')}</p>`;
+    if (!m.top.length) {
+      const old = m.retainedOld.map(x => `${x.label} last observed ${SIT.clock(x.observed_at)}`).slice(0, 2).join('; ');
+      return `<div class="dev" data-sit-state="${checkFailed && !m.stale ? 'degraded' : m.state}"><p><span class="lbl">Developing now</span> ${m.degraded || checkFailed ? 'Current developments were only partly checked; see source status.' : 'No newer measured move crossed a materiality rule and no fresh original report qualified.'}${old ? ' ' + esc(old) + '.' : ''} ${evBtn({kind: 'situation', id: 'all'}, 'What was checked', 'text')}</p>${clocks}</div>`;
+    }
+    // At most two facts, one implication each; values, clocks, bases and next checks live in the evidence sheet.
+    return `<div class="dev" data-sit-state="${checkFailed && !m.stale ? 'degraded' : m.state}" data-sit-fp="${esc(m.fingerprint)}"><h2 class="dev-h">Developing now</h2><ul class="dev-list">${m.top.map(d => `<li data-dev="${esc(d.id)}" data-dev-kind="${d.kind}"><p class="dev-fact"><b>${esc(d.brief || d.measured || d.reported)}</b>${d.kind === 'reported' ? ' <span class="small dim">(reported)</span>' : ''}${d.conflict ? ' <span class="tag warn">conflicting reports</span>' : ''}</p><p class="dev-meaning">${esc(d.interpretation)}</p></li>`).join('')}</ul>${clocks}</div>`;
+  }
+  // Newer developments replace up to two baseline reasons (never below two), so the reading does not grow.
+  function trimReasons() { const n = Math.min(2, S.sitModel?.top?.length || 0), lis = [...doc.querySelectorAll('.market-reasons > li')]; lis.forEach((li, i) => { li.hidden = i >= Math.max(2, lis.length - n); }); }
+  function paintSituation() { const el = $('#situation'); if (!el) return; const y = root.scrollY, f = doc.activeElement, fk = f && el.contains(f) ? f.dataset.ev : null; el.innerHTML = situationHtml(); trimReasons(); if (fk) el.querySelector(`[data-ev='${fk}']`)?.focus({preventScroll: true}); root.scrollTo(0, y); }
+  function situationEvidence(ev) {
+    const m = situationModelNow(), SIT = root.SmartOptionsSituation;
+    if (!m || !m.measures) return {title: 'Developing situation', html: '<p>Current developments could not be checked; no situation file was available.</p>'};
+    const d = m.developments.find(x => x.id === ev.id), imp = m.implications;
+    const obsRows = m.measures.map(x => `<tr><td>${esc(x.label || x.symbol)}${x.valid ? `<br><button type="button" class="text" data-follow-reference="${esc(x.symbol)}">Follow this observation</button>` : ''}</td><td class="n">${x.valid ? esc(x.value) : 'n/a'}</td><td>${x.valid ? esc(SIT.clock(x.observed_at)) + (x.newer ? '' : ' <b>(not newer than the completed session)</b>') + (x.carried ? ' · retained from an earlier run' : '') : esc(x.reason)}</td><td>${x.valid ? esc(x.comparison.value) + ' · ' + esc(x.comparison.date) + ' · ' + esc(x.comparison.basis) : ''}</td><td class="n">${x.valid ? (x.kind === 'volatility_index' ? (x.change >= 0 ? '+' : '−') + Math.abs(x.change).toFixed(2) + ' pts' : pct(x.pct)) : ''}</td></tr>`).join('');
+    const reps = (d && d.reports || m.reports.slice(0, 8)).map(r => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.headline)}</a> <span class="small dim">${esc(r.source)} · published ${esc(SIT.clock(r.published_at))} · ${r.headline_only ? 'headline only, article not read' : 'excerpt supplied'} · topic “${esc(r.topic || 'unclassified')}” · ${esc(r.match_reason || 'selected by recency and source')}</span> <button type="button" class="text" data-follow-report="${esc(r.id)}">Follow this report</button>${(r.conflicts || []).length ? ' <span class="tag warn">conflicts with ' + esc(r.conflicts.join(', ')) + '</span>' : ''}</li>`).join('');
+    const srcs = Object.entries(m.sources || {}).map(([k, v]) => `<li>${esc(k)}: ${esc(v.status)}${v.calls != null ? ' · ' + esc(v.calls) + ' calls' : ''}${v.at ? ' · ' + esc(SIT.clock(v.at)) : ''}${v.error ? ' · ' + esc(v.error) : ''}</li>`).join('');
+    return {title: d ? 'Developing: ' + (d.topic || d.inputs?.[0]?.label || d.id) : 'Developing situation · what was checked', html: `${d ? `<p class="lead">${esc(d.measured || d.reported)}</p><p>${esc(d.interpretation)}</p><p class="small">Rule <b>${esc(d.rule)}</b> (${esc(d.threshold)}) · fingerprint ${esc(d.fingerprint)} · rules ${esc(m.version)}. Thresholds decide what is shown; they are not forecasts.</p>${d.exposure ? `<p><b>Relevant exposure:</b> ${esc(d.exposure.text)} <span class="small dim">(${esc(d.exposure.basis)})</span></p>` : ''}` : ''}
+      ${imp ? `<h3>Conditional implications</h3><ul><li><b>Protect:</b> ${esc(imp.protect)}</li><li><b>Income:</b> ${esc(imp.income)}</li><li><b>Growth:</b> ${esc(imp.growth)}</li><li><b>Watch:</b> ${esc(imp.watch)}</li></ul>` : ''}
+      <h3>Observations and comparison bases</h3><div class="tablewrap"><table><thead><tr><th>Reference</th><th class="n">Value</th><th>Observed</th><th>Compared with</th><th class="n">Change</th></tr></thead><tbody>${obsRows || '<tr><td colspan="5">No observations in this file.</td></tr>'}</tbody></table></div><p class="small dim">Futures are compared with their last completed provider daily bar, not an official settlement. A Sunday read of a Friday VIX is still Friday's VIX. No equity breadth or heatmap value is updated from futures.</p>
+      <h3>Reported context</h3><ul>${reps || '<li>No fresh original reports qualified in this collection. That is a coverage gap, not a quiet market.</li>'}</ul><p class="small dim">Reports are context. No price move is attributed to a headline.${m.synthesis ? ' Synthesis: ' + esc(m.synthesis.status) + (m.synthesis.reason ? ' (' + esc(m.synthesis.reason) + ')' : '') + '.' : ''}</p>
+      <h3>Acquisition</h3><ul>${srcs || '<li>No source receipts.</li>'}</ul><p class="small dim">File generated ${esc(SIT.clock(m.generated_at))}; observation times above are the provider's own. Checking the file does not renew them.</p>`};
+  }
+  function startSituation() {
+    const SIT = root.SmartOptionsSituation; if (!SIT || S.sitCtl) return;
+    const canonical = 'https://soham-porwal.github.io/smartoptions-brief/data/situation.json', urls = ['data/situation.json'].concat(root.location.origin === 'https://soham-porwal.github.io' && root.location.pathname.startsWith('/smartoptions-brief/') ? [] : [canonical]);
+    // Live recovery URL comes from the existing relay origin in config; only consulted when static files are stale.
+    const go = liveUrl => { S.sitCtl = SIT.controller({urls, liveUrl, onChange: () => { if (S.view === 'brief') paintSituation(); }}); syncSituation(); };
+    S.sitCtl = {get: () => null, lastCheck: () => null, check() {}};
+    fetch('data/config.json', {cache: 'no-cache', signal: AbortSignal.timeout(5000)}).then(r => r.ok ? r.json() : null).then(c => { let u = null; try { const b = new URL(c?.quotes_proxy_url || ''); if (b.protocol === 'https:' && !b.username && !b.password) u = b.origin + '/situation/live'; } catch (e) { u = null; } go(u); }, () => go(null));
+  }
+  function syncSituation() {
+    if (S.view === 'brief') { S.sitCtl?.start?.(); if (S.sitCtl?.get()) paintSituation(); }
+    else S.sitCtl?.stop?.();
+  }
+
+  // Optional investigation: one in-memory focus, explicitly persisted only through the existing typed room store.
+  // Public evidence stays separate from hypothetical factor assumptions and from private position/room text.
+  function focusError(e) {
+    console.warn('[investigation] action failed', e.message);
+    let n = doc.querySelector('[data-focus-status]');
+    if (!n) { n = doc.createElement('p'); n.dataset.focusStatus = ''; n.setAttribute('role', 'status'); $('#view').prepend(n); }
+    n.textContent = 'Investigation not changed: ' + e.message;
+  }
+  async function followFocus(value) {
+    await roomStore();
+    S.focus = root.SmartOptionsDashboardSpec.focusContext(value, root.SmartOptionsInstruments.roomUniverse(S.core.rows.map(r => r.t)));
+    closeSheet(); paintFocus(true);
+  }
+  API.followFocus = followFocus;
+  API.focus = () => S.focus || null;
+  async function followEvidence(button) {
+    const data = button.dataset, clean = s => String(s || '').replace(/[<>{}\x00-\x1f]/g, ' ').slice(0, 300);
+    let value;
+    if (data.followTrend) {
+      const t = data.followTrend, r = row(t), a = root.SmartOptionsInstruments.get(t);
+      if (!r && !a) throw Error('No validated instrument identity.');
+      const history = r ? null : await historyFor(t), date = r?.pxd || history?.bars?.at(-1)?.[0];
+      if (!date) throw Error('A dated history is required before following this instrument.');
+      value = {id: 'trend:' + t + ':' + date, kind: 'observed', label: clean(`${t}: ${isNum(r?.d1) ? pct(r.d1) + ' completed-session price return' : 'price/history investigation; no company fit assumed'}`), at: date, source: history?.source || 'Published daily price history', assets: [t]};
+    } else if (data.followReport) {
+      const r = S.sitCtl?.get()?.reports.find(r => r.id === data.followReport);
+      if (!r) throw Error('The report is no longer in the current source collection.');
+      value = {id: 'report:' + r.id, kind: 'reported', label: clean(r.headline), at: r.published_at, source: r.source, source_url: r.url, assets: (r.tickers || []).filter(t => row(t) || root.SmartOptionsInstruments.get(t)).slice(0, 4)};
+    } else {
+      const r = S.sitCtl?.get()?.observations.find(r => r.symbol === data.followReference);
+      if (!r) throw Error('The observation is no longer in the source collection.');
+      value = {id: 'observation:' + r.symbol + ':' + r.observed_at, kind: 'observed', label: clean(`${r.label}: ${r.value} ${r.unit}, compared with ${r.comparison.value} on ${r.comparison.date}`), at: r.observed_at, source: 'Yahoo market reference', source_url: r.source_url, assets: []};
+    }
+    await followFocus(value);
+  }
+  function paintFocus(force = false) {
+    const main = $('#view'), old = main.querySelector('[data-focus-bar]'), c = S.focus, host = main.querySelector('.mk-insp:not([hidden])') || main;
+    if (!c) { old?.remove(); return; }
+    if (old && old.dataset.focusBar === JSON.stringify(c) && !force) { if (old.parentElement !== host) host.prepend(old); return; }
+    old?.remove();
+    const M = root.SmartOptionsDashboardSpec, t = c.assets[0] || '', a = c.assumption, factors = M.SHOCKS, draft = S.focusDraft?.id === c.id ? S.focusDraft : null;
+    const instruments = [...S.core.rows.map(r => [r.t, r.n]), ...root.SmartOptionsInstruments.all().filter(x => !row(x.symbol)).map(x => [x.symbol, x.name])];
+    const n = doc.createElement('section'); n.className = 'investigation'; n.dataset.focusBar = JSON.stringify(c);
+    n.innerHTML = `<div class="focus-chip"><b>Following ${c.kind === 'reported' ? 'a report' : 'an observation'}</b><span>${esc(c.label)}</span><button type="button" class="text" data-focus-clear>Clear focus</button></div><details class="focus-details"><summary>Evidence and conditional impact</summary><p>${esc(c.source)} · ${esc(c.at)}${c.source_url ? ` · <a href="${esc(c.source_url)}" target="_blank" rel="noopener">Original source</a>` : ''}.</p><p>${c.kind === 'reported' ? 'This is attributed reporting; market impact and causality are not established. A proposal is not a completed event.' : 'This is a dated observation, not a continuation forecast.'} Choose a covered asset to investigate; selection does not establish exposure to this source.</p><div class="focus-controls"><label>Asset<select data-focus-asset><option value="">Choose an asset</option>${instruments.map(([id, name]) => `<option value="${esc(id)}"${t === id ? ' selected' : ''}>${esc(id + ' · ' + name)}</option>`).join('')}</select></label><label>Factor<select data-focus-factor>${Object.entries(factors).map(([id, x]) => `<option value="${id}"${(a?.factor || 'us10y_bps') === id ? ' selected' : ''}>${esc(x.label + ' (' + x.unit + ')')}</option>`).join('')}</select></label><label>Hypothetical move<input data-focus-shock type="number" step="any" value="${a?.shock ?? 10}"></label><button type="button" class="btn" data-focus-test>Test this factor move</button></div><div data-focus-result></div><p class="actions"><a class="btn" href="#/markets?u=all${t ? '&sel=' + encodeURIComponent(t) : ''}">Explore in Markets</a> <a class="btn" href="#/workspace/risk${t ? '?t=' + encodeURIComponent(t) : ''}">Risk workspace</a> <button type="button" class="btn" data-focus-save>Save focus as room</button></p><p data-focus-status role="status"></p></details>`;
+    if (host !== main) host.querySelector('.mk-insp-head').after(n); else main.prepend(n);
+    if (draft) { n.querySelector('[data-focus-factor]').value = draft.factor; n.querySelector('[data-focus-shock]').value = draft.shock; }
+    const keepDraft = () => { S.focusDraft = {id: c.id, factor: n.querySelector('[data-focus-factor]').value, shock: n.querySelector('[data-focus-shock]').value}; };
+    n.querySelector('[data-focus-factor]').onchange = keepDraft; n.querySelector('[data-focus-shock]').oninput = keepDraft;
+    const output = () => {
+      const out = n.querySelector('[data-focus-result]');
+      if (!c.assumption) { out.textContent = 'No scenario applied. Observed returns, chart values and holdings remain their own data.'; return; }
+      const x = focusImpact(S.core, c.assets[0], c.assumption.factor, c.assumption.shock);
+      out.innerHTML = x.ok ? `<p data-focus-impact="${esc(x.response_pct)}"><b>Conditional factor contribution: ${pct(x.response_pct)}</b> = ${esc(x.coefficient)} × ${esc(x.shock)}. ${esc(x.unit)}; other fitted factors held fixed.</p><p class="small">${esc(x.ticker)} model: ${esc(x.window)} · n=${x.n} · R²=${esc(x.r2)} · t=${esc(x.t ?? 'unavailable')}. ${isNum(x.t) && Math.abs(x.t) < 2 ? 'Weak sample evidence for this factor. ' : ''}Observed session return: ${pct(x.observed_return_pct)} on ${esc(x.session)}. A one-day historical association, not a price target, forecast or confidence interval. Other drivers and changing relationships can invalidate this reading.</p>` : `<p>${esc(x.reason)}</p>`;
+    };
+    output();
+    n.querySelector('[data-focus-clear]').onclick = () => { S.focus = null; n.remove(); (doc.querySelector('.mk-insp [data-mk-act="follow"]') || $('#gs-toggle'))?.focus({preventScroll: true}); };
+    n.querySelector('[data-focus-asset]').onchange = e => {
+      c.assets = e.target.value ? [e.target.value] : []; n.dataset.focusBar = JSON.stringify(c);
+      const ts = c.assets[0]; n.querySelector('a[href^="#/markets"]').href = '#/markets?u=all' + (ts ? '&sel=' + encodeURIComponent(ts) : '');
+      n.querySelector('a[href^="#/workspace/risk"]').href = '#/workspace/risk' + (ts ? '?t=' + encodeURIComponent(ts) : ''); output();
+    };
+    n.querySelector('[data-focus-test]').onclick = () => { try { c.assumption = M.settings('sensitivity', {factor: n.querySelector('[data-focus-factor]').value, shock: +n.querySelector('[data-focus-shock]').value}); n.dataset.focusBar = JSON.stringify(c); output(); } catch (e) { focusError(e); } };
+    n.querySelector('[data-focus-save]').onclick = async () => {
+      try { const r = saveRoom(c.assets, {focus: c}); if (!r.ok) throw Error(r.error); const saved = await r.pending; if (saved.status !== 'OK') throw Error(saved.text); n.querySelector('[data-focus-status]').innerHTML = 'Focus saved with its source clocks. <a href="#/room">Open saved room</a>'; }
+      catch (e) { focusError(e); }
+    };
   }
 
   /* ------------------------------------------------------------ Market brief */
@@ -850,33 +1203,62 @@
     const h=horizonEvents(S.horizon||7),x=h.items.find(e=>e.kind==='macro'&&e.major===true||e.kind==='earnings'&&e.entered)||h.relevant[0];
     return x?`<span class="lbl">Next</span> <b>${esc(x.title)}</b> <span class="dim">${when(x.when)}</span> <button type="button" class="text" data-jump="my-risk">Upcoming risks →</button>`:`<span class="lbl">Next</span> No listed release in ${h.days} days. ${h.complete?'':'Calendar coverage is incomplete. '}<button type="button" class="text" data-jump="my-risk">Upcoming risks →</button>`;
   }
-  function renderBrief(main,legacy) {
-    const b=S.brief,pos=b.positioning||{},short=(b.shortlist||[]).slice(0,8),model=todayModel(b,S.core),tk=takeaway(model,b),conc=pos.concentration||{},rotation=pos.rotation||{};
-    Live.watch('index',['SPY','RSP']);Live.watch('research',short.map(x=>x.t));Live.watch('company',[]);
-    const gap=changeItem(b,'eq_cap_gap_5d');
-    main.innerHTML=`${legacy?`<p class="note">That view lives in the <a href="backup.html${esc(legacy)}">expanded edition</a>.</p>`:''}
-      <div class="cockpit"><section class="read" id="market" aria-labelledby="read-h"><h1 id="read-h" class="page-label">Today’s market</h1>
-        <p class="trust"><span>${esc(shortDate(model.session))} close · updated ${esc(model.updated)}</span> ${evBtn({kind:'today',id:'trust'},'Data and sources','text')}</p>
-        <div class="opening"><div class="opening-read"><h2 class="headline" data-tone="${postureTone(model)}">${cue(postureTone(model))}<span class="headline-copy">${esc(model.label)}</span></h2>
-          <p class="tk-so"><span class="lbl">So what</span> ${esc(tk.so)} ${evBtn({kind:'today',id:'posture'},'Why','text')}</p>
-          <p class="now-strip">${slot('now',nowSlot)}</p></div>
-        <ul class="market-reasons">${firstReasons(model).map(x=>`<li><button type="button" class="ev reason" data-ev="${evAttr(x.ev)}">${cue(model.signals.find(s=>s.id===x.ev.id)?.tone||'neutral')}<span class="reason-copy">${esc(shortReason(x,b,model))}</span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul></div>
-        </section>
-      <section id="since"><h2>Since previous session</h2><p class="dim small">${esc(model.comparisons[0].x?.prior?.date||'Prior date unavailable')} → ${esc(b.asof_session)}. Five-session and monthly changes remain separate.</p><div class="comparison-grid">${model.comparisons.map(c=>`<article data-comparison="${c.id}"><h3>${CHANGE_NAMES[c.id]}</h3><p class="comparison-value">${esc(comparisonText(c))}</p>${c.available&&(c.x.prior.date!==model.comparisons[0].x?.prior?.date||c.x.current.date!==b.asof_session)?`<p class="small">${esc(c.x.prior.date)} → ${esc(c.x.current.date)}</p>`:''}<p>${esc(comparisonMeaning(c))}</p>${evBtn({kind:'today-change',id:c.id})}</article>`).join('')}</div></section>
-      <section class="next-steps" aria-label="What this means"><nav class="implications" aria-label="What this means">${implicationsHtml(model)}</nav>
-        <p class="next-risk" id="next-risk">${nextRisk()}</p></section>
-      <section><h2>Four signals</h2><div class="assess">${model.signals.map(tile).join('')}</div><details><summary>Detailed macro observations</summary><p><a href="#/macro">Open all eight macro groups, histories and sources</a></p>${(b.macro?.detail||[]).map(d=>`<p><b>${esc(GROUPS[d.group]||d.group)}:</b> ${esc(d.line)}</p>`).join('')}</details></section>
-      <section id="developments"><h2>Recent developments</h2><p class="dim small">Dated developments from market desks, official releases and matched companies. A headline is context to check; it is not a measured cause of any price move.</p><details class="news-depth"><summary>Show dated headlines and their sources</summary><div id="news-list"><p class="dim">Opens on request so the first view stays fast.</p></div></details></section>
-      <section id="positioning"><h2>S&P positioning</h2><p>${esc(model.signals[1].word)}. ${esc(conc.line||'Provider-cap concentration unavailable.')} ${esc(rotation.line||'Leadership unavailable.')}</p><p class="dim small">Provider capitalization is a proxy, not official index contribution. ${gap?.status==='ok'?`RSP minus SPY 20-session price gap ${pp(gap.prior.value)} → ${pp(gap.current.value)}, ${gap.prior.date} → ${gap.current.date} (five sessions apart).`: 'Equal versus cap-weight comparison unavailable.'}</p><p>${evBtn({kind:'today',id:'positioning'})} <a href="${esc(W.encodeHash({s:[{id:'eq:RSP'},{id:'eq:SPY'}],r:'6m',m:'index'}))}">Compare RSP and SPY</a></p>
-        <details class="positioning-depth"><summary>Sector map and movers</summary><div class="map-period" role="group" aria-label="Sector map period">${['1D','1W','1M'].map(p=>`<button data-map-period="${p}" aria-pressed="${(S.heatPeriod||'1D')===p}">${p}</button>`).join('')}</div>${slot('heat',heatSlot)}<p class="dim small">${slot('breadth',breadthSlot)}</p>${moversHtml()}</details></section>
-      <section><h2>What does this mean for me today?</h2><p class="dim small">Investigation conditions, not a personal recommendation.</p><div id="objectives" class="objective-grid">${objectivesHtml()}</div></section>
-      <section id="my-risk"><h2>My risk</h2><p>Equities entered: ${enteredNames().length} · companies followed: ${WL().get().length}. Options positions are not covered.</p><h3 id="ahead-h">Upcoming risks</h3><div id="ahead">${aheadHtml()}</div><section id="for-you" class="for-you" aria-label="For you"></section></section>
-      <section id="income"><h2>Income</h2>${incomeHtml()}</section>
-      <section id="opportunity" class="research"><h2>Research shortlist</h2><p>Business quality is separate from entry timing. Watch pullbacks, extended prices and valuation premiums before adding exposure.</p><p class="dim small">Setups: completed ${esc(b.asof_session)} session, adjusted closes. Live prices above keep their own timestamps. Full statement periods, missing measures and comparisons are in each evidence sheet.</p><div class="ideas">${short.length?'<div class="short-head" aria-hidden="true"><span>Company</span><span>Business case</span><span>Concern / next check</span><span></span></div>':''}${short.map(shortCard).join('')||'<p>No company met the coverage rule. <a href="#/companies">Inspect company coverage</a>.</p>'}</div><a href="#/companies?mode=shortlist">All eligible company evidence</a></section>
-      <section id="deep-dive" class="evidence-more"><h2>Deep dive</h2><p><a href="#/companies">Companies</a> · <a href="#/macro">Macro</a> · <a href="#/explore">Compare</a> · <a href="backup.html">Expanded strategies and private tools</a></p><details><summary>Relationships and evidence to investigate</summary><div class="insights">${insightCard(concentrationInsight(S.core.rel?.vol_breadth))}${S.rel?insightCard(leadershipInsight(S.rel))+insightCard(macroInsight(S.rel,S.core)): '<p>Relationship catalog unavailable; no inferred comparison.</p>'}</div><p class="dim">${slot('live-conc',liveConcSlot)}</p></details></section></div>`;
-    S.personal=root.SmartOptionsInvestor.mountToday($('#for-you'),{...investorArgs(),compact:true});S.onQuote=changed=>S.personal?.quotes(changed);
-    S.news=root.SmartOptionsNews.mount($('#news-list'),{core:S.core,disclosure:$('.news-depth')});
-    $('#income-company').onchange=e=>{S.incomeTicker=e.target.value;$('#income-context').innerHTML=incomeContext();};
+  // Today: five bounded sections. Each summary owns one evidence target and one seeded deeper action.
+  function prevRow(model) {
+    const ids = ['spy_1d', 'vix', 'us10y'], label = {spy_1d: 'SPY', vix: 'VIX', us10y: '10Y'};
+    return `<ul class="prev-row" aria-label="Previous session">${ids.map(id => { const c = model.comparisons.find(x => x.id === id); return `<li><button type="button" class="ev prev" data-ev="${evAttr({kind: 'today-change', id})}"><span class="lbl">${label[id]}</span> <b>${esc(c.available ? (id === 'spy_1d' ? pct(c.pct) : id === 'us10y' ? fmtU(c.change, 'bp') : fmtU(c.change, 'points')) : 'n/a')}</b>${c.available ? ` <span class="small dim">${esc(id === 'us10y' ? c.x.current.value.toFixed(2) + '%' : String(c.x.current.value))}</span>` : ''}</button></li>`; }).join('')}<li><button type="button" class="text" data-ev="${evAttr({kind: 'today', id: 'positioning'})}">DXY, breadth</button></li></ul>`;
+  }
+  function riskLines() {
+    const n = enteredNames().length, h = horizonEvents(S.horizon || 7), ev = h.relevant.slice(0, 2), mine = h.relevant.filter(x => x.entered).slice(0, 2);
+    const first = n ? `${n} entered equit${n === 1 ? 'y' : 'ies'}; options positions are not covered.` : 'No positions entered, so personal risk is not measured. Followed companies stay separate.';
+    const second = mine.length ? `Your nearest event: ${mine.map(x => x.title + ' ' + when(x.when)).join('; ')}.` : ev.length ? `Next listed: ${ev.map(x => `${x.title} (${when(x.when)})`).join('; ')}.${h.complete ? '' : ' Calendar coverage is partial.'}` : `No listed release in ${h.days} days; calendar coverage is ${h.complete ? 'complete for tracked sources' : 'partial'}.`;
+    return `<p>${esc(first)}</p><p>${esc(second)} ${evBtn({kind: 'event', scope: 'today', i: 0}, 'Source', 'text')}</p>`;
+  }
+  function shortRow(x) {
+    const s = shortSetup(x), why = ((x.why || [])[0]?.text || 'Inspect dated company evidence.').replace(/, provider quarter label [\d-]+\.?/i, '.'), obj = s.concern.measured ? s.concern.text : s.signal;
+    return `<li data-short="${esc(x.t)}"><p class="short-name"><a href="#/markets?sel=${esc(x.t)}">${esc(x.t)}</a> <span class="dim">${esc(x.name)}</span> <span class="tag" data-short-category="${esc(x.t)}">${esc(s.category)}</span></p><p class="small"><span class="lbl">Why</span> ${esc(why)}</p><p class="small" data-short-caution="${esc(x.t)}"><span class="lbl">Against</span> ${esc(obj)}</p>${evBtn({kind: 'shortlist', t: x.t}, `Evidence<span class="sr"> for ${esc(x.t)}</span>`, 'text')}</li>`;
+  }
+  // Income environment from measured inputs (posture, VIX, the name's event date and delayed IV/RV) - separate from
+  // contract premium quality, which stays unrated without option chains. One next check; the limitation sits beside it.
+  function incomeBrief(model, t) {
+    const vix = model.comparisons.find(c => c.id === 'vix'), r = row(t), lvl = vix?.available ? vix.x.current.value : null;
+    const stance = /^Defensive/.test(model.label) ? 'Protect first' : model.label === 'Supportive conditions' ? 'Conditions allow income research' : 'Be selective';
+    const vol = isNum(lvl) ? `VIX was ${lvl.toFixed(1)} on ${vix.x.current.date || model.session}; it does not price a specific contract.` : 'A current volatility observation is unavailable.';
+    const days = r?.er ? Math.round((Date.parse(r.er + 'T12:00:00Z') - Date.now()) / 864e5) : null;
+    const ev = !r ? ' Choose an asset before testing a structure.' : isNum(days) && days >= 0 && days <= 45 ? ` ${t} reports ${shortDate(r.er)}: check the expiry against that event.` : isNum(days) && days > 45 ? ` ${t} reports ${shortDate(r.er)}; verify the calendar for the chosen expiry.` : ` Verify ${t}'s next earnings date before choosing an expiry.`;
+    const next = /^Defensive/.test(model.label) ? 'Review downside exposure before considering a short-premium structure.' : 'Compare a covered call only if willing to cap gains; a cash-secured put only if willing to own the shares.';
+    return `<p><b>${esc(stance)}.</b> ${esc(next)}${esc(ev)}</p><p class="small dim">${esc(vol)} Not rated - contract pricing unavailable.</p><p><a class="btn" href="#/workspace/strategies?t=${esc(t || 'SPY')}&tab=pocket">Open income workspace</a> ${evBtn({kind: 'today-change', id: 'vix'}, 'Evidence', 'text')}</p>`;
+  }
+
+  function renderBrief(main, legacy) {
+    const b = S.brief, short = (b.shortlist || []).slice(0, 3), model = todayModel(b, S.core), tk = takeaway(model, b);
+    Live.watch('index', ['SPY', 'RSP']); Live.watch('research', short.map(x => x.t)); Live.watch('company', []);
+    const sit = S.sitCtl?.get() ? situationModelNow() : null, reasons = firstReasons(model).slice(0, 4);
+    const incomeName = enteredNames()[0] || WL().get()[0] || short[0]?.t;
+    main.innerHTML = `${legacy ? `<p class="note">That older link opened Today. Use Markets or Workspace for the tool you wanted.</p>` : ''}
+      <div class="today">
+      <section class="read" id="market" aria-labelledby="read-h"><h1 id="read-h" class="page-label">Market</h1>
+        <p class="trust small"><span>${esc(shortDate(model.session))} completed session · brief ${esc(model.updated)}</span> ${evBtn({kind: 'today', id: 'trust'}, 'Data and sources', 'text')}</p>
+        <div class="market-grid"><div class="market-main">
+        <h2 class="headline" data-tone="${postureTone(model)}">${cue(postureTone(model))}<span class="headline-copy">${esc(model.label)}</span></h2>
+        <p class="tk-so">${esc(tk.so)} ${evBtn({kind: 'today', id: 'posture'}, 'Why', 'text')}</p>
+        ${prevRow(model)}
+        <div id="situation" class="situation" aria-live="polite">${situationHtml()}</div>
+        </div><div class="market-side">
+        <ul class="market-reasons">${reasons.map(x => `<li><button type="button" class="ev reason" data-ev="${evAttr(x.ev)}">${cue(model.signals.find(s => s.id === x.ev.id)?.tone || 'neutral')}<span class="reason-copy">${esc(shortReason(x, b, model))}</span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul>
+        <p class="now-strip small">${slot('now', nowSlot)}</p>
+        <p class="next-risk" id="next-risk">${nextRisk()}</p>
+        </div></div>
+        <div class="map-preview"><div class="map-period" role="group" aria-label="Sector map period">${['1D', '1W', '1M'].map(p => `<button data-map-period="${p}" aria-pressed="${(S.heatPeriod || '1D') === p}">${p}</button>`).join('')}</div>${slot('heat', heatSlot)}<p><a class="go" href="#/markets?p=${esc(S.heatPeriod || '1D')}" data-open-grid>Open the full market grid</a></p></div>
+      </section>
+      <div class="today-blocks"><section id="my-risk"><h2>My risk</h2>${riskLines()}<p class="actions"><a class="btn" href="#/positions">Review positions</a> <button type="button" class="btn" data-open="ahead-more">All upcoming risks</button></p>
+        <details id="ahead-more" class="more"><summary>Upcoming risks and your book</summary><div id="ahead">${aheadHtml()}</div><section id="for-you" class="for-you" aria-label="For you"></section></details></section>
+      <section id="income"><h2>Income</h2>${incomeBrief(model, incomeName)}</section>
+      <section id="opportunity" class="research"><h2>Opportunity</h2><ul class="short-list">${short.map(shortRow).join('') || '<li>No company met the coverage rule.</li>'}</ul><p><a class="btn" href="#/companies?mode=shortlist">All eligible ideas</a></p></section></div>
+      <section id="deep-dive" class="deep-strip"><h2>Deep dive</h2><nav aria-label="Deep dive"><a href="#/markets">Markets</a><a href="#/macro">Macro</a><a href="#/explore">Compare</a><a href="#/room">Saved rooms</a><a href="#/workspace">All tools</a></nav><details><summary>Relationships and evidence to investigate</summary><div class="insights">${insightCard(concentrationInsight(S.core.rel?.vol_breadth))}${S.rel?insightCard(leadershipInsight(S.rel))+insightCard(macroInsight(S.rel,S.core)): '<p>Relationship catalog unavailable; no inferred comparison.</p>'}</div><p class="dim">${slot('live-conc',liveConcSlot)}</p></details></section>
+      </div>`;
+    S.personal = root.SmartOptionsInvestor.mountToday($('#for-you'), {...investorArgs(), compact: true}); S.onQuote = changed => S.personal?.quotes(changed);
+    S.news = null; trimReasons();
   }
   function investorArgs() {return {core:S.core,brief:S.brief,live:Live,watch:WL(),compare:companyHref,events:()=>horizonEvents(S.horizon||7),days:()=>S.horizon||7};}
   /* ------------------------------------------------------------ saved companies (shared store) */
@@ -924,11 +1306,11 @@
   function openSheet(ev, trigger) {
     let content;
     try { content = evidence(ev); } catch (e) { console.error('[brief] evidence failed', e); content = {title: 'Evidence unavailable', html: `<p>This evidence could not be assembled from the published data (${esc(e.message)}).</p>`}; }
-    const el = sheetEl();
+    const el = sheetEl(), origin = trigger || doc.activeElement, nested = sheetOpen() && el.contains(origin);
     el.querySelector('#sheet-h').textContent = content.title;
     el.querySelector('.sheet-body').innerHTML = content.html + (content.ask && root.SmartOptionsIntents ? `<p><button type="button" class="cp-context" data-intent="${esc(content.ask.intent)}" data-entities="${evAttr(content.ask.entities || {})}">Ask about this</button></p>` : '');
     el.dataset.kind = ev.kind; el.hidden = false; doc.getElementById('sheet-bg').hidden = false; doc.documentElement.classList.add('sheet-open');
-    sheetTrigger = trigger || doc.activeElement;
+    if (!nested) sheetTrigger = origin;
     el.querySelector('.sheet-x').focus({preventScroll: true});
   }
   const defText = label => { const d = MEANINGS.find(([re]) => re.test(label)); return d ? `<p class="def">${esc(d[1])}</p>` : ''; };
@@ -943,6 +1325,7 @@
       <p class="dim">${esc(x.note || '')} Source: ${x.source_url ? `<a href="${esc(x.source_url)}" target="_blank" rel="noopener">${esc(x.source)}</a>` : esc(x.source)}.</p>`;
   }
   function evidence(ev) {
+    if (ev.kind === 'situation') return situationEvidence(ev);
     const b = S.brief;
     const model=todayModel(b,S.core);
     if(ev.kind==='today-change'){
@@ -1038,7 +1421,7 @@
     }
     if (x.kind === 'show_sector') {
       const sec = S.core.rows.find(r => r.sec === x.sector) ? x.sector : null; if (!sec) throw new Error('That sector is not in the current data.');
-      go('#/sector/' + encodeURIComponent(sec)); await wait(() => S.view === 'sector' && $('#view h2') && $('#view h2').textContent.startsWith(sec), 'sector view');
+      go('#/markets?sec=' + encodeURIComponent(sec) + (S.heatPeriod && S.heatPeriod !== '1D' ? '&p=' + S.heatPeriod : '')); await wait(() => S.view === 'markets' && $('.mk-crumbs') && $('.mk-crumbs').textContent.includes(sec), 'sector grid');
       return {text: `Opened ${sec} (${S.heatPeriod || '1D'} period).`, sector: sec};
     }
     if (x.kind === 'switch_period') {
@@ -1091,6 +1474,7 @@
     [/Brent|copper/i,'Brent is a global oil benchmark in US dollars per barrel; COMEX copper is an industrial metal future in US dollars per pound. These continuous front-month series are not roll-adjusted, so a contract change can affect returns. Stronger commodity prices can help producers and raise costs for users; they do not establish a single cause.'],
     [/Federal Reserve total|Reserve balances/i,'The Federal Reserve balance sheet records central-bank assets; reserve balances are banks’ deposits at the Fed. The source unit and dated observation are shown below. More reserves can ease funding conditions, but the balance sheet does not translate mechanically into stock gains; policy, demand and money-market operations also matter.'],
     [/Market value|market cap/i,'Market value (capitalization) is share price times shares outstanding, in US dollars; bn means billion and T means trillion. Larger companies occupy more map area. This is an equity valuation, not company revenue or cash in the bank. The map uses the dated snapshot weighting; live price movements do not imply a new share-count observation.'],
+    [/Adjusted close/i,'An adjusted close restates earlier closing prices for splits and dividends so that returns over time compare like with like. It can differ from the unadjusted price shown on a company chart; each dated evidence row states which basis it uses.'],
     [/^Price/, 'The price of one share in US dollars. A higher price raises market value and price-based valuation ratios when earnings and share count stay fixed. It does not itself mean the business improved.'],
     [/Daily return|% change|return/i,'Percentage gain or loss relative to the previous regular close: 100 × (price ÷ prior close − 1). After-hours moves have a separate basis. One percentage point is the difference between two percentage returns.'],
     [/Sector basket|index/i,'A sector groups companies with related businesses. The map weights by market value (price × shares); large companies occupy more area and influence its return more. Chart baskets equally average available member daily returns, rebased to 100. They are research baskets, not investable funds or official indices; membership changes and missing names matter.'],
@@ -1334,7 +1718,7 @@
       <li><b>Structure:</b> check the payoff and maximum loss of the actual position. A covered call retains substantial downside in the shares; premium does not remove that risk. <a href="https://www.optionseducation.org/strategies/all-strategies/covered-call-buy-write" target="_blank" rel="noopener">Covered-call risk</a></li>
       <li><b>Liquidity and assignment:</b> wide bid/ask spreads, low open interest and early assignment on short calls near dividends can change the outcome.</li>
       <li><b>No-trade alternative:</b> holding no position, or the shares alone, is a valid choice when the case or the timing is unclear.</li></ul>
-      ${o.line ? `<p class="dim">${esc(o.line)}</p>` : ''}<p><a href="backup.html#/research/markets?t=${encodeURIComponent(t)}">Open ${esc(t)} in the expanded strategy tools →</a> <span class="dim small">(modelled payoffs, clearly labelled; not live prices)</span></p>`;
+      ${o.line ? `<p class="dim">${esc(o.line)}</p>` : ''}<p><a href="#/workspace/strategies?t=${encodeURIComponent(t)}">Open ${esc(t)} in the strategy builder →</a> <span class="dim small">(modelled payoffs, clearly labelled; not live prices)</span> · <a href="#/workspace/technicals?t=${encodeURIComponent(t)}">Technicals and patterns</a> · <a href="#/workspace/risk?t=${encodeURIComponent(t)}">Shock scenarios</a></p>`;
   }
   function selectTab(tab, focus) {
     const box = $('.co-tabs'); if (!box) return;
@@ -1390,7 +1774,7 @@
   }
   /* ------------------------------------------------------------ Macro */
   const GROUPS = {policy: 'Policy rate', inflation: 'Inflation', labor: 'Labor', growth: 'Growth', curve: 'Treasury curve', credit_funding: 'Credit and funding', cross_asset: 'Dollar and commodities', volatility: 'Volatility'};
-  function macroValue(x) { if (!isNum(x.v)) return 'n/a'; const u = x.unit || ''; return (Math.abs(x.v) >= 1e5 ? big(x.v) : +x.v.toFixed(2)) + (u ? ' ' + esc(u) : ''); }
+  function macroValue(x) { return esc(unitValue(x.v, x.unit)); }
   function renderMacro(main) {
     Live.watch('research', []); Live.watch('company', []); Live.watch('index', ['SPY']);
     const bd = S.brief.macro && S.brief.macro.backdrop || {}, risk = S.brief.macro && S.brief.macro.risk || {};
@@ -1399,8 +1783,8 @@
     S.metricEvidence ||= new Map();for(const group of Object.values(S.core.macro||{}))for(const x of group){S.metricEvidence.set(x.label,{label:x.label,value:x.v,unit:x.unit,period:x.period,asof:x.retrieved_at,source:x.provider,source_url:x.url,note:x.note||'Observation date '+x.date+'; reference period is not the release timestamp.'});}
     const mc = (S.brief.daily_changes && S.brief.daily_changes.macro) || [], ev = S.brief.macro && S.brief.macro.risk_events;
     const h = horizonEvents(S.horizon); S.lastEvents = S.lastEvents || {}; S.lastEvents.macro = h.items.filter(x => x.kind === 'macro');
-    const detail = Object.fromEntries(((S.brief.macro && S.brief.macro.detail) || []).map(d => [d.group, d.line]));
-    const cv = x => x.unit === '%' || /%/.test(x.unit) ? +x.value.toFixed(2) + (x.unit === '%' ? '%' : ' ' + x.unit) : (Math.abs(x.value) >= 1e5 ? big(x.value) : +x.value.toFixed(2)) + ' ' + x.unit;
+    const detail = Object.fromEntries(((S.brief.macro && S.brief.macro.detail) || []).map(d => [d.group, macroGroupLine(S.core, d.group, d.line)]));
+    const cv = (x, unit) => unitValue(x?.value, x?.unit ?? unit);
     main.innerHTML = `<h1>Macro</h1>
       <div class="macro-top">
         <section><h2>Persistent trends</h2><ul>${['growth', 'inflation', 'policy'].filter(k => bd[k] && bd[k].line).map(k => `<li><b>${GROUPS[k] || k}:</b> ${esc(bd[k].line)}</li>`).join('')}</ul><p>${evBtn({kind: 'assessment', id: 'backdrop'}, 'Backdrop evidence')}</p></section>
@@ -1409,7 +1793,7 @@
           <ul class="events">${S.lastEvents.macro.map((x, i) => eventLine(x, i, 'macro')).join('') || '<li class="dim">No listed release in this window; see coverage.</li>'}</ul><p class="dim small">${h.notes.slice(0, 1).concat(h.notes.slice(2)).map(esc).join(' ')}</p></section>
       </div>
       <section><h2>Latest observation versus the prior one</h2><p class="dim small">Each row compares two dated observations from the retained history (current data vintage, so earlier values may include revisions). A newer retrieval without a new observation is not a change.</p>
-        <div class="tablewrap"><table class="mchg"><thead><tr><th>Series</th><th class="n">Latest</th><th class="n">Prior</th><th class="n">Change</th></tr></thead><tbody>${mc.map(x => x.status === 'ok' ? `<tr><td>${esc(x.label)}${x.obs_status && x.obs_status !== 'ok' ? ` <span class="tag">${esc(x.obs_status)}</span>` : ''}</td><td class="n">${esc(cv(x.current))} <span class="dim small">${esc(x.current.date)}</span></td><td class="n">${esc(cv(x.prior))} <span class="dim small">${esc(x.prior.date)}</span></td><td class="n ${x.direction === 'up' ? 'up' : x.direction === 'down' ? 'dn' : ''}">${x.change > 0 ? '+' : ''}${+x.change.toFixed(3)}</td></tr>` : `<tr><td>${esc(x.label)}</td><td colspan="3" class="dim">Unavailable: ${esc(x.reason)}</td></tr>`).join('') || '<tr><td colspan="4" class="dim">Dated comparisons are not in this data build.</td></tr>'}</tbody></table></div></section>
+        <div class="tablewrap"><table class="mchg"><thead><tr><th>Series</th><th class="n">Latest</th><th class="n">Prior</th><th class="n">Change</th></tr></thead><tbody>${mc.map(x => x.status === 'ok' ? `<tr><td>${esc(x.label)}${x.obs_status && x.obs_status !== 'ok' ? ` <span class="tag">${esc(x.obs_status)}</span>` : ''}</td><td class="n">${esc(cv(x.current, x.unit))} <span class="dim small">${esc(x.current.date)}</span></td><td class="n">${esc(cv(x.prior, x.unit))} <span class="dim small">${esc(x.prior.date)}</span></td><td class="n ${x.direction === 'up' ? 'up' : x.direction === 'down' ? 'dn' : ''}">${x.change > 0 ? '+' : ''}${+x.change.toFixed(3)}</td></tr>` : `<tr><td>${esc(x.label)}</td><td colspan="3" class="dim">Unavailable: ${esc(x.reason)}</td></tr>`).join('') || '<tr><td colspan="4" class="dim">Dated comparisons are not in this data build.</td></tr>'}</tbody></table></div></section>
       <section><h2>How sectors have moved with macro</h2>${rels.map(r => `<p>${esc(r.text)} <a class="go" href="${esc(factorHref(r))}">Chart it</a></p>`).join('')}
         ${S.rel ? `<div class="insights">${insightCard(macroInsight(S.rel, S.core))}</div>` : ''}
         <details class="src"><summary>Sector medians by factor</summary>${rels.map(r => { const s = sectorSensitivity(S.core.rows, r.factor); return `<h4>${esc(FACTORS[r.factor].name)} (per ${FACTORS[r.factor].per})</h4><table>${s.map(x => `<tr><td>${esc(x.sector)}</td><td class="n">${pct(x.coef * FACTORS[r.factor].scale, 2)}</td><td class="dim">${x.n} names</td></tr>`).join('')}</table>`; }).join('')}
@@ -1433,7 +1817,7 @@
   /* ------------------------------------------------------------ Explore */
   const PALETTE = ['#1a56b0', '#d2691e', '#2e8b57', '#8e44ad', '#c0392b', '#5f6b76'];
   const PALETTE_DARK = ['#8ab4f8', '#f6a868', '#7bd389', '#c79bf2', '#f28b82', '#c4c9d0'];
-  const DEFAULT_STATE = {s: [{id: 'eq:SPY'}, {id: 'eq:RSP'}, {id: 'sec:Information Technology'}], r: '1y', m: 'index', ind: {sma: false, rc: false}, lag: 0};
+  const DEFAULT_STATE = {s: [{id: 'eq:SPY'}, {id: 'eq:RSP'}, {id: 'sec:Information Technology'}], r: '1y', m: 'pct', ind: {sma: false, rc: false}, lag: 0};
   const MACRO_KIND = {us10y: ['rate', 'diff_bp', 'bp'], us2y: ['rate', 'diff_bp', 'bp'], us3m: ['rate', 'diff_bp', 'bp'], dxy: ['price', 'ret', '%'], wti: ['price', 'ret', '%'], brent: ['price', 'ret', '%'], copper: ['price', 'ret', '%']};
   function macroMeta(x) {
     const k = MACRO_KIND[x.id] || (x.unit === '%' || /% /.test(x.unit || '') ? ['rate', 'diff_bp', 'bp'] : x.unit === 'bps' ? ['rate', 'diff', 'bp'] : ['level', 'diff', x.unit || 'units']);
@@ -1455,13 +1839,20 @@
     }));
     return (S.exIndex = out);
   }
-  const metaOf = id => seriesIndex().find(x => x.id === id) || null;
+  function importedSeries() { try { const d = root.SmartOptionsLocalData?.sharedStore(root.localStorage).get(); return Array.isArray(d?.series) ? d.series.slice(0, 4) : []; } catch (e) { return []; } }
+  function identitySeries() {
+    const I = root.SmartOptionsInstruments, base = new Set(seriesIndex().map(x => x.id));
+    const own = importedSeries().map((x, i) => ({id: 'mac:imp_' + i, label: 'Yours: ' + String(x.label).slice(0, 40), sub: `your imported series, ${x.points.length} dated points, stays on this device · not verified`, unit: '', group: 'Your imported series', freq: 'as imported', name: x.label}));
+    return own.concat((I ? I.all() : []).filter(a => !base.has('eq:' + a.symbol)).map(a => ({id: 'eq:' + a.symbol, label: a.symbol, sub: `${a.name} · ${a.type === 'ETF' ? 'ETF' : 'stock'}, USD, daily close · Yahoo (validated identity)`, kind: 'price', chg: 'ret', unit: 'USD', cunit: '%', group: a.type === 'ETF' ? 'ETFs' : 'Companies', name: a.name, freq: 'daily'})));
+  }
+  const metaOf = id => seriesIndex().find(x => x.id === id) || identitySeries().find(x => x.id === id) || null;
   async function loadSeries(id) {
     S.exData ||= {};
     if (S.exData[id]) return S.exData[id];
     const m = metaOf(id); if (!m) throw new Error('not in the published data');
     let h = null;
-    if (id.startsWith('eq:')) { const d = await pxJson(id.slice(3)); h = (d.bars || []).filter(b => isNum(b[4]) && b[4] > 0).map(b => [b[0], b[4]]); }
+    if (id.startsWith('eq:')) { const d = await historyFor(id.slice(3)); h = (d.bars || []).filter(b => isNum(b[4]) && b[4] > 0).map(b => [b[0], b[4]]); }
+    else if (/^mac:imp_\d$/.test(id)) { const x = importedSeries()[+id.slice(8)]; h = x ? x.points.filter(p => isNum(p[1])).map(p => [String(p[0]).slice(0, 10), p[1]]) : null; }
     else if (id.startsWith('sec:')) { const b = Object.values(S.rel.baskets).find(x => x.id === id); h = b ? b.h.map(p => [p[0], p[1]]) : null; }
     else { for (const g of Object.values(S.core.macro)) for (const x of g || []) if ('mac:' + x.id === id) h = x.h.filter(p => isNum(p[1])).map(p => [String(p[0]).slice(0, 10), p[1]]); }
     if (!h || !h.length) throw new Error('no published history');
@@ -1479,6 +1870,7 @@
     let state = hash ? W.decodeHash(hash) : null, note = st.error ? `${st.error} The saved text is untouched until you choose. ` : '';
     if (state && state.error) { note += `This link could not be used (${state.error}); showing your last workspace. `; state = null; }
     if (!state || !state.s.length) state = S.exStore.current || W.cleanState(DEFAULT_STATE);
+    if (!/[?&]m=/.test(hash || '') && !(S.exStore.current && state === S.exStore.current)) state = {...state, m: state.s.length === 1 && state.s[0].id.startsWith('eq:') ? 'raw' : 'pct'};
     S.ex = {state: W.cleanState(state), cursorDate: null};
     S.exStore.current = S.ex.state; writeStore(S.exStore);   // a followed link becomes the last workspace (skipped while unreadable data is kept)
     Live.watch('research', []); Live.watch('company', []); Live.watch('index', ['SPY']);
@@ -1534,11 +1926,18 @@
     const showHits = () => {
       const s = find.value.trim().toLowerCase(); if (!s) { hits.hidden = true; hits.innerHTML = ''; return; }
       const have = new Set(S.ex.state.s.map(x => x.id)), score = x => x.label.toLowerCase() === s ? 0 : x.label.toLowerCase().startsWith(s) ? 1 : 2;
-      const xs = seriesIndex().filter(x => !have.has(x.id) && (x.label.toLowerCase().includes(s) || (x.name || '').toLowerCase().includes(s) || x.group.toLowerCase().startsWith(s))).sort((a, b) => score(a) - score(b)).slice(0, 12);
-      hits.innerHTML = xs.map(x => `<li role="option" tabindex="-1" data-add="${esc(x.id)}"><b>${esc(x.label)}</b> <span class="dim">${esc(x.sub)}</span></li>`).join('') || '<li class="dim">No match in the published data.</li>';
+      const q = s.replace(/^\$/, ''), sym = root.SmartOptionsInstruments?.symbol(q).toLowerCase() || q;
+      const xs = seriesIndex().concat(identitySeries()).filter(x => !have.has(x.id) && (x.label.toLowerCase().includes(sym) || (x.name || '').toLowerCase().includes(q) || x.group.toLowerCase().startsWith(q))).sort((a, b) => (a.label.toLowerCase() === sym ? 0 : a.label.toLowerCase().startsWith(sym) ? 1 : 2) - (b.label.toLowerCase() === sym ? 0 : b.label.toLowerCase().startsWith(sym) ? 1 : 2)).slice(0, 12);
+      hits.innerHTML = xs.map(x => `<li role="option" tabindex="-1" data-add="${esc(x.id)}"><b>${esc(x.label)}</b> <span class="dim">${esc(x.sub)}</span></li>`).join('') + `<li class="dim small" role="presentation" id="ex-disc">${S.exDisc || ''}</li>`;
       hits.hidden = false;
     };
-    find.addEventListener('input', showHits);
+    // Wider stock/ETF discovery through the shared public relay; debounced and cancellable. Validated identities join the list.
+    let discTimer = null, discCtl = null, discVer = 0;
+    const discover = () => { clearTimeout(discTimer); discCtl?.abort(); const q = find.value.trim(), v = ++discVer; S.exDisc = ''; if (q.length < 2) return;
+      discTimer = setTimeout(async () => { const I = root.SmartOptionsInstruments; if (!I) return; discCtl = new AbortController(); S.exDisc = 'Checking the wider stock and ETF catalog…'; showHits();
+        const d = await I.search(q, {signal: discCtl.signal}).catch(e => e.name === 'AbortError' ? null : {status: 'error', error: e.message}); if (!d || v !== discVer || !find.isConnected) return;
+        S.exDisc = d.status === 'error' ? 'Wider catalog unavailable (' + esc(d.error) + '); published series remain.' : 'US-listed stocks and ETFs · Yahoo'; showHits(); }, 300); };
+    find.addEventListener('input', showHits); find.addEventListener('input', discover);
     find.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { const f = hits.querySelector('[data-add]'); if (f) { e.preventDefault(); f.focus(); } } if (e.key === 'Enter') { const f = hits.querySelector('[data-add]'); if (f) { e.preventDefault(); addSeries(f.dataset.add); } } if (e.key === 'Escape') hits.hidden = true; });
     hits.addEventListener('keydown', e => {
       const el = e.target.closest('[data-add]'); if (!el) return;
@@ -1840,11 +2239,12 @@
     const id=S.ex.state.s[0]?.id, m=S.rel?.joint?.find(m=>m.y===id), el=$('#ex-joint');
     if(!el)return;
     S.jointModel=m;S.jointValues ||= [0,0];
+    if(m?.available&&!S.jointOpen&&!root.__soPersonalWhatif){el.innerHTML=`<p class="joint-entry"><button type="button" class="btn" data-joint-open>Test a scenario</button> <span class="dim small">Off until chosen: applies the dated joint fit for ${esc(metaOf(id)?.label||id)} to rate and oil moves you enter. Observed prices are never changed.</span></p>`;el.querySelector('[data-joint-open]').onclick=()=>{S.jointOpen=true;renderJoint();$('#joint-rate')?.focus();};return;}
     if(!m?.available){el.innerHTML=`<details class="joint"><summary>Economic what-if</summary><p>${esc(m?.reason||'No joint model for this asset in the fixed 64-candidate research budget. Choose SPY, AAPL, MSFT, NVDA, AMZN, JPM, XOM or a supported sector basket.')} Historical overlays remain available through chart controls.</p></details>`;if(root.__soPersonalWhatif){root.__soPersonalWhatif=false;el.querySelector('details').open=true;el.tabIndex=-1;el.scrollIntoView({block:'start'});el.focus({preventScroll:true});}return;}
     el.innerHTML=`<section class="joint"><h3>Two economic moves, together ${learnLink('Scenario','What does this mean?')}</h3><p class="dim">Hypothetical one-day changes associated with ${esc(metaOf(id)?.label||id)}; ${m.n} common days, ${esc(m.fit_start)}–${esc(m.fit_end)}. Joint fit, holding the other driver fixed. It describes history, not a forecast.</p><div class="joint-inputs"><label>10-year Treasury move ${learnLink('Basis points','bp')}<input id="joint-rate" type="number" step="any" inputmode="decimal" value="${S.jointValues[0]}" data-joint="0"></label><label>WTI oil move (%)<input id="joint-oil" type="number" step="any" inputmode="decimal" value="${S.jointValues[1]}" data-joint="1"></label></div><div class="ex-ctl"><label><input type="checkbox" id="joint-on"${S.jointEnabled?' checked':''}> Show hypothetical marker & mean band</label><button type="button" data-joint-overlays>Add rate & oil history</button><button type="button" data-joint-reset>Clear what-if</button></div><p id="joint-out" role="status"></p><details><summary>Method, bounds & counterargument</summary><p>Asset daily percent change = ${f3(m.coefficients[0])} + ${f3(m.coefficients[1])} × rate move (bp) + ${f3(m.coefficients[2])} × oil move (%). Each driver is bounded to its central 90% sample: rate ${m.bounds[0].map(f3).join(' to ')} bp; oil ${m.bounds[1].map(f3).join(' to ')}%. Joint leverage must be ≤9/n. Condition number ${f3(m.condition)}; residual daily standard deviation ${f3(Math.sqrt(m.residual_variance))}%. ${esc(m.method)}.</p><p>Counterargument: these two variables leave other market and company events unexplained; revised macro histories, different close times and changing relationships can break the association. The chart uses the last observed chart price as an anchor, not a target date or fabricated price bar.</p><p>${learnLink('Confidence interval','Average uncertainty vs individual-day variation')} · ${learnLink('Beta','Joint slopes')} · Catalog built ${esc(S.rel.generated_at)}; total fixed search ≤${S.rel.candidate_search.max} candidates.</p></details></section>`;
     el.querySelectorAll('[data-joint]').forEach(inp=>inp.oninput=()=>{S.jointValues[+inp.dataset.joint]=inp.value===''?null:Number(inp.value);updateJoint();});
     $('#joint-on').onchange=e=>{S.jointEnabled=e.target.checked;updateJoint();};
-    el.querySelector('[data-joint-reset]').onclick=()=>{S.jointEnabled=false;S.jointValues=[0,0];$('#joint-on').checked=false;$('#joint-rate').value='0';$('#joint-oil').value='0';updateJoint();};
+    el.querySelector('[data-joint-reset]').onclick=()=>{S.jointEnabled=false;S.jointValues=[0,0];S.jointOpen=false;updateJoint();renderJoint();$('[data-joint-open]')?.focus();};
     el.querySelector('[data-joint-overlays]').onclick=()=>exSet(s=>{for(const id of m.drivers)if(!s.s.some(x=>x.id===id)&&s.s.length<W.MAX_SERIES)s.s.push({id});s.m='z';});
     updateJoint();
     if(root.__soPersonalWhatif){root.__soPersonalWhatif=false;el.scrollIntoView({block:'start'});$('#joint-rate')?.focus({preventScroll:true});}
@@ -1954,7 +2354,7 @@
     const main=$('#view'),y=root.scrollY,open=[...main.querySelectorAll('details')].map(d=>d.open),af=doc.activeElement,key=n=>n&&(n.dataset?.ev||n.dataset?.jump||n.id||n.getAttribute?.('href')),fk=main.contains(af)?key(af):null;
     if(!adoptPending())return;
     S.personal?.suspend?.();S.news?.destroy?.();S.slots=[];S.onQuote=null;
-    renderBrief(main);Live.paint(doc,null);
+    renderBrief(main);Live.paint(doc,null);paintFocus();
     const ds=[...main.querySelectorAll('details')];if(ds.length===open.length)ds.forEach((d,i)=>{if(open[i]&&!d.open)d.open=true;});
     if(fk)[...main.querySelectorAll('[data-ev],[data-jump],[id],a')].find(n=>key(n)===fk)?.focus({preventScroll:true});
     root.scrollTo(0,y);
@@ -1972,7 +2372,7 @@
       try { S.rel = await json('data/relationships.json'); if (!S.rel || S.rel.schema !== 'brief.relationships.v1') throw new Error('unexpected schema'); } catch (e) { S.rel = null; S.relError = e.message; console.warn('[brief] relationships unavailable', e.message); }
       Live.setRows(core.rows);
     } catch (e) {
-      $('#view').innerHTML = `<p>The published market data could not be loaded (${esc(e.message)}). <a href="backup.html">Expanded dashboard (backup)</a></p>`; return;
+      $('#view').innerHTML = `<p role="alert">The published market data could not be loaded (${esc(e.message)}). Reload in a minute; saved data on this device is untouched.</p>`; return;
     }
     Live.subscribe(onQuotes);
     doc.addEventListener('click',e=>{const b=e.target.closest('[data-map-period]');if(b){S.heatPeriod=b.dataset.mapPeriod;doc.querySelectorAll('[data-map-period]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));const heat=$('#heat');if(heat)heat.innerHTML=heatSlot();}});
@@ -1980,14 +2380,18 @@
     WL();
     root.SmartOptionsAPI = Object.assign(root.SmartOptionsAPI || {}, {brief_action: mainAction});
     doc.addEventListener('click', e => {
+      const op=e.target.closest('[data-open]');if(op){const d=doc.getElementById(op.dataset.open);if(d){d.open=true;d.querySelector('summary')?.focus({preventScroll:true});d.scrollIntoView({block:'start'});}return;}
+      if(e.target.closest('[data-sit-retry]')){S.sitCtl?.check();return;}
+      const sc=e.target.closest('[data-scan]');if(sc){S.scanSort=sc.dataset.scan;const p=$('#ws-panel');if(p)p.innerHTML=scannerHtml();p?.querySelector(`[data-scan="${sc.dataset.scan}"]`)?.focus();return;}
       const jump=e.target.closest('[data-jump]');if(jump){const section=doc.getElementById(jump.dataset.jump),heading=section?.querySelector('h1,h2,h3');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});section.scrollIntoView({block:'start'});}return;}
       if(e.target.closest('[data-income-search]')){$('#gsearch').focus();root.scrollTo(0,0);return;}
       const pt=e.target.closest('[data-position-t]');if(pt)S.positionTicker=pt.dataset.positionT;
+      const follow = e.target.closest('[data-follow-report],[data-follow-reference],[data-follow-trend]'); if (follow) { followEvidence(follow).catch(err => focusError(err)); return; }
       const ev = e.target.closest('[data-ev]'); if (ev) { e.preventDefault(); try { openSheet(JSON.parse(ev.dataset.ev), ev); } catch (err) { console.error('[brief] evidence id', err); } return; }
       const st = e.target.closest('[data-star]'); if (st) { toggleStar(st.dataset.star); if (S.coDraw && S.co && S.co.mode === 'saved') S.coDraw(); return; }
       const hz = e.target.closest('[data-horizon]');
       if (hz) { UI.horizon = S.horizon = +hz.dataset.horizon;
-        if (S.view === 'brief' && $('#ahead')) {$('#ahead').innerHTML = aheadHtml();$('#objectives').innerHTML=objectivesHtml();if($('#next-risk'))$('#next-risk').innerHTML=nextRisk();if($('.implications'))$('.implications').innerHTML=implicationsHtml(todayModel(S.brief,S.core));doc.querySelectorAll('[data-short-category]').forEach(el=>{const x=S.brief.shortlist.find(x=>x.t===el.dataset.shortCategory),s=shortSetup(x);el.innerHTML=researchBadges(s);const caution=doc.querySelector(`[data-short-caution="${x.t}"]`);if(caution)caution.innerHTML=shortCaution(s);});S.personal?.refresh();}
+        if (S.view === 'brief' && $('#ahead')) {$('#ahead').innerHTML = aheadHtml();if($('#objectives'))$('#objectives').innerHTML=objectivesHtml();if($('#next-risk'))$('#next-risk').innerHTML=nextRisk();if($('.implications'))$('.implications').innerHTML=implicationsHtml(todayModel(S.brief,S.core));doc.querySelectorAll('[data-short-category]').forEach(el=>{const x=S.brief.shortlist.find(x=>x.t===el.dataset.shortCategory),s=shortSetup(x);el.textContent=s.category;const caution=doc.querySelector(`[data-short-caution="${x.t}"]`);if(caution)caution.innerHTML=`<span class="lbl">Against</span> ${esc(s.concern.measured?s.concern.text:s.signal)}`;});S.personal?.refresh();}
         else if (S.view === 'company' && $('#co-events')) { const t = route(root.location.hash).t; $('#co-events').innerHTML = eventsHtml(t, S.company[t]); }
         else if (S.view === 'macro') renderMacro($('#view'));
         const again = doc.querySelector(`[data-horizon="${S.horizon}"]`); if (again) again.focus({preventScroll: true}); }
@@ -1998,25 +2402,23 @@
     root.addEventListener('hashchange', render);
     render();
     Live.start();
+    startSituation();
     const wakeGen=()=>{if(!doc.hidden)refreshGeneration();};
     doc.addEventListener('visibilitychange',wakeGen);root.addEventListener('pageshow',wakeGen);root.addEventListener('focus',wakeGen);setInterval(wakeGen,60e3);
     S.refreshGeneration=refreshGeneration;
-    // Chat modules (~150 KB) wait until the first view has rendered and the main thread is idle (phone-first).
+    // The lightweight chat launcher appears at idle; chat modules wait for deliberate intent.
     const later = root.requestIdleCallback ? fn => root.requestIdleCallback(fn, {timeout: 4000}) : fn => setTimeout(fn, 1500);
     later(loadChat);
   }
   // Header company search across the whole retained universe.
   function initSearch() {
     const inp = $('#gsearch'), hits = $('#gs-hits'); if (!inp || !hits) return;
-    const show = () => {
-      const s = inp.value.trim().toUpperCase(); if (!s) { hits.hidden = true; hits.innerHTML = ''; return; }
-      const xs = S.core.rows.filter(r => r.t.startsWith(s.replace('.', '-')) || String(r.n).toUpperCase().includes(s)).sort((a, b) => (a.t === s ? -1 : 0) - (b.t === s ? -1 : 0) || (b.mcap || 0) - (a.mcap || 0)).slice(0, 8);
-      hits.innerHTML = xs.map(r => `<li role="option"><a href="#/company/${esc(r.t)}"><b>${esc(r.t)}</b> ${esc(r.n)} <span class="dim">${esc(r.sec)}${r.sp500_member === false ? ' · not in current S&amp;P list' : ''}</span></a></li>`).join('') || '<li class="dim">No company matches.</li>';
-      hits.hidden = false;
-    };
-    inp.addEventListener('input', show);
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { const a = hits.querySelector('a'); if (a) { e.preventDefault(); root.location.hash = a.getAttribute('href'); inp.value = ''; hits.hidden = true; inp.blur(); } } if (e.key === 'Escape') { hits.hidden = true; } if (e.key === 'ArrowDown') { const a = hits.querySelector('a'); if (a) { e.preventDefault(); a.focus(); } } });
-    hits.addEventListener('click', e => { if (e.target.closest('a')) { inp.value = ''; hits.hidden = true; S.closeSearch?.(false); } });
+    // One identity contract: published companies, retained/pinned funds, then validated provider discovery.
+    const I = root.SmartOptionsInstruments;
+    const hrefOf = x => row(x.symbol) ? '#/company/' + x.symbol : '#/markets?u=all&sel=' + encodeURIComponent(x.symbol);
+    const renderHits = (xs, note) => xs.map(x => `<li role="option"><a href="${esc(hrefOf(x))}" data-instrument="${esc(x.symbol)}"><b>${esc(x.symbol)}</b> ${esc(x.name)} <span class="dim">${x.type === 'ETF' ? 'ETF' : esc(row(x.symbol)?.sec || 'Stock')}${row(x.symbol)?.sp500_member === false ? ' · not in current S&amp;P list' : ''}</span></a></li>`).join('') + `<li class="dim small" role="presentation">${esc(note || '')}</li>`;
+    const choose = a => { root.location.hash = a.getAttribute('href'); inp.value = ''; hits.hidden = true; S.closeSearch?.(false); inp.blur(); };
+    S.searchCtl = I.bindSearch(inp, hits, {rows: () => S.core.rows, render: renderHits, onChoose: choose});
     doc.addEventListener('click', e => { if (!e.target.closest('.gsearch')) hits.hidden = true; });
     // Phone header: Search expands the same input/results row on request; desktop keeps it visible (CSS).
     const hdr = $('#hdr'), tog = $('#gs-toggle');
@@ -2047,11 +2449,26 @@
     });
   }
   // Popup chat: deterministic answers from the same published data; optional rephrasing never replaces them.
+  // Chat code (~85 KB of modules) loads on deliberate intent only: a small launcher (same id/class as the real one)
+  // appears at idle; hovering, focusing or touching it prewarms, clicking loads and opens. Cold Today never fetches it.
   function loadChat() {
-    if (root.SmartOptionsChatPopup) return;
-    Promise.all(['chat-popup.css'].map(loadAsset)).then(() => loadAsset('chat-popup.js')).catch(e => {
-      console.warn('[brief] chat unavailable', e.message);
-      const n = doc.createElement('p'); n.className = 'cp-load-error note'; n.setAttribute('role', 'status'); n.textContent = 'Chat could not load: ' + e.message + '. Every number remains on the page.'; doc.body.appendChild(n);
+    if (root.SmartOptionsChatPopup || doc.getElementById('cp-fab')) return;
+    loadAsset('chat-popup.css').then(() => {
+      if (root.SmartOptionsChatPopup || doc.getElementById('cp-fab')) return;
+      const b = doc.createElement('button'); b.type = 'button'; b.className = 'cp-fab'; b.id = 'cp-fab'; b.dataset.placeholder = '1';
+      b.setAttribute('aria-label', 'Open chat'); b.setAttribute('aria-expanded', 'false');
+      b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.2 3.6c-.5.4-1.3.1-1.3-.6V16A2.5 2.5 0 0 1 4 13.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+      doc.body.appendChild(b);
+      let ready = null;
+      const realFab = () => [...doc.querySelectorAll('.cp-fab')].find(x => !x.dataset.placeholder);
+      const load = () => ready ||= loadAsset('chat-popup.js').then(() => new Promise((resolve, reject) => {
+        const t0 = Date.now(), tick = () => { if (realFab()) { b.remove(); resolve(); } else if (Date.now() - t0 > 20000 || doc.querySelector('.cp-load-error')) reject(new Error('chat did not start')); else setTimeout(tick, 50); }; tick();
+      })).catch(e => { ready = null; b.removeAttribute('aria-busy'); console.warn('[brief] chat unavailable', e.message);
+        const n = doc.createElement('p'); n.className = 'cp-load-error note'; n.setAttribute('role', 'status'); n.textContent = 'Chat could not load: ' + e.message + '. Every number remains on the page.'; doc.body.appendChild(n); throw e; });
+      b.addEventListener('click', e => { e.preventDefault(); b.setAttribute('aria-busy', 'true'); load().then(() => { root.SmartOptionsChatPopup.open(); }, () => {}); });
+      ['pointerenter', 'focus', 'touchstart'].forEach(ev => b.addEventListener(ev, () => { load().catch(() => {}); }, {once: true, passive: true}));
+      // Chat-backed page actions (e.g. "Ask about this") also count as intent.
+      S.ensureChat = () => load().then(() => root.SmartOptionsChatPopup);
     });
   }
   if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', boot); else boot();

@@ -106,6 +106,8 @@
   function C() { return root.SmartOptionsChat; }
 
   function build() {
+    const placeholder = doc.querySelector('.cp-fab[data-placeholder]'), restoreFocus = placeholder === doc.activeElement;
+    placeholder?.remove();
     const btn = doc.createElement('button');
     btn.type = 'button'; btn.className = 'cp-fab'; btn.id = 'cp-fab';
     btn.setAttribute('aria-label', 'Open chat'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', 'cp-panel');
@@ -130,6 +132,7 @@
       <form class="cp-in"><textarea rows="1" aria-label="Your question" placeholder="Ask a question"></textarea><button type="submit" class="cp-send" aria-label="Send">Send</button></form>
       <button type="button" class="cp-cancel" hidden>Cancel</button><p class="cp-disc">Research tool, not advice. Answers cite the data on this site.</p>`;
     doc.body.append(btn, p);
+    if (restoreFocus) btn.focus({preventScroll: true});
     root.visualViewport?.addEventListener('resize',syncViewport);root.visualViewport?.addEventListener('scroll',syncViewport);root.addEventListener('resize',syncViewport);syncViewport();
     p.querySelector('.cp-dash-example').addEventListener('click',()=>{const ta=p.querySelector('.cp-in textarea');ta.value='Create a war room for NVDA';saveDraft(ta.value);ta.focus();});
     btn.addEventListener('click', () => toggle());
@@ -250,7 +253,7 @@
   }
   async function loadModules(){
     for(const [file,key]of [['universe','SmartOptionsUniverse'],['intents','SmartOptionsIntents'],['facts','SmartOptionsFacts'],['verify','SmartOptionsVerify'],['polish','SmartOptionsPolish'],['actions','SmartOptionsActions'],['dashboard','SmartOptionsDashboardSpec'],['relationships','SmartOptionsRelationships'],['runtime','SmartOptionsBriefChat']]){
-      if(root[key])continue;await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js?v=client-20261018-adaptive-rooms2';s.onload=resolve;s.onerror=()=>reject(new Error('Chat module failed to load: '+file));doc.head.appendChild(s);});
+      if(root[key])continue;await new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src='chat/'+file+'.js?v=client-20261019-unified2';s.onload=resolve;s.onerror=()=>reject(new Error('Chat module failed to load: '+file));doc.head.appendChild(s);});
     }
   }
   function _start() {

@@ -247,7 +247,15 @@ def macro_assessment(core,position,cfg,risks):
         observations=core.get('macro',{}).get(group,[])
         metrics=[obs_metric(o) for o in observations if not o.get('id','').endswith(('bps_chg','ret_1d','ret_5d'))][:6]
         trend=core.get('rel',{}).get('trends',{}).get(group,{}).get('label')
-        text=backdrop['inflation']['line'] if group=='inflation' else growth_line if group=='growth' else policy_line if group=='policy' else risk['line'] if group in ('volatility','credit_funding') else f"{group.replace('_',' ').capitalize()} observations are {trend or 'not available'}."
+        text=backdrop['inflation']['line'] if group=='inflation' else growth_line if group=='growth' else policy_line if group=='policy' else f"{group.replace('_',' ').capitalize()} observations are {trend or 'not available'}."
+        if group=='volatility':
+            text=(f"VIX is {vix:.2f} points on {observation(core,'vix').get('date')}." if vix is not None else 'VIX is unavailable or stale.')
+            if term is not None:
+                text+=f' VIX / three-month volatility is {term:.2f} on matched dates.'
+        if group=='credit_funding':
+            text=(f"High-yield spreads are {hy:.0f} basis points on {observation(core,'hy_oas').get('date')}." if hy is not None else 'High-yield spreads are unavailable or stale.')
+            if hych is not None:
+                text+=f' Spreads {"widened" if hych>=0 else "narrowed"} {abs(hych):.0f} basis points over 20 observations.'
         if group=='inflation':
             for id_ in ('cpi_headline','pce_headline'):
                 o=observation(core,id_)
