@@ -362,6 +362,14 @@
   }
   // First-view synthesis: measured supports beside measured challenges, then a conditional implication.
   // It never presumes holdings or gains, never rates a trade, and ranks nothing by colour alone.
+  function currentMessage(model, situation, fallback) {
+    if (!situation || situation.stale || situation.state === 'unavailable') return fallback;
+    const fs=(situation.measures||[]).filter(m=>['ES=F','NQ=F'].includes(m.symbol)&&m.valid&&m.newer&&!m.expired&&!m.carried&&isNum(m.pct));
+    if (new Set(fs.map(m=>m.symbol)).size !== 2 || !(situation.developments||[]).some(d=>d.rule==='index_futures')) return fallback;
+    const direction=fs.every(m=>m.pct>0)?'firmer':fs.every(m=>m.pct<0)?'under pressure':'diverging';
+    const trend=model.signals?.find(s=>s.id==='price_trend')?.status;
+    return `Newer index futures are ${direction}; the completed-session cash trend remains ${trend||'unconfirmed'}. Check the cash open before treating this as a reversal.`;
+  }
   function pricePhrase(b,sig) {
     const ms=b.macro?.price_trend?.metrics||[],c=findMetric(ms,/^SPY close$/),a50=findMetric(ms,/50-session average/),a200=findMetric(ms,/200-session average/);
     if(!sig.status||!c||!a50||!a200)return null;const u50=c.value>a50.value,u200=c.value>a200.value;
@@ -604,13 +612,13 @@
     return hi > lo ? {pos: 100 * (cur.px - lo) / (hi - lo), lo, hi} : null;
   }
 
-  const API = {focusImpact,unitValue,macroGroupLine,macroWords,takeaway,nowVsClose,nowText,coherentPair,delayedIv,signalCue,postureTone,objectiveTone,researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
+  const API = {currentMessage,focusImpact,unitValue,macroGroupLine,macroWords,takeaway,nowVsClose,nowText,coherentPair,delayedIv,signalCue,postureTone,objectiveTone,researchSetup,researchCategory,normalizedSignals,ptClock,posture,sessionComparison,todayModel,objectiveModel,catalogNote, concentrationInsight, leadershipInsight, macroInsight, basketMoves, liveConcentration, corrWord, valuationText, counterpoint, sessionWord, sectorSensitivity, factorSentence, liveBreadth, vsAverages, route, median, FACTORS, pct, px, assessments, marketRead, supportChallenge, caseFor, eventsInHorizon, compareQuestion, rangePos, addDays, CARD_ORDER, CARD_Q};
   if (typeof module !== 'undefined' && module.exports) { module.exports = API; return; }
   root.SmartOptionsMain = API;
   const doc = root.document; if (!doc) return;
 
   /* ------------------------------------------------------------ page */
-  const ASSET_V = 'client-20261019-unified2';
+  const ASSET_V = 'client-20261019-unified3';
   const Live = root.SmartOptionsLive;
   const S = root.__soMainState = {core: null, brief: null, rel: null, rowMap: new Map(), slots: [], view: null, chart: null, company: {}, onQuote: null};
   const $ = s => doc.querySelector(s);
@@ -948,23 +956,23 @@
   function situationHtml() {
     const SIT = root.SmartOptionsSituation, chk = S.sitCtl?.lastCheck();
     if (!SIT || !S.sitCtl) return '';
-    if (!S.sitCtl.get()) return chk ? `<p class="dev-none" data-sit-state="unavailable"><span class="lbl">Developing now</span> Current developments could not be checked (${esc(chk.errors[0] || 'no situation file')}). The completed-session reading below still applies. <button type="button" class="text" data-sit-retry>Check again</button></p>` : '<p class="dev-none dim" data-sit-state="pending"><span class="lbl">Developing now</span> Checking current developments…</p>';
+    if (!S.sitCtl.get()) return chk ? `<p class="current-check dim" data-sit-state="unavailable">Current developments could not be checked. <button type="button" class="text" data-sit-retry>Retry</button> ${evBtn({kind:'situation',id:'all'},'Source status','text')}</p>` : '<p class="current-check dim" data-sit-state="pending">Checking current developments…</p>';
     const m = situationModelNow(), checkFailed = chk?.ok === false; S.sitModel = m;
-    const clocks = `<p class="dim small dev-clock">As of ${esc(SIT.clock(m.generated_at))}${S.sitCtl.get()?.live ? ' · shared live check (scheduled file was stale)' : ''}${m.stale ? ' · <b>not updated for over two hours</b>' : ''}${m.degraded ? ` · <b>market: ${esc(m.marketStatus)}; reporting: ${esc(m.newsStatus)}</b>; retained evidence keeps its own clocks` : ''}${m.joinNote ? ' · ' + esc(m.joinNote) : ''}${checkFailed ? ' · <b>Latest current-context check failed; showing last good evidence</b>' : ''} ${evBtn({kind: 'situation', id: m.top[0]?.id || 'all'}, 'Evidence and sources', 'text')}</p>`;
+    const checkClock = new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(m.generated_at));
+    const clocks = `<p class="dim small dev-clock">Checked ${esc(checkClock)} ET${m.stale ? ' · <b>over two hours old</b>' : ''}${m.degraded ? ' · <b>partial coverage</b>' : ''}${checkFailed ? ' · <b>Latest current-context check failed; retained evidence</b>' : ''} ${evBtn({kind: 'situation', id: m.top[0]?.id || 'all'}, 'Sources', 'text')}</p>`;
     if (m.state === 'unavailable') return `<p class="dev-none" data-sit-state="unavailable">${esc(m.reason)} ${evBtn({kind: 'situation', id: 'all'}, 'Evidence and sources', 'text')}</p>`;
     if (!m.top.length) {
-      const old = m.retainedOld.map(x => `${x.label} last observed ${SIT.clock(x.observed_at)}`).slice(0, 2).join('; ');
-      return `<div class="dev" data-sit-state="${checkFailed && !m.stale ? 'degraded' : m.state}"><p><span class="lbl">Developing now</span> ${m.degraded || checkFailed ? 'Current developments were only partly checked; see source status.' : 'No newer measured move crossed a materiality rule and no fresh original report qualified.'}${old ? ' ' + esc(old) + '.' : ''} ${evBtn({kind: 'situation', id: 'all'}, 'What was checked', 'text')}</p>${clocks}</div>`;
+      return `<div class="current-check" data-sit-state="${checkFailed && !m.stale ? 'degraded' : m.state}"><p>${m.degraded || checkFailed ? 'Current checks are partial.' : 'No new qualifying development in this check.'} ${evBtn({kind: 'situation', id: 'all'}, 'What was checked', 'text')}</p>${clocks}</div>`;
     }
     // At most two facts, one implication each; values, clocks, bases and next checks live in the evidence sheet.
-    return `<div class="dev" data-sit-state="${checkFailed && !m.stale ? 'degraded' : m.state}" data-sit-fp="${esc(m.fingerprint)}"><h2 class="dev-h">Developing now</h2><ul class="dev-list">${m.top.map(d => `<li data-dev="${esc(d.id)}" data-dev-kind="${d.kind}"><p class="dev-fact"><b>${esc(d.brief || d.measured || d.reported)}</b>${d.kind === 'reported' ? ' <span class="small dim">(reported)</span>' : ''}${d.conflict ? ' <span class="tag warn">conflicting reports</span>' : ''}</p><p class="dev-meaning">${esc(d.interpretation)}</p></li>`).join('')}</ul>${clocks}</div>`;
+    return `<div class="dev" data-sit-state="${checkFailed && !m.stale ? 'degraded' : m.state}" data-sit-fp="${esc(m.fingerprint)}"><h2 class="dev-h">Since the close</h2><ul class="dev-list">${m.top.map(d => `<li data-dev="${esc(d.id)}" data-dev-kind="${d.kind}">${evBtn({kind: 'situation', id: d.id}, `<b>${esc(d.brief || d.measured || d.reported)}</b>${d.kind === 'reported' ? ' <span class="small dim">reported</span>' : ''}${d.conflict ? ' <span class="tag warn">conflicting reports</span>' : ''}<span aria-hidden="true">›</span>`, 'text dev-row')}</li>`).join('')}</ul><p class="dev-meaning">${esc(m.top[0].interpretation)}</p>${clocks}</div>`;
   }
-  // Newer developments replace up to two baseline reasons (never below two), so the reading does not grow.
-  function trimReasons() { const n = Math.min(2, S.sitModel?.top?.length || 0), lis = [...doc.querySelectorAll('.market-reasons > li')]; lis.forEach((li, i) => { li.hidden = i >= Math.max(2, lis.length - n); }); }
-  function paintSituation() { const el = $('#situation'); if (!el) return; const y = root.scrollY, f = doc.activeElement, fk = f && el.contains(f) ? f.dataset.ev : null; el.innerHTML = situationHtml(); trimReasons(); if (fk) el.querySelector(`[data-ev='${fk}']`)?.focus({preventScroll: true}); root.scrollTo(0, y); }
+  // Compact assessment controls retain all four dimensions; full interpretations open in their evidence sheets.
+  function trimReasons() { doc.querySelectorAll('.market-reasons > li').forEach(li => { li.hidden = false; }); }
+  function paintSituation() { const el = $('#situation'); if (!el) return; const y = root.scrollY, f = doc.activeElement, fk = f && el.contains(f) ? f.dataset.ev : null; el.innerHTML = situationHtml(); const message=doc.querySelector('[data-current-message]');if(message){const model=todayModel(S.brief,S.core);message.textContent=currentMessage(model,S.sitModel,takeaway(model,S.brief).so);}trimReasons(); if (fk) el.querySelector(`[data-ev='${fk}']`)?.focus({preventScroll: true}); root.scrollTo(0, y); }
   function situationEvidence(ev) {
     const m = situationModelNow(), SIT = root.SmartOptionsSituation;
-    if (!m || !m.measures) return {title: 'Developing situation', html: '<p>Current developments could not be checked; no situation file was available.</p>'};
+    if (!m || !m.measures) return {title: 'Developing situation', html: `<p>Current developments could not be checked; no situation file was available.</p><p>${esc(S.sitCtl?.lastCheck()?.errors?.join('; ') || 'No source receipt yet.')}</p>`};
     const d = m.developments.find(x => x.id === ev.id), imp = m.implications;
     const obsRows = m.measures.map(x => `<tr><td>${esc(x.label || x.symbol)}${x.valid ? `<br><button type="button" class="text" data-follow-reference="${esc(x.symbol)}">Follow this observation</button>` : ''}</td><td class="n">${x.valid ? esc(x.value) : 'n/a'}</td><td>${x.valid ? esc(SIT.clock(x.observed_at)) + (x.newer ? '' : ' <b>(not newer than the completed session)</b>') + (x.carried ? ' · retained from an earlier run' : '') : esc(x.reason)}</td><td>${x.valid ? esc(x.comparison.value) + ' · ' + esc(x.comparison.date) + ' · ' + esc(x.comparison.basis) : ''}</td><td class="n">${x.valid ? (x.kind === 'volatility_index' ? (x.change >= 0 ? '+' : '−') + Math.abs(x.change).toFixed(2) + ' pts' : pct(x.pct)) : ''}</td></tr>`).join('');
     const reps = (d && d.reports || m.reports.slice(0, 8)).map(r => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.headline)}</a> <span class="small dim">${esc(r.source)} · published ${esc(SIT.clock(r.published_at))} · ${r.headline_only ? 'headline only, article not read' : 'excerpt supplied'} · topic “${esc(r.topic || 'unclassified')}” · ${esc(r.match_reason || 'selected by recency and source')}</span> <button type="button" class="text" data-follow-report="${esc(r.id)}">Follow this report</button>${(r.conflicts || []).length ? ' <span class="tag warn">conflicts with ' + esc(r.conflicts.join(', ')) + '</span>' : ''}</li>`).join('');
@@ -1073,6 +1081,13 @@
     const lead = lb.sectors[0], lag = lb.sectors[lb.sectors.length - 1];
     return `${lb.up} of ${lb.n} S&amp;P 500 names priced for the ${esc(lb.session)} session${lb.n === lb.members ? '' : ` (${lb.n} of ${lb.members} members)`} were up versus their previous close ${sessionWord(lb.newest, now)} (${lb.up_pct.toFixed(0)}%).` +
       (lead && lag && lead !== lag ? ` Cap-weighted, ${esc(lead.sector)} led (${pct(lead.chg)}) and ${esc(lag.sector)} trailed (${pct(lag.chg)}).` : '') + `<span class="dim">${esc(pending)}</span>`;
+  }
+  function mapHealthSlot() {
+    const H=root.SmartOptionsHeatmap,period=S.heatPeriod||'1D';if(!H)return '';
+    const map=H.sessionMap(S.core.rows,Live.snapshot().quotes,period,S.core.asof_session),known=map.values.filter(r=>isNum(r.value));
+    if(!known.length)return '';
+    const up=known.filter(r=>r.value>0).length,sectors=map.sectors.filter(s=>isNum(s.pct)).sort((a,b)=>b.pct-a.pct),lead=sectors[0],lag=sectors[sectors.length-1];
+    return `<button type="button" class="map-health ev" data-ev="${evAttr({kind:'map-health'})}" aria-label="${Math.round(100*up/known.length)}% of mapped names higher over ${esc(period)}; open coverage and method"><span class="map-health-number"><b>${Math.round(100*up/known.length)}<span>%</span></b><span>higher · ${esc(period)}</span></span><span class="map-health-date">${up} of ${known.length} mapped names<br><span class="dim">Through ${esc(map.session)}</span></span></button>${lead&&lag?`<p class="map-leaders small"><span>Leading <a href="#/sector/${encodeURIComponent(lead.sec)}"><b>${esc(lead.sec)} ${pct(lead.pct)}</b></a></span><span>Trailing <a href="#/sector/${encodeURIComponent(lag.sec)}"><b>${esc(lag.sec)} ${pct(lag.pct)}</b></a></span></p>`:''}`;
   }
   function heatSlot() {
     const H=root.SmartOptionsHeatmap, period=S.heatPeriod||'1D';
@@ -1206,59 +1221,72 @@
   // Today: five bounded sections. Each summary owns one evidence target and one seeded deeper action.
   function prevRow(model) {
     const ids = ['spy_1d', 'vix', 'us10y'], label = {spy_1d: 'SPY', vix: 'VIX', us10y: '10Y'};
-    return `<ul class="prev-row" aria-label="Previous session">${ids.map(id => { const c = model.comparisons.find(x => x.id === id); return `<li><button type="button" class="ev prev" data-ev="${evAttr({kind: 'today-change', id})}"><span class="lbl">${label[id]}</span> <b>${esc(c.available ? (id === 'spy_1d' ? pct(c.pct) : id === 'us10y' ? fmtU(c.change, 'bp') : fmtU(c.change, 'points')) : 'n/a')}</b>${c.available ? ` <span class="small dim">${esc(id === 'us10y' ? c.x.current.value.toFixed(2) + '%' : String(c.x.current.value))}</span>` : ''}</button></li>`; }).join('')}<li><button type="button" class="text" data-ev="${evAttr({kind: 'today', id: 'positioning'})}">DXY, breadth</button></li></ul>`;
+    return `<ul class="prev-row" aria-label="Previous session">${ids.map(id => { const c = model.comparisons.find(x => x.id === id); return `<li><button type="button" class="ev prev" data-ev="${evAttr({kind: 'today-change', id})}"><span class="lbl">${label[id]}</span> <b>${esc(c.available ? (id === 'spy_1d' ? pct(c.pct) : id === 'us10y' ? fmtU(c.change, 'bp') : fmtU(c.change, 'pt')) : 'n/a')}</b>${c.available ? ` <span class="small dim">${esc(id === 'us10y' ? c.x.current.value.toFixed(2) + '%' : String(c.x.current.value))}</span>` : ''}</button></li>`; }).join('')}<li><button type="button" class="text" data-ev="${evAttr({kind: 'today', id: 'positioning'})}">DXY, breadth</button></li></ul>`;
   }
   function riskLines() {
-    const n = enteredNames().length, h = horizonEvents(S.horizon || 7), ev = h.relevant.slice(0, 2), mine = h.relevant.filter(x => x.entered).slice(0, 2);
-    const first = n ? `${n} entered equit${n === 1 ? 'y' : 'ies'}; options positions are not covered.` : 'No positions entered, so personal risk is not measured. Followed companies stay separate.';
-    const second = mine.length ? `Your nearest event: ${mine.map(x => x.title + ' ' + when(x.when)).join('; ')}.` : ev.length ? `Next listed: ${ev.map(x => `${x.title} (${when(x.when)})`).join('; ')}.${h.complete ? '' : ' Calendar coverage is partial.'}` : `No listed release in ${h.days} days; calendar coverage is ${h.complete ? 'complete for tracked sources' : 'partial'}.`;
-    return `<p>${esc(first)}</p><p>${esc(second)} ${evBtn({kind: 'event', scope: 'today', i: 0}, 'Source', 'text')}</p>`;
+    const n = enteredNames().length, h = horizonEvents(S.horizon || 7), mine = h.relevant.filter(x => x.entered);
+    const first = n ? `${n} entered equit${n === 1 ? 'y' : 'ies'} checked; open options are not covered.` : 'Add holdings to check your personal exposure.';
+    const nearest = (mine.length ? mine : n ? h.relevant.filter(x=>x.kind==='macro') : h.relevant).slice(0, 1);
+    const second = nearest.length ? `${mine.length ? 'Your next event' : 'Next tracked event'}: ${nearest[0].title} (${when(nearest[0].when)}).${h.complete ? '' : ' Partial calendar.'}` : `No tracked release in ${h.days} days; ${h.complete ? 'tracked calendar checked' : 'partial calendar'}.`;
+    return `<p data-risk-priority hidden></p><p>${esc(first)}</p><p>${esc(second)} ${nearest.length ? evBtn({kind: 'event', scope: 'today', i: h.relevant.indexOf(nearest[0])}, 'Source', 'text') : evBtn({kind: 'today', id: 'trust'}, 'Coverage', 'text')}</p>`;
   }
   function shortRow(x) {
     const s = shortSetup(x), why = ((x.why || [])[0]?.text || 'Inspect dated company evidence.').replace(/, provider quarter label [\d-]+\.?/i, '.'), obj = s.concern.measured ? s.concern.text : s.signal;
-    return `<li data-short="${esc(x.t)}"><p class="short-name"><a href="#/markets?sel=${esc(x.t)}">${esc(x.t)}</a> <span class="dim">${esc(x.name)}</span> <span class="tag" data-short-category="${esc(x.t)}">${esc(s.category)}</span></p><p class="small"><span class="lbl">Why</span> ${esc(why)}</p><p class="small" data-short-caution="${esc(x.t)}"><span class="lbl">Against</span> ${esc(obj)}</p>${evBtn({kind: 'shortlist', t: x.t}, `Evidence<span class="sr"> for ${esc(x.t)}</span>`, 'text')}</li>`;
+    return `<li data-short="${esc(x.t)}"><p class="short-name"><a href="#/markets?sel=${esc(x.t)}">${esc(x.t)}</a> <span class="dim">${esc(x.name)}</span></p><p class="short-why">${esc(why)}</p><div class="short-actions"><details class="short-risk"><summary data-short-category="${esc(x.t)}">${esc(s.category)}</summary><p data-short-caution="${esc(x.t)}"><b>Against:</b> ${esc(obj)}</p></details>${evBtn({kind: 'shortlist', t: x.t}, `Evidence<span class="sr"> for ${esc(x.t)}</span>`, 'text')}</div></li>`;
   }
   // Income environment from measured inputs (posture, VIX, the name's event date and delayed IV/RV) - separate from
   // contract premium quality, which stays unrated without option chains. One next check; the limitation sits beside it.
   function incomeBrief(model, t) {
-    const vix = model.comparisons.find(c => c.id === 'vix'), r = row(t), lvl = vix?.available ? vix.x.current.value : null;
-    const stance = /^Defensive/.test(model.label) ? 'Protect first' : model.label === 'Supportive conditions' ? 'Conditions allow income research' : 'Be selective';
-    const vol = isNum(lvl) ? `VIX was ${lvl.toFixed(1)} on ${vix.x.current.date || model.session}; it does not price a specific contract.` : 'A current volatility observation is unavailable.';
-    const days = r?.er ? Math.round((Date.parse(r.er + 'T12:00:00Z') - Date.now()) / 864e5) : null;
-    const ev = !r ? ' Choose an asset before testing a structure.' : isNum(days) && days >= 0 && days <= 45 ? ` ${t} reports ${shortDate(r.er)}: check the expiry against that event.` : isNum(days) && days > 45 ? ` ${t} reports ${shortDate(r.er)}; verify the calendar for the chosen expiry.` : ` Verify ${t}'s next earnings date before choosing an expiry.`;
-    const next = /^Defensive/.test(model.label) ? 'Review downside exposure before considering a short-premium structure.' : 'Compare a covered call only if willing to cap gains; a cash-secured put only if willing to own the shares.';
-    return `<p><b>${esc(stance)}.</b> ${esc(next)}${esc(ev)}</p><p class="small dim">${esc(vol)} Not rated - contract pricing unavailable.</p><p><a class="btn" href="#/workspace/strategies?t=${esc(t || 'SPY')}&tab=pocket">Open income workspace</a> ${evBtn({kind: 'today-change', id: 'vix'}, 'Evidence', 'text')}</p>`;
+    const income = objectiveModel(model,S.brief,horizonEvents(S.horizon||7),S.core).find(x=>x.id==='income');
+    return `<p class="decision-label" data-tone="${objectiveTone(income,model)}">${cue(objectiveTone(income,model))}<b>${esc(income.word)}</b></p><p>${esc(income.summary)}</p><p class="small dim">Contract premium quality is not rated; check live bid/ask and the expiry's event window.</p><p class="actions"><a class="btn" href="#/workspace/strategies?t=${esc(t || 'SPY')}&tab=pocket">Explore income</a> ${evBtn({kind: 'objective', id: 'income'}, 'Conditions & assumptions', 'text')}</p>`;
   }
 
   function renderBrief(main, legacy) {
     const b = S.brief, short = (b.shortlist || []).slice(0, 3), model = todayModel(b, S.core), tk = takeaway(model, b);
+    const decision=S.todayTab||'market';
     Live.watch('index', ['SPY', 'RSP']); Live.watch('research', short.map(x => x.t)); Live.watch('company', []);
     const sit = S.sitCtl?.get() ? situationModelNow() : null, reasons = firstReasons(model).slice(0, 4);
     const incomeName = enteredNames()[0] || WL().get()[0] || short[0]?.t;
     main.innerHTML = `${legacy ? `<p class="note">That older link opened Today. Use Markets or Workspace for the tool you wanted.</p>` : ''}
-      <div class="today">
-      <section class="read" id="market" aria-labelledby="read-h"><h1 id="read-h" class="page-label">Market</h1>
-        <p class="trust small"><span>${esc(shortDate(model.session))} completed session · brief ${esc(model.updated)}</span> ${evBtn({kind: 'today', id: 'trust'}, 'Data and sources', 'text')}</p>
+      <div class="today" data-today-active="${esc(decision)}">
+      <nav class="today-decisions" aria-label="Your decisions">${[['market','Brief',model.label.replace(' market conditions','').replace(' conditions','')],['my-risk','My risk',enteredNames().length?enteredNames().length+(enteredNames().length===1?' position':' positions'):'Add holdings'],['income','Income',objectiveModel(model,b,horizonEvents(S.horizon||7),S.core).find(x=>x.id==='income').word],['opportunity','Growth',short.length+' to research']].map(([id,label,status])=>`<button type="button" data-today-panel="${id}" aria-controls="${id}" aria-pressed="${decision===id}"><b>${label}</b><span>${esc(status)}</span></button>`).join('')}</nav>
+      <section class="read" id="market" aria-labelledby="read-h"><h1 id="read-h" class="sr">Today's market brief</h1>
+        <p class="trust small"><span>Cash close ${esc(shortDate(model.session))}<br>Brief ${esc(model.updated)}</span> ${evBtn({kind: 'today', id: 'trust'}, 'Sources', 'text')}</p>
         <div class="market-grid"><div class="market-main">
         <h2 class="headline" data-tone="${postureTone(model)}">${cue(postureTone(model))}<span class="headline-copy">${esc(model.label)}</span></h2>
-        <p class="tk-so">${esc(tk.so)} ${evBtn({kind: 'today', id: 'posture'}, 'Why', 'text')}</p>
+        <p class="tk-so"><span data-current-message>${esc(currentMessage(model,sit,tk.so))}</span> ${evBtn({kind: 'today', id: 'posture'}, 'Why', 'text')}</p>
         ${prevRow(model)}
         <div id="situation" class="situation" aria-live="polite">${situationHtml()}</div>
         </div><div class="market-side">
-        <ul class="market-reasons">${reasons.map(x => `<li><button type="button" class="ev reason" data-ev="${evAttr(x.ev)}">${cue(model.signals.find(s => s.id === x.ev.id)?.tone || 'neutral')}<span class="reason-copy">${esc(shortReason(x, b, model))}</span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul>
-        <p class="now-strip small">${slot('now', nowSlot)}</p>
-        <p class="next-risk" id="next-risk">${nextRisk()}</p>
+        <ul class="market-reasons assessment-grid">${model.signals.map(s => `<li><button type="button" class="ev reason" data-ev="${evAttr({kind:'assessment',id:s.id})}" aria-label="${esc(s.title+': '+s.word)}">${cue(s.tone)}<span class="reason-copy"><span class="signal-name">${esc(s.title)}</span><b>${esc(s.status ? s.status.charAt(0).toUpperCase()+s.status.slice(1) : s.word)}</b></span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul>
+        <details class="current-detail"><summary>Live prices and session context</summary><p class="now-strip small">${slot('now', nowSlot)}</p></details>
+        <div class="market-map-panel"><h2>Inside the S&amp;P 500</h2>${slot('map-health', mapHealthSlot)}<details class="market-map-detail" ${doc.documentElement.clientWidth>=1000?'open':''}><summary>Sector map</summary><div class="map-preview"><div class="map-period" role="group" aria-label="Sector map period">${['1D', '1W', '1M'].map(p => `<button data-map-period="${p}" aria-pressed="${(S.heatPeriod || '1D') === p}">${p}</button>`).join('')}</div>${slot('heat', heatSlot)}<p><a class="go" href="#/markets?p=${esc(S.heatPeriod || '1D')}" data-open-grid>Open the full market grid</a></p></div></details></div>
         </div></div>
-        <div class="map-preview"><div class="map-period" role="group" aria-label="Sector map period">${['1D', '1W', '1M'].map(p => `<button data-map-period="${p}" aria-pressed="${(S.heatPeriod || '1D') === p}">${p}</button>`).join('')}</div>${slot('heat', heatSlot)}<p><a class="go" href="#/markets?p=${esc(S.heatPeriod || '1D')}" data-open-grid>Open the full market grid</a></p></div>
       </section>
-      <div class="today-blocks"><section id="my-risk"><h2>My risk</h2>${riskLines()}<p class="actions"><a class="btn" href="#/positions">Review positions</a> <button type="button" class="btn" data-open="ahead-more">All upcoming risks</button></p>
+
+      <div class="today-blocks" data-active="${esc(decision)}"><section id="my-risk"><h2>My risk</h2>${riskLines()}<p class="actions"><a class="btn" href="#/positions">Review positions</a> <button type="button" class="btn" data-open="ahead-more">All upcoming risks</button></p>
         <details id="ahead-more" class="more"><summary>Upcoming risks and your book</summary><div id="ahead">${aheadHtml()}</div><section id="for-you" class="for-you" aria-label="For you"></section></details></section>
       <section id="income"><h2>Income</h2>${incomeBrief(model, incomeName)}</section>
       <section id="opportunity" class="research"><h2>Opportunity</h2><ul class="short-list">${short.map(shortRow).join('') || '<li>No company met the coverage rule.</li>'}</ul><p><a class="btn" href="#/companies?mode=shortlist">All eligible ideas</a></p></section></div>
-      <section id="deep-dive" class="deep-strip"><h2>Deep dive</h2><nav aria-label="Deep dive"><a href="#/markets">Markets</a><a href="#/macro">Macro</a><a href="#/explore">Compare</a><a href="#/room">Saved rooms</a><a href="#/workspace">All tools</a></nav><details><summary>Relationships and evidence to investigate</summary><div class="insights">${insightCard(concentrationInsight(S.core.rel?.vol_breadth))}${S.rel?insightCard(leadershipInsight(S.rel))+insightCard(macroInsight(S.rel,S.core)): '<p>Relationship catalog unavailable; no inferred comparison.</p>'}</div><p class="dim">${slot('live-conc',liveConcSlot)}</p></details></section>
+      <section id="deep-dive" class="deep-strip"><h2>Investigate</h2><nav aria-label="Deep dive"><a href="#/markets">Market map</a><a href="#/macro">Macro & events</a><a href="#/explore">Compare</a><a href="#/room">Saved rooms</a><a href="#/workspace">All tools</a></nav><details><summary>Relationships and evidence to investigate</summary><div class="insights">${insightCard(concentrationInsight(S.core.rel?.vol_breadth))}${S.rel?insightCard(leadershipInsight(S.rel))+insightCard(macroInsight(S.rel,S.core)): '<p>Relationship catalog unavailable; no inferred comparison.</p>'}</div><p class="dim">${slot('live-conc',liveConcSlot)}</p></details></section>
       </div>`;
-    S.personal = root.SmartOptionsInvestor.mountToday($('#for-you'), {...investorArgs(), compact: true}); S.onQuote = changed => S.personal?.quotes(changed);
+    S.personal = root.SmartOptionsInvestor.mountToday($('#for-you'), {...investorArgs(), compact: true,onReview(review){
+      const target=main.querySelector('[data-risk-priority]');if(!target)return;
+      target.hidden=review.scope!=='positions'||!review.text;
+      if(target.textContent!==review.text)target.textContent=review.text;
+    }}); S.onQuote = changed => S.personal?.quotes(changed);
+    main.querySelectorAll('[data-today-panel]').forEach(button=>{button.onclick=()=>{
+      selectTodayPanel(button.dataset.todayPanel);
+      const panel=main.querySelector('#'+button.dataset.todayPanel),heading=panel.querySelector('h2');
+      heading.tabIndex=-1;heading.focus({preventScroll:true});panel.scrollIntoView({block:'start'});
+    };});
     S.news = null; trimReasons();
+  }
+  function selectTodayPanel(id) {
+    if (!['market','my-risk','income','opportunity'].includes(id)) return;
+    const panels=doc.querySelector('.today-blocks');if(!panels)return;
+    S.todayTab=id;panels.dataset.active=id;doc.querySelector('.today').dataset.todayActive=id;
+    doc.querySelectorAll('[data-today-panel]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.todayPanel===id)));
   }
   function investorArgs() {return {core:S.core,brief:S.brief,live:Live,watch:WL(),compare:companyHref,events:()=>horizonEvents(S.horizon||7),days:()=>S.horizon||7};}
   /* ------------------------------------------------------------ saved companies (shared store) */
@@ -1352,7 +1380,7 @@
       if (ev.id === 'backdrop') html += ['growth', 'inflation', 'policy'].map(k => m.backdrop && m.backdrop[k] ? `<p><b>${GROUPS[k]}:</b> ${esc(m.backdrop[k].line)}</p>` : '').join('');
       html += `<h3>Inputs and sources</h3>${metricTable(ev.id === 'backdrop' ? ['growth', 'inflation', 'policy'].flatMap(k => (m.backdrop[k] && m.backdrop[k].metrics || []).slice(0, 4)) : obj && obj.metrics, true)}`;
       html+=`<p>Coverage: ${esc(a.coverage)}. ${esc((obj?.missing||[]).join('; '))}</p><p>Rule: ${esc(obj?.rule||'Same-cohort dated direction; levels do not establish change.')}</p><p><a href="${esc(ev.id==='participation'?W.encodeHash({s:[{id:'eq:RSP'},{id:'eq:SPY'}],r:'6m',m:'index'}):ev.id==='price_trend'?W.encodeHash({s:[{id:'eq:SPY'}],r:'1y',m:'index',ind:{sma:[50,200]}}):'#/macro')}">Open ${ev.id==='participation'?'RSP and SPY comparison':ev.id==='price_trend'?'SPY chart':'detailed Macro observations'}</a></p>`;
-      return {title: a.title, html: html + defText(a.title === 'Participation' ? 'participation average' : a.title === 'Risk conditions' ? 'VIX volatility' : a.title === 'Macro backdrop' ? 'inflation CPI' : 'average trend'), ask: {intent: {price_trend: 'pulse', participation: 'breadth', backdrop: 'pulse', risk: 'risks'}[ev.id], entities: {}}};
+      return {title: a.title, html: html + defText(a.title === 'Participation' ? 'market breadth' : a.title === 'Risk conditions' ? 'VIX volatility' : a.title === 'Macro backdrop' ? 'inflation CPI' : 'average trend'), ask: {intent: {price_trend: 'pulse', participation: 'breadth', backdrop: 'pulse', risk: 'risks'}[ev.id], entities: {}}};
     }
     if (ev.kind === 'change') {
       const d = b.daily_changes || {};
@@ -1387,6 +1415,10 @@
       }
       return {title: `${ev.t} · ${CARD_NAME[ev.id]}`, html: `<p class="dim">${esc(CARD_Q[ev.id])}</p><p class="lead"><span class="st" data-status="${esc(k.status)}">${esc(k.status)}</span> ${esc(k.line)}</p>${ev.id === 'valuation' ? `<p>${valSlot(ev.t, k)()}</p><p class="dim">Peer comparison uses the broad sector median, not a curated peer group; the company's own valuation history is not available in this build.</p>` : ''}${metricTable(k.metrics, true)}${defText(CARD_NAME[ev.id])}`,
         ask: {intent: 'ticker_card', entities: {tickers: [ev.t], card: ev.id}}};
+    }
+    if(ev.kind==='map-health') {
+      const period=S.heatPeriod||'1D',map=root.SmartOptionsHeatmap.sessionMap(S.core.rows,Live.snapshot().quotes,period,S.core.asof_session),known=map.values.filter(r=>isNum(r.value)),up=known.filter(r=>r.value>0).length;
+      return {title:'S&P map coverage and method',html:`<p class="lead">${up} of ${known.length} mapped names rose over ${esc(period)}, through ${esc(map.session)}.</p><p>Count share = positive covered returns ÷ all covered returns. Zero returns stay in the denominator. This is an equal-name count; the index and sector returns are weighted differently.</p><p>The map covers ${map.covered}/${map.members} members with positive market-cap inputs. Missing values are excluded, never treated as zero. Periods use the published 1, 5 or 21-session return. Newer incomplete sessions are not mixed with this dated map.</p><p>Tile area = published market value. Sector return = sum of each covered member's market value × its period return, divided by covered sector market value. This basket is not the official sector index.</p><p>Source: retained Yahoo Finance prices and market values. Observation: ${esc(map.session)}; dataset generated: ${esc(S.core.generated_at||S.core.asof||'see Data and sources')}. A build time is not a quote time.</p><a href="#/markets?p=${esc(period)}">Open the covered names, filters and ranking</a>`};
     }
     if (ev.kind === 'event') {
       const x = ((S.lastEvents || {})[ev.scope] || [])[ev.i];
@@ -1428,8 +1460,10 @@
       if (!['1D', '1W', '1M'].includes(x.period)) throw new Error('Unsupported map period.');
       if (S.view !== 'brief') go('#/');
       await wait(() => $(`[data-map-period="${x.period}"]`), 'map controls');
+      selectTodayPanel('market');const mapDetail=$('.market-map-detail');if(mapDetail)mapDetail.open=true;
       $(`[data-map-period="${x.period}"]`).click();
       await wait(() => S.heatPeriod === x.period && $(`[data-map-period="${x.period}"]`).getAttribute('aria-pressed') === 'true', 'map period');
+      mapDetail?.scrollIntoView({block:'start'});
       return {text: `Sector map now shows ${x.period}.`};
     }
     if (x.kind === 'expand_macro') { go('#/macro'); await wait(() => S.view === 'macro' && $('.macro-groups'), 'macro view'); return {text: 'Opened the macro observations.'}; }
@@ -1492,7 +1526,8 @@
     [/dollar|DXY/i,'DXY measures the US dollar against a currency basket in index points. A stronger dollar can change translated overseas revenue and commodity prices; company hedging and costs complicate the effect.'],
     [/VIX|volatility/i,'VIX measures option-implied variation in the S&P 500 over roughly 30 days, in annualized percentage points. Higher readings mean more expected variation, not a guaranteed price decline.'],
     [/inflation|CPI|PCE|PPI/i,'These price measures track consumer or producer costs. Year-over-year compares with the same month last year; month-over-month compares adjacent months. Higher inflation can pressure purchasing power and affect rate decisions, but the mix and expectations matter.'],
-    [/labor|payroll|employment|claims|participation/i,'Labor measures track jobs, joblessness or new benefit claims. Jobs/payrolls use counts, unemployment uses a percent of the labor force. Stronger employment can support demand but influence inflation and policy. Reference month is not the publication date.'],
+    [/market breadth/i,'Market breadth measures how many constituent stocks participate in a move. The share rising versus the prior close and the share above a moving average answer different questions. A broadening five-session trend can coexist with fewer than half of stocks above their average.'],
+    [/labor|payroll|employment|claims|labor participation/i,'Labor measures track jobs, joblessness or new benefit claims. Jobs/payrolls use counts, unemployment uses a percent of the labor force. Stronger employment can support demand but influence inflation and policy. Reference month is not the publication date.'],
     [/GDP|growth|production/i,'GDP measures economic output. Real growth removes inflation; an annualized quarterly rate extrapolates one quarter. It does not mean that rate actually occurred over a full year. Revisions and publication lags limit timely interpretation.'],
     [/average|52.week|trend/i,'A moving average smooths past regular-session prices; the 52-week range spans retained low and high prices. Price above an average describes a trend, not a forecast. Corporate actions and missing history can make comparisons unavailable.'],
     [/R²|R2|fit/i,'R² is the share of sample variation explained by this fitted relationship, between 0 and 1 for an intercept fit. A high in-sample score does not prove future accuracy. The chronological check evaluates later historical observations against a simple baseline.']
@@ -2375,15 +2410,15 @@
       $('#view').innerHTML = `<p role="alert">The published market data could not be loaded (${esc(e.message)}). Reload in a minute; saved data on this device is untouched.</p>`; return;
     }
     Live.subscribe(onQuotes);
-    doc.addEventListener('click',e=>{const b=e.target.closest('[data-map-period]');if(b){S.heatPeriod=b.dataset.mapPeriod;doc.querySelectorAll('[data-map-period]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));const heat=$('#heat');if(heat)heat.innerHTML=heatSlot();}});
+    doc.addEventListener('click',e=>{const b=e.target.closest('[data-map-period]');if(b){S.heatPeriod=b.dataset.mapPeriod;doc.querySelectorAll('[data-map-period]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));const heat=$('#heat');if(heat)heat.innerHTML=heatSlot();const health=$('#map-health');if(health)health.innerHTML=mapHealthSlot();doc.querySelectorAll('[data-open-grid]').forEach(a=>a.href='#/markets?p='+encodeURIComponent(S.heatPeriod));}});
     doc.addEventListener('keydown',e=>{if(e.key==='Escape'&&sheetOpen()){e.preventDefault();closeSheet();return;}if(e.key==='Escape'&&(doc.documentElement.classList.contains('cp-open')||e.target.closest('#cp-panel,#gs-hits,#gsearch')))return;if(e.key==='Escape'&&S.view!=='brief'&&!e.target.closest('.ex-hits')){e.preventDefault();if(root.history.state?.soParent)root.history.back();else root.location.hash='#/';}});
     WL();
     root.SmartOptionsAPI = Object.assign(root.SmartOptionsAPI || {}, {brief_action: mainAction});
     doc.addEventListener('click', e => {
-      const op=e.target.closest('[data-open]');if(op){const d=doc.getElementById(op.dataset.open);if(d){d.open=true;d.querySelector('summary')?.focus({preventScroll:true});d.scrollIntoView({block:'start'});}return;}
+      const op=e.target.closest('[data-open]');if(op){const d=doc.getElementById(op.dataset.open);if(d){selectTodayPanel(d.closest('.today-blocks>section')?.id);d.open=true;d.querySelector('summary')?.focus({preventScroll:true});d.scrollIntoView({block:'start'});}return;}
       if(e.target.closest('[data-sit-retry]')){S.sitCtl?.check();return;}
       const sc=e.target.closest('[data-scan]');if(sc){S.scanSort=sc.dataset.scan;const p=$('#ws-panel');if(p)p.innerHTML=scannerHtml();p?.querySelector(`[data-scan="${sc.dataset.scan}"]`)?.focus();return;}
-      const jump=e.target.closest('[data-jump]');if(jump){const section=doc.getElementById(jump.dataset.jump),heading=section?.querySelector('h1,h2,h3');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});section.scrollIntoView({block:'start'});}return;}
+      const jump=e.target.closest('[data-jump]');if(jump){selectTodayPanel(jump.dataset.jump);const section=doc.getElementById(jump.dataset.jump),heading=section?.querySelector('h1,h2,h3');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});section.scrollIntoView({block:'start'});}return;}
       if(e.target.closest('[data-income-search]')){$('#gsearch').focus();root.scrollTo(0,0);return;}
       const pt=e.target.closest('[data-position-t]');if(pt)S.positionTicker=pt.dataset.positionT;
       const follow = e.target.closest('[data-follow-report],[data-follow-reference],[data-follow-trend]'); if (follow) { followEvidence(follow).catch(err => focusError(err)); return; }

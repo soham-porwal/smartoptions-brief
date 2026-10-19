@@ -146,6 +146,10 @@
   function observationText(p,r){return 'Price source: '+p?.source+' · observed '+(p?.ts?humanET(p.ts):r?.pxd||'unavailable')+'. Quotes and completed-session analysis are separate clocks.';}
   function mountToday(host,a) {
     const s=data();let quoteTask=null,rowObserver=null,page=0,expanded=false,scope=host.dataset.scope||(active(s.book.get().book).length?'positions':'saved');
+    function notifyReview(res) {
+      // Local-only presentation seam: ranking and private reads remain in this owner.
+      a.onReview?.({scope,text:res.items.slice(0,2).map(x=>x.t+': '+(x.why[0]?.startsWith('Latest-session ')?pct(x.p?.change)+' · '+(x.p?.session||'session unavailable'):x.why[0])).join(' · ')});
+    }
     function draw() {
       if(!host.isConnected)return;
       const reviewOpen=host.querySelector('.personal-review')?.open||false;
@@ -153,6 +157,7 @@
       const book=s.book.get().book||{},priv=s.private.get(),names=scope==='positions'?active(book):a.watch.get(),ev=a.events(),days=a.days();
       const res=queue({names,scope,book,rows:a.core.rows,get:a.live.get,current:(r,q)=>r?a.live.currentRow(r,q):null,session:a.brief.asof_session,notes:priv.notes,prior:priv.checkpoints?.[scope],events:ev.items});
       const summary=res.summary,sector={};
+      notifyReview(res);
       names.forEach(t=>{const r=a.core.rows.find(r=>r.t===t),v=scope==='positions'?summary.items.find(p=>p.t===t)?.value:1;if(finite(v))sector[r?.sec||'Unknown']=(sector[r?.sec||'Unknown']||0)+v;});
       const start=page*24,shown=expanded?res.items.slice(start,start+24):res.items.slice(0,3);
       const relevant=ev.items.filter(e=>e.kind==='macro'||names.includes(e.t));
@@ -202,6 +207,7 @@
       if(!host.isConnected)return;
       const book=s.book.get().book||{},priv=s.private.get(),names=scope==='positions'?active(book):a.watch.get();
       const res=queue({names,scope,book,rows:a.core.rows,get:a.live.get,current:(r,q)=>r?a.live.currentRow(r,q):null,session:a.brief.asof_session,notes:priv.notes,prior:priv.checkpoints?.[scope],events:a.events().items});
+      notifyReview(res);
       host.querySelectorAll('[data-personal-t]').forEach(el=>{const x=res.items.find(x=>x.t===el.dataset.personalT);if(!x)return;el.querySelector('[data-personal-change]').textContent=changeText(x.p);el.querySelector('[data-personal-value]').textContent=valueText(x.p,res.summary,scope);el.querySelector('[data-personal-why]').textContent=x.why.join(' · ');el.querySelector('[data-personal-observation]').textContent=observationText(x.p,x.r);const att=attribution(x.r),n=el.querySelector('[data-personal-attribution]');if(att&&n)n.textContent=attributionText(att,x.p);});
       const clock=host.querySelector('.review-clock>p');if(clock)clock.textContent=res.comparison.text;
       const differences=host.querySelector('[data-review-changes]');if(differences){const html=res.comparison.items.map(x=>`<li>${esc(x.t)}: ${x.why.map(esc).join('; ')}</li>`).join('');if(differences.innerHTML!==html)differences.innerHTML=html;}

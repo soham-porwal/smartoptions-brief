@@ -127,8 +127,68 @@
 .dev-meaning{font-weight:400}
 .dev-clock{margin:.3rem 0 0}
 .prev-row{margin:.35rem 0 .5rem}
+/* Today is a short reading path. Detailed source narratives and the full grid keep their native depth. */
+.today .assessment-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.assessment-grid .reason-copy{display:grid;gap:.1rem}.assessment-grid .signal-name{font-size:15px;color:var(--dim)}
+.today .assessment-grid .reason{padding:.45rem .6rem}.assessment-grid b{font-size:17px}
+.today .prev-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.45rem}
+.prev-row li{min-width:0}.prev-row .prev{display:flex;flex-direction:column;align-items:flex-start;width:100%;height:100%;gap:.05rem;padding:.35rem .55rem}
+.prev-row .prev .lbl{margin:0}.prev-row li:last-child{grid-column:1/-1}.prev-row li:last-child .text{padding:.1rem .2rem;min-height:44px;border:0;background:none}
+.today .current-detail summary,.today .income-detail summary{color:var(--dim);font-size:15px}
+.today .dev-fact{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 .4rem}.today .dev-fact .text{padding:0;min-height:44px}
+.today .dev-clock{font-size:14px}.today .dev-clock .text{padding:0;min-height:44px}
+.today .short-why{font-size:17px}.short-actions{display:flex;align-items:flex-start;gap:.7rem;justify-content:space-between}
+.short-actions details{flex:1;min-width:0}.short-actions summary{font-size:15px;color:var(--dim)}
+.short-actions>button{flex-shrink:0}.short-risk p{font-size:17px}.today section{padding:.75rem 0}
+.market-map-detail>.map-preview{margin-top:.5rem}
+.today .trust{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin:.1rem 0 .5rem}
+.today .headline{font-size:1.55rem}.today .dev-row{display:flex;width:100%;align-items:center;justify-content:space-between;text-align:left;gap:.5rem;padding:0;min-height:44px;color:var(--fg)}
+.today .dev-meaning{margin:.25rem 0}.today .dev-clock{display:flex;align-items:center;justify-content:space-between;gap:.4rem;flex-wrap:wrap}
+.today-decisions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.4rem;margin:1rem 0 .4rem}
+.today-decisions button{display:flex;flex-direction:column;align-items:flex-start;gap:.2rem;min-height:64px;min-width:0;overflow-wrap:anywhere;padding:.5rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);font:inherit;text-align:left;cursor:pointer}
+.today-decisions span{font-size:15px;color:var(--dim)}.today-decisions button[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 -3px var(--acc)}
+@media(max-width:999px){.today-decisions{position:sticky;top:var(--hdr-h,60px);z-index:3;background:var(--bg);padding:.35rem 0}.today-blocks>section{display:none;scroll-margin-top:calc(var(--hdr-h,60px) + 92px)}.today-blocks[data-active=my-risk]>#my-risk,.today-blocks[data-active=income]>#income,.today-blocks[data-active=opportunity]>#opportunity{display:block}}
+@media(min-width:1000px){.today-decisions{display:none}}
 .mk-quote .px:has([data-live-quiet][data-state]){display:none}
 .mk-quote .quote-note{white-space:pre-line}
+/* Decision desk: typography establishes hierarchy; the market itself supplies the colour. */
+.today .headline{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:clamp(32px,3.3vw,46px);line-height:1.08;letter-spacing:-.025em;max-width:20ch;margin:.6rem 0 1rem}
+.today .tk-so{font-size:18px;line-height:1.5;max-width:58ch}
+.today button.text{border:0;background:transparent;border-radius:0;text-decoration:underline;text-underline-offset:4px;padding:.15rem .25rem;color:var(--acc)}
+.today .trust{font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line);padding-bottom:.65rem;margin-bottom:1rem}
+.today .prev-row{gap:0;margin:.75rem 0}
+.today .prev-row .prev{border:0;border-right:1px solid var(--line);border-radius:0;background:transparent;padding:.25rem .7rem}
+.today .prev-row li:first-child .prev{padding-left:0}.today .prev-row li:nth-child(3) .prev{border-right:0}
+.prev-row .prev b{font-size:23px;font-variant-numeric:tabular-nums;letter-spacing:-.025em}
+.today .assessment-grid{gap:0;margin:0}
+.today .assessment-grid li{border-bottom:1px solid var(--line)}
+.today .assessment-grid .reason{background:none;border:0;border-radius:0;min-height:72px;padding:.5rem .25rem}
+.today .assessment-grid .signal-name{font-size:14px}.today .assessment-grid b{font-size:17px}
+.today .dev{background:transparent;border-top:1px solid var(--line);border-left:3px solid var(--amber);border-radius:0;padding:.5rem 0 .35rem .85rem;margin-top:.5rem}
+.today .dev h2{font-size:15px;text-transform:uppercase;letter-spacing:.05em;font-weight:650}
+.today .dev-list{list-style:none;padding:0;margin:.25rem 0}
+.today .dev-row{border:0!important;border-radius:0!important;text-decoration:none!important;background:transparent!important;font-size:16px}
+.today .dev-meaning{font-size:16px}.today .dev-clock{font-size:13px}
+.today .market-map-detail{margin:.7rem 0 0}.today .market-map-detail>summary{font-size:18px;font-weight:650;border-top:1px solid var(--line)}
+.map-health{display:flex;align-items:center;gap:1rem;margin:.3rem 0}.map-health>div{display:flex;align-items:baseline;gap:.5rem}.map-health b{font-size:44px;line-height:1;font-weight:600;letter-spacing:-.04em;font-variant-numeric:tabular-nums}.map-health b span{font-size:23px}.map-health p{font-size:13px;line-height:1.5;margin:0;padding-left:1rem;border-left:1px solid var(--line)}
+.map-leaders{display:grid;gap:.15rem;margin:.5rem 0}.map-leaders span{display:flex;justify-content:space-between;gap:.5rem}.map-leaders b{font-weight:500}
+.map-preview .market-map svg{display:block;max-height:215px;border-radius:5px}.map-preview .sector-access summary{font-size:13px;color:var(--dim)}
+.map-preview>p{margin:0}.map-preview>p a{display:inline-flex;min-height:44px;align-items:center}
+.today .short-list li{border:0;border-top:1px solid var(--line);border-radius:0;padding:.85rem 0;background:transparent}
+.today .short-name{display:flex;align-items:baseline;gap:.5rem}.today .short-name a{font-size:22px;letter-spacing:-.02em}.today .short-name .dim{font-size:15px}
+.today .short-why{margin:.4rem 0}.today .short-actions summary{text-decoration:underline;text-underline-offset:4px}
+.today-decisions button{border-radius:0;border:0;border-bottom:2px solid var(--line);background:transparent}.today-decisions button[aria-pressed=true]{box-shadow:none;border-bottom:3px solid var(--acc)}
+.decision-label{display:flex;align-items:center;gap:.5rem}
+@media(min-width:1000px){.market-grid{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:3rem}.market-side{padding-left:2rem;border-left:1px solid var(--line)}.today .market-main{padding-right:.5rem}.today-blocks{grid-template-columns:1fr 1fr;gap:1.5rem 2rem}.today-blocks>section{border:0!important;border-top:2px solid var(--line)!important;border-radius:0;background:transparent;padding:1rem 0!important}.today-blocks>#opportunity{grid-column:1/-1}.today #opportunity .short-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:1.5rem}.today #opportunity .short-list li{border-top:0;padding:.5rem 0}.today #opportunity>p{margin:.5rem 0}.today .deep-strip{padding-top:1rem}}
+@media(max-width:599px){.today .headline{max-width:17ch}.map-preview .market-map svg{max-height:180px}.map-health b{font-size:36px}.today .market-map-detail>summary{font-size:17px}.map-leaders{font-size:13px}.today .tk-so{font-size:17px}}
+.today .headline{display:flex;flex-wrap:nowrap;align-items:flex-start;gap:.5rem}.today .headline-copy{min-width:0}.today .headline .signal-icon{font:18px/1.7 system-ui,sans-serif;flex-shrink:0}
+.market-map-panel{margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--line)}
+.today button.map-health{display:flex;align-items:center;width:100%;text-align:left;gap:1rem;padding:.25rem 0;border:0;border-radius:0;background:transparent;color:var(--fg);font:inherit;cursor:pointer}
+.map-health-number{display:flex;align-items:baseline;gap:.5rem}.map-health-date{font-size:13px;line-height:1.5;padding-left:1rem;border-left:1px solid var(--line)}
+.map-health:hover .map-health-number{text-decoration:underline;text-underline-offset:5px}.map-leaders a{display:inline-flex;align-items:center;min-height:44px}.map-leaders span{align-items:center}
+.today-decisions{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 .5rem}
+.today-decisions b{font-size:15px}.today-decisions span{font-size:13px}.today-decisions button{padding:.45rem .25rem;min-height:62px}
+@media(max-width:999px){.today:not([data-today-active=market])>#market{display:none}.today[data-today-active=market]>.today-blocks{display:none}.today-decisions{top:var(--hdr-h,60px)}.today .trust{margin-top:.5rem}.today>#market,.today .market-map-detail{scroll-margin-top:calc(var(--hdr-h,60px) + 92px)}}
 /* Legacy tools inside Workspace: readable body type and 44px targets; legacy dark desk mapped to shell tokens */
 #ws-panel .st,#ws-panel .tc,#ws-panel .cy-panel,#ws-panel .sq-card,#ws-panel .fl-embedded,#ws-panel .ed-embedded,#ws-panel .mf-page{font-size:16px;line-height:1.5}
 #ws-panel .st h4,#ws-panel .st-fam,#ws-panel .st-pt,#ws-panel .st-flip,#ws-panel .st-cap,#ws-panel .tc-foot,#ws-panel .tc-tbl{font-size:15px}
@@ -142,3 +202,23 @@
 .mk-cols p{display:flex;flex-wrap:wrap;gap:.3rem 1rem}
 /* main.css .st is a status pill; the strategy module root shares the class name. Undo the pill inside Workspace. */
 #ws-panel .st{text-transform:none;border:0;padding:0;border-radius:0;color:var(--fg);display:block;font-size:16px}
+/* Shared research language. These rules affect presentation, never tool state or calculations. */
+#view .co-head h1,#view .ws-head h1,#view .macro>h1,#view .md h1,#view .mk-head h1{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:clamp(28px,3vw,38px);line-height:1.15;letter-spacing:-.02em}
+#sheet .sheet-hd h2{font-family:Georgia,'Times New Roman',serif;font-size:27px;font-weight:400;line-height:1.2}
+#sheet .sheet-body{font-size:16px;line-height:1.6}#sheet .sheet-body h3{font-size:17px;margin:1.4rem 0 .5rem;padding-top:.6rem;border-top:1px solid var(--line)}
+#sheet .sheet-body table{font-size:14px;font-variant-numeric:tabular-nums}#sheet .sheet-body .def{padding-top:1rem;border-top:1px solid var(--line)}
+#view .co-tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;color:var(--dim);font-size:16px;padding:.5rem .9rem}
+#view .co-tabs button[aria-selected=true]{border-bottom-color:var(--acc);background:transparent;color:var(--fg);font-weight:650}
+#view .co-tabs,#view .ws-tabs{scrollbar-width:thin;overscroll-behavior-x:contain}
+#view .co .cards{grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:1rem}
+#view .co .card,#view .macro-groups>.src,#view .mk-insp{border-color:var(--line);border-radius:6px;box-shadow:none}
+#view .co .card h3,#view .ws-panel h2{letter-spacing:-.01em}
+#view .md{max-width:var(--frame);padding:1rem 0 4rem;font-size:16px;line-height:1.6}
+#view .md-widget,#view .md-thesis,#view .md-edit,#view .md-form{border-radius:6px;border-color:var(--line);box-shadow:none}
+#view .md-grid{gap:1.25rem}#view .md-widget{padding:1.1rem}#view .md-widget h3{font-size:18px;letter-spacing:-.01em}
+#view .md button,#view .md-import{border-radius:6px!important;font-size:16px!important;min-height:44px}
+#view .md select,#view .md textarea{border-radius:6px;font-size:16px}
+#view .md-sub,#view .md-mode,#view .md-meta{font-size:14px}
+#view .ws-head{padding-bottom:.75rem;border-bottom:1px solid var(--line)}
+#view .ws-panel{padding-top:1rem}#view .ws-rail a{border-radius:4px}
+@media(max-width:599px){#sheet{padding-left:16px;padding-right:16px}#view .md-grid{grid-template-columns:1fr}#view .md-full{grid-column:auto}#view .md-widget{padding:1rem}#view .co-tabs button{padding:.5rem .75rem}}

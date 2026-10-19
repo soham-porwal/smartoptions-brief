@@ -1,9 +1,9 @@
 {
   "schema": "smartoptions.release.v1",
-  "release_id": "brief-client-20261019-r27-unified",
+  "release_id": "brief-client-20261019-r28-decision-desk",
   "product": "Market Brief",
-  "built_at": "2026-10-19T06:09:15.108620+00:00",
-  "source_commit": "2810f51f57bdb551928d64a229625ba3ece9e5a3",
+  "built_at": "2026-10-19T06:59:54.497430+00:00",
+  "source_commit": "06159b0088ac0462f501923e5bea009c79ff4461",
   "data_session": "2026-10-16",
   "tickers": 509,
   "current_constituents": 503,
@@ -12,7 +12,7 @@
   "chat": "Opaque lazy popup; typed saved stock/ETF rooms and optional dated investigation focus. BYOK transport tested with synthetic keys; no real user keys read.",
   "shared_rephrasing": "optional; Cloudflare Worker with free-tier providers, each answer checked against dashboard facts",
   "price_feed": "Yahoo Finance stream for up to 100 prioritized active names; one connection. Finnhub shared within-budget 120-second fallback, then the timestamped shared snapshot. Full-index breadth uses one adequately covered dated session, not an unqualified all-index tick claim.",
-  "verification": "Parent570JS pass on2810; native51journeys pass after fund chart/facts fix (mock relay transport); measured phone3cold runs headline4680ms/shell4748ms/688670B versus baseline4675/4737/620192. Retained Sol65classy/110redesign/102viewport/56context checks pass, tested earlier UI lineage with no unrelated subsequent UI changes. Isolated Python1124pass plus1ChromeERR_NO_BUFFER_SPACE failure; exact failed test2viewport retry pass, Python unchanged since isolated6a15cdf. Independent parent actual current-public-data CUA Today/sector75constituents/SPYsearch/fund chart/popup inspected. Worker3651a90 deployed and11actual browser-origin provider/cache/quote checks pass. Full fresh producer/client mirror and actual served new UI remain PENDING; this is preview candidate approval only, not final delivery.",
+  "verification": "Parent571JS,52native stock/ETF/legacy action journeys,58source/context/room disclosure regressions,189private investor journeys,65readability/phone/desktop/quote geometry,110redesign depth/horizon/scenario/chat checks,47actual renderer decision/depth controls and9constrained-phone stress pass. Local current-Worker public-document replay and actual public-data CUA used; external relay transports in source journeys are mocked, separately deployed Worker actually verified. Three cold phone4xCPU150ms/1.6Mbps medians4713msheadline/4770msshell/692538B on ac247db immediately preceding only scroll-margin correction. Python runtime unchanged from actual full39208549170 and news39209749907 successes, no redundant collection for UI. Eight protected PNGs preserved. Actual latest preview/client UI and mirrors pending; this is preview acceptance only.",
   "screener_scores": "dated 2026-07-25 snapshot; separate from refreshed prices and fundamentals",
   "methods": "docs/BRIEF-METHODS.md",
   "notes": [

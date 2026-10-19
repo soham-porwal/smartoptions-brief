@@ -446,7 +446,10 @@
       const unavailable=predatesRow(coreRow(t),q)||!['live','older','closed','delayed'].includes(state);
       const quiet=el.hasAttribute('data-live-quiet'),note=f==='note'?quoteNote(coreRow(t),q,state,unavailable,nowMs,ST.worker.pending?.includes(t)):null;
       if(quiet||note){if(unavailable)el.dataset.state=note?note.kind:'unavailable';else delete el.dataset.state;}
-      const text=note?note.text:f==='fresh'?(state==='older'?'older quote':state==='blocked'?'source wait':state):(['price','pe','pef','chg','range','hi','since'].includes(f)&&unavailable)?(quiet?'':ST.worker.pending?.includes(t)?'Updating…':'Unavailable'):fieldText(f,d,q,nowMs);
+      // A valid dated price may lack a comparable previous close (notably ETF relay histories).
+      // Quiet price headers omit that absent change rather than printing a large placeholder beside the price.
+      // The return remains missing in the model; the source note retains its own observation time.
+      const text=note?note.text:f==='fresh'?(state==='older'?'older quote':state==='blocked'?'source wait':state):(['price','pe','pef','chg','range','hi','since'].includes(f)&&unavailable)?(quiet?'':ST.worker.pending?.includes(t)?'Updating…':'Unavailable'):quiet&&f==='chg'&&!isNum(d.chg_pct)?'':fieldText(f,d,q,nowMs);
       if(q)el.title='Last reported '+fmtPx(q.price)+' at '+(q.asof_utc||q.ts)+'; source checked '+(q.checked_at||q.retrieved_at||'unknown')+(unavailable?'; current value unavailable':'');
       if (f === 'fresh') { const c = classify(q, nowMs); el.dataset.fresh = c.word; el.title = q ? (q.provider || '') + ', trade ' + etLabel(q.asof_utc || q.ts, nowMs) + (q.checked_at||q.retrieved_at ? '; source checked ' + (q.checked_at||q.retrieved_at) : '') : 'No observation'; }
       if (f === 'range' && el.style) el.style.setProperty('--pos', isNum(d.range_pct) ? d.range_pct.toFixed(1) + '%' : '50%');
