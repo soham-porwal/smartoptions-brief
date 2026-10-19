@@ -62,7 +62,7 @@
   }
   async function loadRooms(){
     if(root.SmartOptionsMyDashboard||!root.document)return;
-    await new Promise((resolve,reject)=>{const s=root.document.createElement('script');s.src='my-dashboard.js?v=client-20261018-adaptive-rooms1';s.onload=resolve;s.onerror=()=>reject(new Error('Saved rooms failed to load.'));root.document.head.appendChild(s);});
+    await new Promise((resolve,reject)=>{const s=root.document.createElement('script');s.src='my-dashboard.js?v=client-20261018-adaptive-rooms2';s.onload=resolve;s.onerror=()=>reject(new Error('Saved rooms failed to load.'));root.document.head.appendChild(s);});
   }
   async function answer(question,direct,signal,plannerConfig){
     // Fence personal questions before context, remote planning and automatic rephrasing.
