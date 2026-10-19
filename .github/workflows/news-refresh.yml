@@ -46,7 +46,7 @@ jobs:
           if [ "$GITHUB_REPOSITORY" = 'soham-porwal/smartoptions-brief' ]; then
             python -m smartoptions.news_refresh --data-root data --work-root _pipeline/out/news --cache-root _pipeline/data/cache/news
           else
-            python -m smartoptions.news_refresh --data-root data --work-root _pipeline/out/news --cache-root _pipeline/data/cache/news --mirror-url https://soham-porwal.github.io/smartoptions-brief/data/snapshot.zip
+            python -m smartoptions.news_refresh --data-root data --work-root _pipeline/out/news --cache-root _pipeline/data/cache/news --mirror-url https://soham-porwal.github.io/smartoptions-brief/data/snapshot.zip --catch-up-full
           fi
       - name: Commit only validated news and its coordinated bundle
         if: steps.build.outcome == 'success'
@@ -55,6 +55,9 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- data/money-flow.json data/news-refresh-status.json data/snapshot.zip
           if [ -f data/situation.json ]; then git add -- data/situation.json; fi
+          # The existing client cadence can also catch a daily snapshot that finished
+          # after its daily mirror. It uses the same verified ZIP, no extra collection.
+          if [ "$GITHUB_REPOSITORY" = 'samsej/sp500-screener-dashboard' ]; then git add -- data; fi
           if ! git diff --cached --quiet; then
             git commit -m 'Refresh dated public news and the bounded situation file without recollecting fundamentals'
             # Fail on a concurrent external publication. Never rebase a stale

@@ -480,7 +480,7 @@ def refresh(data_root, work_root, cache_root, *, source_snapshot=None, offline=F
         raise
 
 
-def mirror(data_root, work_root, url, workspace=None):
+def mirror(data_root, work_root, url, workspace=None, *, bundle_bytes=None):
     """Client editions mirror the canonical snapshot without provider requests."""
     workspace = Path(workspace or Path.cwd()).resolve()
     data_root, work_root = confined(data_root, workspace), confined(work_root, workspace)
@@ -495,7 +495,9 @@ def mirror(data_root, work_root, url, workspace=None):
                    stages={})
     try:
         shutil.copytree(data_root, candidate, ignore=shutil.ignore_patterns('snapshot.zip'))
-        manifest = read_bundle(fetch_bundle(url), candidate)
+        if url != 'https://soham-porwal.github.io/smartoptions-brief/data/snapshot.zip':
+            raise ValueError('Mirror source must be the canonical public Brief snapshot')
+        manifest = read_bundle(fetch_bundle(url) if bundle_bytes is None else bundle_bytes, candidate)
         canonical = load_json(candidate / 'refresh-status.json', required=True)
         if canonical.get('status') not in ('ok', 'degraded'):
             raise ValueError('Canonical snapshot receipt does not indicate a successful build')

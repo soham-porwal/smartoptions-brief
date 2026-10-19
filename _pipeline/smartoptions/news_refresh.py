@@ -59,7 +59,23 @@ def hashes(root):
             for p in root.rglob('*') if p.is_file() and p.name not in ('money-flow.json','news-refresh-status.json','snapshot.zip','situation.json')}
 
 
-def refresh_news(data_root, work_root, cache_root, *, workspace=None, mirror_url=None, key=None, collector=None, now=None, market_fetch=None, situation_builder=None):
+def newer_full_pair(local, remote, now):
+    """A delayed client daily job is repaired by its existing news mirror cadence.
+
+    Both source clocks must advance together. The full mirror still validates the
+    whole bundle/coverage and preserves independent quote/news/situation clocks.
+    """
+    lc,lb=(load_json(local/n,required=True) for n in ('core.json','brief.json'))
+    rc,rb=(load_json(remote/n,required=True) for n in ('core.json','brief.json'))
+    clocks=[rc.get('exported_at'),rb.get('generated_at'),lc.get('exported_at'),lb.get('generated_at')]
+    if not all(clocks):return False
+    a,b,c,d=map(stamp,clocks)
+    if a>now+timedelta(minutes=10) or b>now+timedelta(minutes=10):raise ValueError('Future canonical pair')
+    if rc.get('asof_session')!=rb.get('asof_session'):raise ValueError('Canonical pair session mismatch')
+    return a>c and b>d and str(rc.get('asof_session',''))>=str(lc.get('asof_session',''))
+
+
+def refresh_news(data_root, work_root, cache_root, *, workspace=None, mirror_url=None, key=None, collector=None, now=None, market_fetch=None, situation_builder=None, catch_up_full=False):
     workspace=Path(workspace or Path.cwd()).resolve()
     data_root,work_root,cache_root=(confined(p,workspace) for p in (data_root,work_root,cache_root))
     if any(a.is_relative_to(b) for a,b in ((work_root,data_root),(data_root,work_root),(cache_root,data_root),(data_root,cache_root))):
@@ -75,9 +91,19 @@ def refresh_news(data_root, work_root, cache_root, *, workspace=None, mirror_url
         if mirror_url:
             if mirror_url!=CANONICAL:raise ValueError('Unapproved canonical news mirror')
             remote=run/'canonical';remote.mkdir()
-            manifest=read_bundle(fetch_bundle(mirror_url),remote)
+            raw_bundle=fetch_bundle(mirror_url)
+            manifest=read_bundle(raw_bundle,remote)
             incoming=load_json(remote/'money-flow.json',required=True)
             validate(incoming,now)
+            if catch_up_full and newer_full_pair(data_root,remote,now):
+                from smartoptions.refresh import mirror
+                full=mirror(data_root,run/'full-catchup',mirror_url,workspace=workspace,bundle_bytes=raw_bundle)
+                receipt['full_catchup']={'status':'ok','asof_session':full['asof_session'],'canonical_generated_at':full['canonical_generated_at']}
+                previous=load_json(data_root/'money-flow.json',required=True)
+                protected=hashes(data_root)
+                candidate=run/'data-after-full';shutil.copytree(data_root,candidate,ignore=shutil.ignore_patterns('snapshot.zip'))
+            elif catch_up_full:
+                receipt['full_catchup']={'status':'not_needed'}
             if previous.get('news_status',{}).get('retrieved_at') and stamp(incoming['news_status']['retrieved_at'])<stamp(previous['news_status']['retrieved_at']):
                 raise ValueError('Canonical news would move collection backward')
             result={**previous,**{k:incoming.get(k,[]) if k!='news_status' else incoming[k] for k in NEWS_FIELDS}}
@@ -159,6 +185,7 @@ def main():
     parser.add_argument('--data-root',type=Path,required=True);parser.add_argument('--work-root',type=Path,required=True)
     parser.add_argument('--cache-root',type=Path,default=Path('_pipeline/data/cache/news'))
     parser.add_argument('--workspace',type=Path,default=Path.cwd());parser.add_argument('--mirror-url')
+    parser.add_argument('--catch-up-full',action='store_true',help='Reuse a newer canonical full bundle on the existing client news cadence; no provider collection')
     args=parser.parse_args()
     try:
         receipt=refresh_news(**vars(args));print(json.dumps(receipt,sort_keys=True));return 0
